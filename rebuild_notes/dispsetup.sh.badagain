@@ -1,8 +1,0 @@
-#!/bin/sh
-if xrandr --output HDMI-1 --primary --mode 1920x1080 --rate 60.000 --pos 0x0 --rotate normal --output HDMI-2 --mode 1920x1080 --rate 60.000 --pos 1920x0 --rotate inverted --dryrun; then
-	xrandr --output HDMI-1 --primary --mode 1920x1080 --rate 60.000 --pos 0x0 --rotate normal --output HDMI-2 --mode 1920x1080 --rate 60.000 --pos 1920x0 --rotate inverted
-fi
-if [ -e /usr/share/ovscsetup.sh ] ; then
-	/usr/share/ovscsetup.sh
-fi
-exit 0
