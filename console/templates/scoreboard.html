@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Pixel Challenge – Scoreboard{% endblock %}
+{% block body_class %}scoreboard-page{% endblock %}
+
+{% block content %}
+<div class="scoreboard-wrapper">
+
+  <header class="sb-header">
+    <h1 class="sb-title" aria-label="Pixel Challenge"><span aria-hidden="true">&#127942;</span> Pixel Challenge</h1>
+    <div class="sb-meta">
+      <span id="sb-game-name"></span>
+      <span id="sb-round"></span>
+      <span id="sb-status" class="sb-status-badge"></span>
+    </div>
+  </header>
+
+  <!-- Leaderboard grid -->
+  <section class="sb-leaderboard" id="sb-leaderboard">
+    <p class="sb-waiting" id="sb-waiting">Waiting for players&#8230;</p>
+  </section>
+
+  <!-- Activity ticker -->
+  <footer class="sb-ticker">
+    <ul id="sb-ticker-list" class="sb-ticker-list"></ul>
+  </footer>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Real-time updates via Server-Sent Events
+const es = new EventSource("/api/events");
+es.onmessage = function(e) { applyState(JSON.parse(e.data)); };
+es.onerror   = function()  { console.warn("SSE connection lost, will retry"); };
+
+function applyState(state) {
+  document.getElementById("sb-game-name").textContent = state.game_name || "";
+  document.getElementById("sb-round").textContent =
+    state.round ? "Round " + state.round + " / " + state.max_rounds : "";
+
+  var statusEl = document.getElementById("sb-status");
+  statusEl.textContent = capitalize(state.status || "");
+  statusEl.className = "sb-status-badge badge-" + (state.status || "idle");
+
+  renderLeaderboard(state.players || []);
+  renderTicker(state.recent_events || []);
+}
+
+var _prevScores = {};
+
+function renderLeaderboard(players) {
+  var container = document.getElementById("sb-leaderboard");
+
+  if (!players.length) {
+    container.innerHTML = '<p class="sb-waiting">Waiting for players&#8230;</p>';
+    return;
+  }
+
+  var sorted = players.slice().sort(function(a, b) { return b.score - a.score; });
+  var maxScore = sorted[0] ? sorted[0].score : 1;
+  if (maxScore === 0) maxScore = 1;
+
+  var html = sorted.map(function(p, rank) {
+    var isNew    = !(p.id in _prevScores);
+    var changed  = !isNew && _prevScores[p.id] !== p.score;
+    var barPct   = Math.round((p.score / maxScore) * 100);
+    var medals   = ["&#129351;", "&#129352;", "&#129353;"];
+    var medal    = rank < 3 ? medals[rank] : (rank + 1) + ".";
+    var cls      = "sb-card" + (rank === 0 ? " sb-card--first" : "") + (changed ? " score-bump" : "");
+    return '<div class="' + cls + '" id="card-' + p.id + '"'
+      + ' style="--player-color:rgb(' + p.color_rgb.join(",") + ')">'
+      + '<div class="sb-card-rank">' + medal + '</div>'
+      + '<div class="sb-card-body">'
+      + '<div class="sb-card-name">' + esc(p.name) + '</div>'
+      + '<div class="sb-card-bar-track"><div class="sb-card-bar" style="width:' + barPct + '%"></div></div>'
+      + '</div>'
+      + '<div class="sb-card-score">' + p.score + '</div>'
+      + '</div>';
+  }).join("");
+
+  container.innerHTML = html;
+
+  players.forEach(function(p) { _prevScores[p.id] = p.score; });
+
+  container.querySelectorAll(".score-bump").forEach(function(el) {
+    setTimeout(function() { el.classList.remove("score-bump"); }, 600);
+  });
+}
+
+function renderTicker(events) {
+  var ul = document.getElementById("sb-ticker-list");
+  ul.innerHTML = events.slice().reverse().slice(0, 8).map(function(e) {
+    return '<li><span class="ticker-pts">' + (e.delta > 0 ? "+" : "") + e.delta + '</span> '
+      + esc(e.player_name) + ' &#8211; ' + esc(e.reason) + '</li>';
+  }).join("");
+}
+
+function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+</script>
+{% endblock %}

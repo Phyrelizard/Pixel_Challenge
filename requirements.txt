@@ -1,0 +1,12 @@
+# Pixel Challenge – Python dependencies
+#
+# Install with:   pip install -r requirements.txt
+#
+# Core web framework (real-time scoreboard uses SSE – no extra JS library needed)
+flask>=3.0,<4
+
+# E1.31 / sACN support (WS2811 via Falcon controller)
+# sacn>=1.9   # uncomment when using physical hardware
+
+# Joystick input (only needed on the Pi with real joysticks)
+# inputs>=0.5  # uncomment when using physical hardware
