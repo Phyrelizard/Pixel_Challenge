@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Runtime/generated files
+viewer_command.txt
+scoreboard_data.json
+controller_assignments.json
+score_history.json
+
+# Logs/temp
+*.log
+*.tmp

@@ -1,0 +1,879 @@
+ping falcon
+ping 192.168.2.113
+sudo apt update
+sudo apt -y full-upgrade
+sudo reboot
+pip install python-sacn gpiozero
+sudo apt install -y python3-venv python3-full python3-gpiozero
+mkdir -p ~/easter_game
+cd ~/easter_game
+python3 -m venv .venv --system-site-packages  
+python3 -m venv .venv --system-site-packages 
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install python-sacn 
+cd ~/easter_game
+source .venv/bin/activate
+python -m pip install sacn 
+sudo apt install -y python3-gpiozero
+python -c "import sacn; print('sacn OK')"
+python -c "import gpiozero; print('gpiozero OK')"
+import sacn
+sender = sacn.sACNsender()
+nano countdown_runner_demo.py
+python3 one_lane_test.py
+nano one_lane_test.py
+python3 one_lane_test.py
+nano one_lane_test.py
+python3 one_lane_test.py
+nano one_lane_test.py
+nano one_lane_test2.py
+python3 one_lane_test2.py
+ifconfig
+ping 192.168.2.113
+sudo apt -y install python3-pip python3-vencv
+sudo apt -y install python3-pip python3-venv
+python3 -m venv ~/eastergame-venv
+source ~/eastergame-venv/bin/activate
+pip install python-sacn gpiozero
+exit
+lsusb
+cat /proc/bus/input/devices
+sudo apt install -y joystick
+jstest /dev/input/js0
+dir
+dir ;ad
+dir /ad
+cd ~/easter_game
+source .venv/bin/activate
+python -m pip install evdev
+nano ~/easter_game/map_controller.py
+python map_controller.py
+nano ~/easter_game/map_controller.py
+python map_controller.py
+source .venv/bin/activate
+python map_controller.py
+dir
+ll
+ls
+rm map_controller.py
+nano ~/easter_game/map_controller.py
+python map_controller.py
+jstest /dev/input/js0
+rm map_controller.py
+nano ~/easter_game/map_controller.py
+python map_controller.py
+jstest /dev/input/js0
+python -m pip install pygame
+nano ~/easter_game/js0_monitor.py
+python js0_monitor.py
+head
+cat controller+_map_p1.json
+dir
+cat controller_map_p1.json
+mv controller_map_p1.json_old
+mv controller_map_p1.json controller_map_p1.json_old
+ll
+ls
+nano ~/easter_game/controller_map_p1.json
+p1_input_test.py
+ll
+ls
+ls -al
+nano p1_input_test.py
+python -m pip install pygame
+python p1_input_test.py
+ls -al
+mv one_lane_test.py one_lane_test.py_using_gpio17
+nano one_lane_color_test.py
+python one_lane_color_test.py
+nano one_lane_color_test.py
+python one_lane_color_test.py
+shutdown
+cd ~/easter_game
+python one_lane_color_test.py
+source .venv/bin/activate
+python one_lane_color_test.py
+cat /proc/bus/input/devices | grep -A3 -B1 -i "DragonRise"
+cat /proc/bus/input/devices | sed -n '/DragonRise/,/^\s*$/p'
+python one_lane_color_test.py
+shutdown
+ls
+cd easter_game
+ls
+ls-al
+ls -al
+jstest --list
+cd ..
+ls
+pwd
+cd ~/easter_game
+source .venv/bin/activate
+sudo apt update
+sudo apt install -y joystick
+jstest --list
+jstest /dev/input/js0
+jstest /dev/input/js1
+python map_controller_js.py 1 controller_map_p2.json
+source .venv/bin/activate
+python map_controller_js.py 1 controller_map_p2.json
+ls =-al;
+ls -al
+ls -la
+nano map_controller_js.py
+python -m pip install pygame
+python map_controller_js.py 1 controller_map_p2.json
+cat controller_map_p2.json
+ls -la
+nano two_lane_color_test.py
+python two_lane_color_test.py
+ls -al
+cd easter_game
+ls
+ls -al
+two_lane_color_test.py
+ls -l /dev/input/js*
+jstest /dev/input/js0
+jstest /dev/input/js1
+jstest /dev/input/js2
+jstest /dev/input/js3
+cd ~/easter_game
+source .venv/bin/activate
+python -c "import sacn; print('sacn OK')"
+python two_lane_color_test.py
+ping -c 20 192.168.2.113
+sudo apt install -y tcpdump
+sudo tcpdump -n -i eth0 udp and port 5568
+python two_lane_color_test.py
+ip route get 192.168.2.113
+sudo tcpdump -n -i eth0 udp port 5568
+ping -c 3 192.168.2.113
+sudo tcpdump -n -i eth0 udp
+ls -l /dev/input/js*
+sudo tcpdump -n -i eth0 udp and host 192.168.2.113
+ip route get 192.168.2.113
+ip -br addr
+sudo tcpdump -n -i eth0 udp
+sudo tcpdump -n -i eth0 udp and host 192.168.2.113
+sudo ip link set wlan0 down
+sudo ip link set wlan0 up
+nano two_lane_color_test.py
+cat  two_lane_color_test.py
+nano two_lane_color_test.py
+mv two_lane_color_test.py two_lane_color_test_chan1_lag.py
+nano two_lane_color_test.py
+python two_lane_color_test.py
+sudo ss -uapn | grep 5568
+ps aux | grep -E "python|two_lane|one_lane" | grep -v grep
+sudo ss -uapn | grep 5568
+ps aux | grep -E "python|two_lane|one_lane" | grep -v grep
+sudo ip link set wlan0 down
+sudo ip link set wlan0 up
+python two_lane_color_test.py
+sudo ip link set wlan0 down
+python two_lane_color_test.py
+[200~sudo ss -uapn | grep 5568~
+sudo ss -uapn | grep 5568
+mv two_lane_color_test.py two_lane_color_test_old3.py
+nano two_lane_color_test.py
+python two_lane_color_test.py
+ls
+cd eastergame-venv
+ls
+cd ~/eastergame-venv
+ls -al
+python two_lane_color_test.py
+source .venv/bin/activate
+cd ~/easter_game
+source .venv/bin/activate
+python two_lane_color_test.py
+nano two_lane_color_test.py
+python two_lane_color_test.py
+nano two_lane_color_test.py
+python two_lane_color_test.py
+ls
+python one_lane_color_test.py
+nano two_lane_color_test.py
+python two_lane_color_test.py
+cd ~/easter_game
+ls
+ls -al
+ls -l /dev/input/js0
+ls -l /dev/input/js1
+ls -l /dev/input/js*
+source .venv/bion/activate
+source .venv/bin/activate
+python two_lane_color_test.py
+ls -l /dev/input/js*
+python two_lane_color_test.py
+cp two_lane_color_test.py two_lane_color_test_backup.py
+nano four_lane_color_test.py
+python four_lane_color_test.py
+nano eight_lane_lane_select_demo.py
+python eight_lane_lane_select_demo.py
+cp  eight_lane_lane_select_demo.py eight_lane_lane_select_demo_backup.py
+python eight_lane_lane_select_demo.py
+cd ~/easter_game
+source .venv/bin/activate
+nano pixel_challenge_console_v1.py
+python pixel_challenge_console_v1.py
+mv pixel_challenge_console_v1.py pixel_challenge_console_v1_backup.py
+nano pixel_challenge_console_v2.py
+ls -al
+
+
+nano pixel_challenge_console_v4.py
+ls -al
+cat  eight_lane_lane_select_demo.py
+python  eight_lane_lane_select_demo.py
+nano pixel_challenge_console_v4.py
+pip install pygame
+nano pixel_challenge_console_v5.py
+ls error
+ls -al
+cat error.txt
+nano pixel_challenge_console_v6.py
+cd ~/easter_game
+source .venv/bin/activate
+ls -al
+pixel_challenge_console_v1.py
+python pixel_challenge_console_v1.py
+python pixel_challenge_console_v2.py
+python pixel_challenge_console_v3.py
+python pixel_challenge_console_v4.py
+python pixel_challenge_console_v5.py
+python pixel_challenge_console_v5.py > error.txt
+python pixel_challenge_console_v5.py
+python pixel_challenge_console_v6.py
+cd ~/easter_game
+source .venv/bin/activate
+ls -al
+python eight_lane_lane_select_demo.py
+cd ~/easter_gme
+cd ~/easter_game
+source .venv/bin/activate
+ls -al
+python pixel_challenge_console_v6.py
+ls -al
+python pixel_challenge_console_v6.py
+pwd
+cd ~/easter_game
+source .venv/bin/activate
+ls
+python pixel_challenge_console_v6.py
+ls -al
+python pixel_challenge_console_v6.py
+xrandr --listmonitors
+ls -al
+python pixel_challenge_viewer.py
+pwd
+cd ~/easter_game
+source .venv/bin/activate
+kls -al
+ls -al
+python pixel_challenge_console_v6.py
+ls -al
+cat pixel_challenge_console_v6.py
+xrandr --listmonitors
+ls
+cd asse*
+ls
+pwd
+pip install pillow
+nano pixel_challenge_viewer.py
+python pixel_challenge_viewer.py
+pip install --upgrade pillow
+which python
+python -c "from PIL import Image, ImageTk; print('ok')"
+python pixel_challenge_viewer.py
+ll
+ls
+ls -al
+cp pixel_challenge_viewer.py /home/ledgame/easter_game/pixel_challenge_viewer.py
+cd ..
+ls
+ls -al
+python pixel_challenge_viewer.py
+ls -al
+pwd
+ls -al | grep v6 && pwd
+ls -al /home/ledgame/easter_game | grep viewer
+nano start_viewer.sh
+nano start_console.sh
+mkdir -p /home/ledgame/.config/autostart
+nano /home/ledgame/.config/autostart/pixel_challenge_viewer.desktop
+nano /home/ledgame/.config/autostart/pixel_challenge_console.desktop
+sudo reboot
+cd ~/easter_game
+source .venv/bin/activate
+ls
+python pixel_challenge_viewer.py
+start_console.sh
+start_viewer.sh
+pwd
+cd easter_game
+start_viewer.sh
+ls
+start_viewer.sh
+./start_viewer.sh
+sudo reboot
+cd ~/easter_game
+source .venv/bin/activate
+ls
+/home/ledgame/easter_game/start_viewer.sh
+/home/ledgame/easter_game/start_console.sh
+chmod +x /home/ledgame/easter_game/start_viewer.sh
+chmod +x /home/ledgame/easter_game/start_console.sh
+sudo chmod +x /home/ledgame/easter_game/start_viewer.sh
+sudo chmod +x /home/ledgame/easter_game/start_console.sh
+ls -l /home/ledgame/easter_game/start_viewer.sh
+ls -l /home/ledgame/easter_game/start_console.sh
+/home/ledgame/easter_game/start_viewer.sh
+/home/ledgame/easter_game/start_console.sh
+cd easter_game
+ls
+ll
+ls -al
+ps-ef
+ps -ef
+nano /home/ledgame/easter_game/pixel_challenge_console_v6.py
+nano /home/ledgame/easter_game/start_console.sh
+chmod +x /home/ledgame/easter_game/start_console.sh
+/home/ledgame/easter_game/start_console.sh
+sudo reboot
+cd easter_game
+ls -al
+ps -ef
+ps -ef |grep easter
+kill 1536
+pwd
+cd assets
+ls
+which cvlc vlc mpv ffplay
+nano /home/ledgame/easter_game/pixel_challenge_viewer.py
+ls -al | grep viewer
+mv pixel_challenge_viewer.py pixel_challenge_viewer_before_disp_intro.py
+nano /home/ledgame/easter_game/pixel_challenge_viewer.py
+ls -al | grep viewer
+ls -al
+nano pixel_challenge_viewer.py
+cd ..cd 
+cd ..
+ls
+ll
+ls =-al
+ls -al
+nano pixel_challenge_console_v6.py
+nano pixel_challenge_console_v7.py
+ls -al
+nano start_console.sh
+./start_viewer.sh
+./start_console.sh &&
+./ start_console.sh
+./start_console.sh
+ps -ef | grep easter
+kill 3979
+sudo reboot
+cd easter_game
+cvlc --fullscreen --opklay-and-exit --no-video-title-show /home/ledgame/easter_game/assets/dot_dash_test_intro.mp4
+cvlc --fullscreen --play-and-exit --no-video-title-show /home/ledgame/easter_game/assets/dot_dash_test_intro.mp4
+cd easter_ame
+cd easter_gasme
+cd easter_game
+;s
+ls -al
+cat viewer_command.txt
+cd assets
+ls
+ll
+ls
+./dot_dash_test_intro.mp4
+ps -ef
+ps -ef | grep viewer
+kill 1519
+cvlc --fullscreen --play-and-exit --no-video-title-show /home/ledgame/easter_game/assets/dot_dash_test_intro.mp4
+cd easter_game
+ls pixel_challenge_viewer
+ls pixel_challenge_viewer.py
+mv pixel_challenge_viewer.py pixel_challenge_viewer_old.py
+nano pixel_challenge_viewer.py
+sudo reboot
+cd easter_game
+ls
+ll
+cd pixel_challenge_viewer.py
+python pixel_challenge_viewer.py &
+ps -ef
+ps -ef |grep viewer
+kill 1522
+ps-ef
+ps -ef
+ps -ef | grep vlc
+ls *.txt
+ls
+cd easter_game
+ls &*.txt
+ls *.txt
+ls -al
+cat viewer_command.txt
+PLAY_VIDEO|/home/ledgame/easter_game/assets/dot_dash_test_intro.mp4
+printf 'PLAY_VIDEO|/home/ledgame/easter_game/assets/dot_dash_test_intro.mp4\n' > /home/ledgame/easter_game/viewer_command.txt
+python pixel_challenge_viewer.py &
+ls -l /home/ledgame/easter_game/viewer_command.txt
+sudo reboot
+python /home/ledgame/easter_game/pixel_challenge_viewer.py
+source /home/ledgame/easter_game/.venv/bin/activate
+python /home/ledgame/easter_game/pixel_challenge_viewer.py
+cd easter_GAME
+cd easter_game
+source .venv/bin/activate
+python /home/ledgame/easter_game/pixel_challenge_viewer.py
+/home/ledgame/easter_game/.venv/bin/python /home/ledgame/easter_game/pixel_challenge_viewer.py
+cd easter_game
+source .venv/bin/activate
+/home/ledgame/easter_game/.venv/bin/python /home/ledgame/easter_game/pixel_challenge_viewer.py
+cd easter_game
+ls
+ll
+ls
+ls -l /home/ledgame/easter_game/viewer_command.txt
+cat /home/ledgame/easter_game/viewer_command.txt
+ps -ef | grep pixel_challenge_viewer
+pkill -f pixel_challenge_viewer.py
+python /home/ledgame/easter_game/pixel_challenge_viewer.py
+ls -l /home/ledgame/easter_game/viewer_command.txt
+printf 'PLAY_VIDEO|/home/ledgame/easter_game/assets/dot_dash_test_intro.mp4\n' > /home/ledgame/easter_game/viewer_command.txt
+ls -l /home/ledgame/easter_game/viewer_command.txt
+pkill -f pixel_challenge_viewer.py
+ps -ef | grep pixel_challenge_viewer.py
+printf 'PLAY_VIDEO|/home/ledgame/easter_game/assets/dot_dash_test_intro.mp4\n' > /home/ledgame/easter_game/viewer_command.txt
+ls -l /home/ledgame/easter_game/viewer_command.txt
+nano pixel_challenge_viewer.py
+cat pixel_challenge_viewer.py
+ll
+ls
+rm pixel_challenge_viewer.py
+nano pixel_challenge_viewer.py
+pkill -f pixel_challenge_viewer.py
+/home/ledgame/easter_game/.venv/bin/python /home/ledgame/easter_game/pixel_challenge_viewer.py &
+pkill -f pixel_challenge_viewer.py
+printf 'PLAY_VIDEO|/home/ledgame/easter_game/assets/dot_dash_test_intro.mp4\n' > /home/ledgame/easter_game/viewer_command.txt
+sudo reboot
+cd easter_)game
+cd easter_game
+source .venv/bin/activate
+ls
+nano pixel_challenge_viewer.py
+sudo reboot
+cd easter_game
+source .venv/bin/activate
+ls *viewer
+ls | grep viewer
+mv pixel_challenge_viewer.py pixel_challenge_viewer_broken.py
+nano pixel_challenge_viewer.py
+sudo reboot
+cd easter_game
+ls
+mv pixel_challenge_viewer.py pixel_challenge_viewer_not_working.py
+nano pixel_challenge_viewer.py
+sudo reboot
+cd easter_game
+source .venv/bin/activate
+ls
+mv pixel_challenge_viewer.py pixel_challenge_viewer_not_working.py
+nano pixel_challenge_viewer.py
+sudo reboot
+cd easter_game
+source .venv/bin/activate
+mv pixel_challenge_viewer.py pixel_challenge_viewer_works_but exposes_desktop1second.py
+lsd
+ls
+mv pixel_challenge_viewer.py pixel_challenge_viewer_works_but exposes_desktop1second.py
+mv pixel_challenge_viewer.py pixel_challenge_viewer_works_but_exposes_desktop1second.py
+nano pixel_challenge_viewer.py
+sudo reboot
+ps -ef | grep viewer
+kill 1486
+cd easter_game
+source .venv/bin/activate
+ls
+cp pixel_challenge_viewer_works_but_exposes_desktop1second.py pixel_challenge_viewer.py
+sudo reboot
+cd easter_game
+ls
+cd assets
+ls
+mv dot_dash_intro.mp4 dot_dash_test_intro.mp4
+ps -ef
+ps -ef | grep viewer
+kill 1541
+python /home/ledgame/easter_game/pixel_challenge_viewer.py
+source .venv/bin/activate
+cd easter_game
+cd ..
+source .venv/bin/activate
+python /home/ledgame/easter_game/pixel_challenge_viewer.py
+sudo reboot
+cd easter_gasme
+cd easter_game
+source .venv/bin/activate
+ls
+cat pixel_challenge_console_v7.py
+sudo reboot
+cd easter_game
+source .venv/bin/activate
+ls
+nano pixel_challenge_console_v8.py
+cd easter_game
+source .venv/bin/activate
+ls
+cd easter_game
+source .venv/bin/activate
+ls
+nano pixel_challenge_console_v7.py
+nano pixel_challenge_console_v8.py
+ps -ef | grep vieweer
+ps -ef | grep viewer
+kill 1527
+cd easter_game
+source .venv/bin/activate
+ls
+nano pixel_challenge_console_v8.py
+sudo reboot
+cd easter_game
+source .venv/bin/activate
+ls
+nano pixel_challenge_console_v8.py
+cd easter_game
+ls
+nano pixel_challenge_console_v8.py
+ls
+cd easter_game
+source .venv/bin/activate
+ls
+nano start_console.sh
+sudo reboot
+ls
+cd easter_game
+ls
+source .venv/bin/activate
+ls
+nano start_viewer.sh
+nano pixel_challenge_console_v8.py
+cd assets
+ls
+mv dot_dash_test_intro.mp4 dot_dash_intro.mp4
+sudo reboot
+cd easter_game
+source .venv/bin/activate
+ls
+head pixel_challenge_console_v8.py
+nano pixel_challenge_console_v9.py
+cd easter_gasme
+cd easter_game
+source .venv/bin/activate
+ls
+nano pixel_challenge_console_v9.py
+cd easter_game
+source .venv/bin/activate
+ls -al
+nano pixel_challenge_console_v9.py
+ls
+cd easter_game
+source .venv/bin/activate
+nano pixel_challenge_console_v9.py
+cd easter_game
+nano pixel_challenge_console_v9.py
+sudo reboot
+cd easter_games
+cd eraster_games
+cd easter_games
+ls
+cd easter_game
+source .venv/bin/activate
+cd assets
+ls
+cp dot_dash_intro.mp4 pixel_pop__intro.mp4
+cp dot_dash_intro.mp4 pixel_pop_intro.mp4
+cp dot_dash_intro.mp4 surround_intro.mp4
+cp dot_dash_intro.mp4 ascend_intro.mp4
+ls
+ls -al
+rm pixel_pop__intro.mp4
+ls -al
+ls -a
+ls -al
+cd ..
+ls
+nano pixel_challenge_console_v10.py
+cd easter_game
+sourc .venv/bin/activate
+source .venv/bin/activate
+ls -al
+nano pixel_challenge_console_v11.py
+source .venv/bin/activate
+cd easter_game
+ls
+nano pixel_challenge_console_v11.py
+cd easter_game
+source .venv/bin/activate
+nano pixel_challenge_console_v11.py
+echo test
+abc
+rpi-connect status
+nano pixel_challenge_console_test_cutpaste.py
+cd easter_game
+source .venv/bin/activate
+nano pixel_challenge_console_test_cutpaste.py
+nano pixel_challenge_console_v11.py
+ls
+nano start_console.sh
+sudo reboot
+cd easter_game
+source .venv/bin/activate
+nano /home/ledgame/Desktop/PixelChallengeConsole.desktop
+chmod +x /home/ledgame/Desktop/PixelChallengeConsole.desktop
+nano pixel_challenge_console_v12.py
+nano start_console.sh
+nano pixel_challenge_console_v13.py
+nano start_console.sh
+nano pixel_challenge_console_v13.1.py
+nano start_console.sh
+start_console.sh
+python start_console.sh
+./start_console.sh
+nano pixel_challenge_console_v13.2.py
+nano start_console.sh
+./start_console.sh
+ls
+head -50  pixel_challenge_console_v13.2.py
+top
+nano pixel_challenge_console_v14.0.1.py
+nano start_console.sh
+./start_console.sh
+./start_console.sh &
+nano pixel_challenge_console_v14.0.2.py
+cd easter_game
+source .venv/bin/activate
+nano pixel_challenge_console_v14.0.2.py
+nano start_console.sh
+./start_console.sh 
+ls
+rm pixel_challenge_console_v14.0.2.py
+nano pixel_challenge_console_v14.0.2.py
+./start_console.sh 
+cp   pixel_challenge_console_v14.0.2.py  pixel_challenge_console_v14.0.3.py
+nano  pixel_challenge_console_v14.0.3.py
+rm pixel_challenge_console_v14.0.3.py
+nano pixel_challenge_console_v14.0.3.py
+nano start_console.sh
+ffprobe -hide_banner /home/ledgame/easter_game/assets/dot_dash_intro.mp4
+ffplay -autoexit -fs /home/ledgame/easter_game/assets/dot_dash_intro.mp4
+mpv --fullscreen /home/ledgame/easter_game/assets/dot_dash_intro.mp4
+cvlc --fullscreen --play-and-exit /home/ledgame/easter_game/assets/dot_dash_intro.mp4
+ffplay -nodisp -autoexit /home/ledgame/easter_game/assets/dot_dash_intro.mp4
+ffmpeg -y -i /home/ledgame/easter_game/assets/dot_dash_intro.mp4 -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -r 20 -b:v 1200k -maxrate 1200k -bufsize 2400k -c:a aac -b:a 128k -ar 44100 -ac 2 -movflags +faststart /home/ledgame/easter_game/assets/dot_dash_intro_pi.mp4
+cvlc --fullscreen --play-and-exit /home/ledgame/easter_game/assets/dot_dash_intro_pi.mp4
+top
+https://chatgpt.com/c/69b36b27-22fc-832c-8993-29e81129615d
+time cvlc --fullscreen --play-and-exit --no-video-title-show /home/ledgame/easter_game/assets/dot_dash_intro_pi_small.mp4
+cd easter_game
+source .venv/bin/activate
+cvic --fullscreen --play-and-exit /home/ledgame/easter_game/assets/dot_dash_intro.mp4
+cvlc --fullscreen --play-and-exit /home/ledgame/easter_game/assets/dot_dash_intro.mp4
+cvlc --fullscreen --play-and-exit /home/ledgame/easter_game/assets/dot_dash_into_pi.mp4
+cvlc --fullscreen --play-and-exit /home/ledgame/easter_game/assets/dot_dash_intro_pi.mp4
+time cvlc --fullscreen --play-and-exit /home/ledgame/easter_game/assets/dot_dash_intro_pi.mp4
+time ffplay =autoexit -fs  /home/ledgame/easter_game/assets/dot_dash_intro_pi.mp4
+time ffplay -autoexit -fs  /home/ledgame/easter_game/assets/dot_dash_intro_pi.mp4
+time ffplay -autoexit -fs  /home/ledgame/easter_game/assets/dot_dash_intro.mp4
+time cvlc --fullscreen --play-and-exit /home/ledgame/easter_game/assets/dot_dash_intro_pi.mp4
+cd easter_game
+source .venv/bin/activate
+ls
+ls | grep txct
+ls | grep txt
+sudo shutdown -now
+sudo reboot
+cd easter_game
+source .venv/bin/activate
+ls
+cd asset*
+ls
+pwd
+ffplay -fs -autoexit -loglevel quiet ~/easter_game/assets/dot_dash_intro.mp4
+ps -ef | viewer
+ps -ef | grep vierwer
+ps -ef | grep view
+kill 1485
+ffplay -fs -autoexit -loglevel quiet ~/easter_game/assets/dot_dash_intro.mp4
+ps -ef | grep view
+ffplay -fs -autoexit -loglevel quiet ~/easter_game/assets/dot_dash_intro.mp4
+cd ..
+ls
+ls 
+cat pixel_challenge_viewer.py
+cd easter_game
+source .venv/bin/activate
+ls -al
+ls | grep 14.0.2
+cat pixel_challenge_console_v14.0.2.py
+ks
+ls | grep 14.0.2
+ls
+nano start_console.sh
+./pixel_challenge_console_v14.0.3.py 
+cat start_console.sh
+head pixel_challenge_console_v14.0.3.py
+head -50 pixel_challenge_console_v14.0.3.py
+nano pixel_challenge_console_v14.0.3.py
+nano pixel_challenge_console_v14.1.0.py
+cd easter_game
+source .venv/bin/activate
+ls |grep[3~
+ls |grep 14.0.2
+cd easter_game
+source .venv/bin/activate
+ls
+nano pixel_challenge_console_v14.1.0.py
+mv start_viewer.sh start_viewer_old.sh
+nano start_viewer.sh
+./start_viewer.sh
+sudo ./start_viewer.sh
+sudo  start_viewer.sh
+sudo reboot
+./start_viewer.sh
+cd easter_game
+source .venv/bin/activate
+./start_viewer.sh
+ls-al
+ls -al
+sudo chmod 771 start_viewer.sh
+ls -al
+sudo chmod 775 start_viewer.sh
+ls -al
+./start_viewer.sh
+ls -al
+python start_viewer.sh
+cd easter_ame
+cd easter_game
+source .venv/bin/activate
+ls
+nano start_console.sh
+cd assets
+ls
+python start_viewer.sh
+cd ,.
+cd ,.,.
+ls
+cd ..
+ls -al
+python start_viewer.sh
+ls -al
+nano pixel_challenge_console_v14.1.1.py
+rm pixel_challenge_viewer.py
+nano pixel_challenge_viewer.py
+nano start_viewer.sh
+cp start_viewer.sh start_viewer.sholf
+rm start_viewer.sh
+nano start_viewer.sh
+nano start_console.sh
+nano start_viewer.sh
+chmod +x /home/ledgame/easter_game/start_viewer.sh
+chmod +x /home/ledgame/easter_game/start_console.sh
+./start_viewer.sh
+./start_console.sh
+sudo reboot
+cd easter_game
+source .venv/bin/activate
+ls
+ls -al
+nano start_viewer.sh
+nano pixel_challenge_viewer.py
+sudo reboot
+cd easter_game
+source .venv/bin/activate
+ls -al | grep viewer
+nano pixel_challenge_viewer.py
+sudo reboot
+cd easter_game
+source .venv/bin/activate
+ffplay -autoexit -fs -an /home/ledgame/easter_game/assets/dot_dash_intro.mp4
+ffplay -autoexit -fs -sync video /home/ledgame/easter_game/assets/dot_dash_intro.mp4
+=good   ffplay -autoexit -fs -af "aresample=async=1:first_pts=0" /home/ledgame/easter_game/assets/dot_dash_intro.mp4
+ffplay -autoexit -fs -af "aresample=async=1:first_pts=0" /home/ledgame/easter_game/assets/dot_dash_intro.mp4
+sudo raspi-config nonint do_audioconf 1
+sudo reboot
+cd easter_game
+source .venv/bin/activate
+ffmpeg -y -i /home/ledgame/easter_game/assets/dot_dash_intro.mp4   -c:v copy -c:a aac -ar 48000 -ac 2 -b:a 128k   /home/ledgame/easter_game/assets/dot_dash_intro_48k_aac.mp4
+export DISPLAY=:0
+ffplay -autoexit -fs /home/ledgame/easter_game/assets/dot_dash_intro_48k_aac.mp4
+sudo raspi-config nonint do_wayland W1
+sudo reboot
+sudo raspi-config nonint do_wayland W1
+sudo reboot
+sudo systemctl restart display-manager
+ps -ef
+ps -ef | grep viewewr
+ps -ef | grep viewe
+kill 2347
+kill 2004
+ls /sys/class/drm
+cat /sys/class/drm/card*-HDMI-A-*/status
+systemctl status display-manager --no-pager
+DISPLAY=:0 xrandr --query
+grep -RIn "xrandr" ~/.config /etc/xdg /etc/X11 2>/dev/null
+DISPLAY=:0 xrandr --output HDMI-2 --primary --mode 1920x1080 --pos 0x0 --output HDMI-1 --off
+ps -ef | grep -E "pixel_challenge|ffplay" | grep -v grep
+pkill -f pixel_challenge_viewer.py; pkill -f pixel_challenge_console
+DISPLAY=:0 xsetroot -solid red
+DISPLAY=:0 xmessage -center "TEST WINDOW"
+DISPLAY=:0 python3 - <<'PY'
+import tkinter as tk
+r = tk.Tk()
+r.title("TEST")
+r.geometry("400x200+100+100")
+r.configure(bg="red")
+tk.Label(r, text="TEST WINDOW", bg="red", fg="white", font=("Arial", 24)).pack(expand=True)
+r.mainloop()
+PY
+
+systemctl status display-manager --no-pager
+grep -RIn "xrandr\|1920x1080" /home/ledgame /etc/xdg /etc/X11 /etc/lightdm 2>/dev/null
+journalctl -b --no-pager | grep -n -C 5 "cannot find mode 1920x1080"
+grep -RIn "display-setup-script\|session-setup-script\|greeter-setup-script" /etc/lightdm 2>/dev/null
+[200~cat /usr/share/dispsetup.sh~
+cat /usr/share/dispsetup.sh
+sudo cp /usr/share/dispsetup.sh /usr/share/dispsetup.sh.bak && printf '#!/bin/sh\nexit 0\n' | sudo tee /usr/share/dispsetup.sh >/dev/null && sudo chmod +x /usr/share/dispsetup.sh
+sudo systemctl restart display-manager
+pkill -f pixel_challenge_viewer.py
+ls -l /home/ledgame/easter_game/viewer_command.txt && cat /home/ledgame/easter_game/viewer_command.txt
+/home/ledgame/easter_game/start_viewer.sh
+sudo reboot
+cat /usr/share/dispsetup.sh
+sudo cp /usr/share/dispsetup.sh /usr/share/dispsetup.sh.badagain && printf '#!/bin/sh\nexit 0\n' | sudo tee /usr/share/dispsetup.sh >/dev/null && sudo chmod +x /usr/share/dispsetup.sh
+sudo systemctl restart display-manager
+DISPLAY=:0 xrandr --query
+DISPLAY=:0 xrandr --output HDMI-1 --primary --mode 1920x1080 --pos 0x0 --rotate normal --output HDMI-2 --mode 1920x1080 --pos 1920x0 --rotate inverted
+sudo tee /usr/share/dispsetup.sh >/dev/null <<'EOF'
+#!/bin/sh
+xrandr --output HDMI-1 --primary --mode 1920x1080 --pos 0x0 --rotate normal \
+       --output HDMI-2 --mode 1920x1080 --pos 1920x0 --rotate inverted
+[ -e /usr/share/ovscsetup.sh ] && /usr/share/ovscsetup.sh
+exit 0
+EOF
+
+sudo chmod +x /usr/share/dispsetup.sh
+sudo systemctl restart display-manager
+sudo reboot
+sudo tee /usr/share/dispsetup.sh >/dev/null <<'EOF'
+#!/bin/sh
+exit 0
+EOF
+
+sudo chmod +x /usr/share/dispsetup.sh
+grep -RIn "start_viewer.sh\|start_console.sh\|pixel_challenge\|start_session.sh" /home/ledgame/.config /etc/xdg/autostart /etc/systemd /lib/systemd 2>/dev/null
+mv /home/ledgame/.config/autostart/pixel_challenge_console.desktop /home/ledgame/.config/autostart/pixel_challenge_console.desktop.disabled
+mv /home/ledgame/.config/autostart/pixel_challenge_viewer.desktop /home/ledgame/.config/autostart/pixel_challenge_viewer.desktop.disabled
+sudo reboot

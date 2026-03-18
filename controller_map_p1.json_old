@@ -1,0 +1,34 @@
+{
+  "device_name": "DragonRise Inc.   Generic   USB  Joystick  ",
+  "device_path": "/dev/input/event13",
+  "buttons": {
+    "P1_B1": 288,
+    "P1_B2": 288,
+    "P1_B3": 290,
+    "P1_B4": 290,
+    "P1_B5": 291
+  },
+  "joystick": {
+    "x_axis": 2,
+    "y_axis": 2,
+    "notes": {
+      "left_sample": [
+        2,
+        127
+      ],
+      "right_sample": [
+        2,
+        126
+      ],
+      "up_sample": [
+        2,
+        127
+      ],
+      "down_sample": [
+        2,
+        126
+      ]
+    },
+    "deadzone": 8000
+  }
+}

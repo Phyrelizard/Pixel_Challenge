@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Pixel Challenge Viewer
+Exec=/home/ledgame/easter_game/start_viewer.sh
+StartupNotify=false
+Terminal=false
+X-GNOME-Autostart-enabled=true
