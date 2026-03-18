@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block title %}Pixel Challenge – Host Console{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+
+{% block content %}
+<header class="console-header">
+  <h1>🎮 Pixel Challenge – Host Console</h1>
+  <span id="status-badge" class="badge badge-idle">Idle</span>
+</header>
+
+<main class="console-main">
+
+  <!-- Player management -->
+  <section class="card">
+    <h2>Players</h2>
+    <div class="player-add-row">
+      <input id="player-name-input" type="text" placeholder="Player name" maxlength="20" />
+      <button id="add-player-btn" class="btn btn-primary">Add Player</button>
+    </div>
+    <ul id="player-list" class="player-list"></ul>
+  </section>
+
+  <!-- Game control -->
+  <section class="card">
+    <h2>Game Control</h2>
+    <div class="control-row">
+      <label for="game-select">Game:</label>
+      <select id="game-select">
+        {% for key, name in games.items() %}
+        <option value="{{ key }}">{{ name }}</option>
+        {% endfor %}
+      </select>
+      <label for="rounds-input">Rounds:</label>
+      <input id="rounds-input" type="number" value="10" min="1" max="50" style="width:60px" />
+    </div>
+    <div class="control-row">
+      <button id="start-btn" class="btn btn-success">&#9654; Start Game</button>
+      <button id="stop-btn" class="btn btn-warning" disabled>&#9632; Stop</button>
+      <button id="reset-btn" class="btn btn-danger">&#8635; Reset Scores</button>
+      <a href="/scoreboard" target="_blank" class="btn btn-info">&#128250; Scoreboard View</a>
+    </div>
+  </section>
+
+  <!-- Current game status -->
+  <section class="card">
+    <h2>Game Status</h2>
+    <div id="game-info" class="game-info">
+      <p>Status: <strong id="info-status">—</strong></p>
+      <p>Game: <strong id="info-game">—</strong></p>
+      <p>Round: <strong id="info-round">—</strong></p>
+    </div>
+  </section>
+
+  <!-- Scoreboard preview -->
+  <section class="card">
+    <h2>Leaderboard</h2>
+    <table class="leaderboard-table" id="leaderboard-table">
+      <thead>
+        <tr><th>#</th><th>Player</th><th>Score</th></tr>
+      </thead>
+      <tbody id="leaderboard-body"></tbody>
+    </table>
+  </section>
+
+  <!-- Activity feed -->
+  <section class="card">
+    <h2>Activity Feed</h2>
+    <ul id="activity-feed" class="activity-feed"></ul>
+  </section>
+
+  <!-- Mock input (dev/demo mode) -->
+  <section class="card" id="mock-section">
+    <h2>&#128295; Mock Button Input <small>(dev mode)</small></h2>
+    <p class="hint">Simulate joystick presses for testing without hardware.</p>
+    <div id="mock-buttons" class="mock-buttons"></div>
+  </section>
+
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Real-time updates via Server-Sent Events (no external library needed)
+const es = new EventSource("/api/events");
+es.onmessage = function(e) { applyState(JSON.parse(e.data)); };
+es.onerror   = function()  { console.warn("SSE connection lost, will retry"); };
+
+function applyState(state) {
+  // Badge
+  const badge = document.getElementById("status-badge");
+  badge.textContent = capitalize(state.status || "idle");
+  badge.className = "badge badge-" + (state.status || "idle");
+
+  // Info panel
+  document.getElementById("info-status").textContent = capitalize(state.status || "—");
+  document.getElementById("info-game").textContent   = state.game_name || "—";
+  document.getElementById("info-round").textContent  =
+    state.round ? state.round + " / " + state.max_rounds : "—";
+
+  // Buttons
+  const playing = state.status === "playing";
+  document.getElementById("start-btn").disabled = playing;
+  document.getElementById("stop-btn").disabled  = !playing;
+
+  renderLeaderboard(state.players || []);
+  renderFeed(state.recent_events || []);
+  renderPlayerList(state.players || []);
+  renderMockButtons(state.players || []);
+}
+
+function renderLeaderboard(players) {
+  const tbody = document.getElementById("leaderboard-body");
+  tbody.innerHTML = players.map(function(p, i) {
+    return '<tr><td>' + (i+1) + '</td><td>'
+      + '<span class="color-dot" style="background:rgb(' + p.color_rgb.join(",") + ')"></span>'
+      + esc(p.name) + '</td><td class="score-cell">' + p.score + '</td></tr>';
+  }).join("");
+}
+
+function renderPlayerList(players) {
+  const ul = document.getElementById("player-list");
+  ul.innerHTML = players.map(function(p) {
+    return '<li>'
+      + '<span class="color-dot" style="background:rgb(' + p.color_rgb.join(",") + ')"></span>'
+      + esc(p.name)
+      + '<button class="btn btn-xs btn-danger remove-btn" data-id="' + p.id + '">&#x2715;</button>'
+      + '</li>';
+  }).join("");
+  ul.querySelectorAll(".remove-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() { removePlayer(btn.dataset.id); });
+  });
+}
+
+function renderFeed(events) {
+  const ul = document.getElementById("activity-feed");
+  ul.innerHTML = events.slice().reverse().map(function(e) {
+    return '<li><span class="feed-pts">' + (e.delta > 0 ? "+" : "") + e.delta + '</span>'
+      + ' <strong>' + esc(e.player_name) + '</strong> – ' + esc(e.reason) + '</li>';
+  }).join("");
+}
+
+let _mockButtonsBuilt = -1;
+function renderMockButtons(players) {
+  if (players.length === _mockButtonsBuilt) return;
+  _mockButtonsBuilt = players.length;
+  const container = document.getElementById("mock-buttons");
+  container.innerHTML = players.map(function(p) {
+    return '<div class="mock-player">'
+      + '<span class="color-dot" style="background:rgb(' + p.color_rgb.join(",") + ')"></span>'
+      + '<span>' + esc(p.name) + '</span>'
+      + '<button class="btn btn-xs btn-mock"'
+      + ' onmousedown="mockBtn(' + p.id + ',true)"'
+      + ' onmouseup="mockBtn(' + p.id + ',false)"'
+      + ' ontouchstart="mockBtn(' + p.id + ',true)"'
+      + ' ontouchend="mockBtn(' + p.id + ',false)">'
+      + 'Hold&nbsp;=&nbsp;Dash&nbsp;|&nbsp;Tap&nbsp;=&nbsp;Dot'
+      + '</button></div>';
+  }).join("");
+}
+
+function mockBtn(playerId, pressed) {
+  fetch("/api/mock/button", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({player_id: playerId, pressed: pressed}),
+  });
+}
+
+document.getElementById("add-player-btn").addEventListener("click", addPlayer);
+document.getElementById("player-name-input").addEventListener("keyup", function(e) {
+  if (e.key === "Enter") addPlayer();
+});
+
+function addPlayer() {
+  const input = document.getElementById("player-name-input");
+  const name = input.value.trim();
+  if (!name) return;
+  fetch("/api/players", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({name: name}),
+  }).then(function(r) {
+    if (r.ok) { input.value = ""; }
+    else { r.json().then(function(d) { alert(d.error || "Error"); }); }
+  });
+}
+
+function removePlayer(id) {
+  fetch("/api/players/" + id, {method: "DELETE"});
+}
+
+document.getElementById("start-btn").addEventListener("click", function() {
+  const game = document.getElementById("game-select").value;
+  const maxRounds = parseInt(document.getElementById("rounds-input").value) || 10;
+  fetch("/api/game/start", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({game: game, max_rounds: maxRounds}),
+  }).then(function(r) {
+    if (!r.ok) { r.json().then(function(d) { alert(d.error || "Error"); }); }
+  });
+});
+
+document.getElementById("stop-btn").addEventListener("click", function() {
+  fetch("/api/game/stop", {method: "POST"});
+});
+
+document.getElementById("reset-btn").addEventListener("click", function() {
+  fetch("/api/game/reset", {method: "POST"});
+});
+
+function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+</script>
+{% endblock %}
