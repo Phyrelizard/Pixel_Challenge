@@ -21,3 +21,7 @@ score_history.json
 # Logs/temp
 *.log
 *.tmp
+
+# Older development versions
+
+old_versions/
