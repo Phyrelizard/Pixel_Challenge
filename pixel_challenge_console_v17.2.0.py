@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v16.8.3
-- Keeps header and bottom info areas visible by clamping/restoring sash positions.
-- Adds "RESET LAYOUT" button to restore safe defaults if panes get collapsed.
-- Moves ALL LANES TEST/STOP button to the Controllers footer.
-- Redeem Points and information box remain in the bottom pane with enforced minimum height.
+Pixel Challenge Host Console v17.2.0
+- Falcon Setup pop-up: yellow border, remembers window geometry; adds Test Falcon button.
+- General setup adds checkboxes: Backup/Restore config JSON, Apply network settings & reboot.
+- Theme/Game brightness split: “Theme Brightness” slider (attract), “Gameplay Brightness” slider (in-game).
+- ALL LANES TEST remains in Attract row; mouse wheel on per-theme sliders retained.
+- Header “GAME” placement kept; STOP button behavior unchanged from 17.1.0 (reset to idle).
+- Layout save button retained.
+- Status/info panel width now user-adjustable via bottom paned sash.
+- New footer button “FALCON CONSOLE” opens/closes Falcon web UI (kiosk) using configured IP.
 """
 import os
 import json
@@ -14,6 +18,8 @@ import colorsys
 import tkinter as tk
 from tkinter import messagebox, ttk
 from enum import Enum, auto
+import subprocess
+import webbrowser
 
 import pygame
 import sacn
@@ -22,10 +28,10 @@ from host_api import ConsoleHostAPI
 from game_manager import GameManager
 from games.base import PlayerConfig
 
-VERSION_LABEL = "v16.8.3"
-FALCON_IP = "192.168.2.113"
-PIXELS_PER_LANE = 100
+VERSION_LABEL = "v17.2.0"
 
+DEFAULT_FALCON_IP = "192.168.2.113"
+PIXELS_PER_LANE = 100
 ASSIGNMENTS_FILE = "/home/ledgame/easter_game/controller_assignments.json"
 SCORE_HISTORY_FILE = "/home/ledgame/easter_game/score_history.json"
 SCOREBOARD_DATA_FILE = "/home/ledgame/easter_game/scoreboard_data.json"
@@ -113,6 +119,7 @@ class FalconService:
         self.pixels_per_lane = pixels_per_lane
         self.sender = None
         self.started = False
+        self.brightness_scale = 1.0  # 0.0 – 1.0
         self.lane_map = {
             1: {"left": 1, "right": 2},
             2: {"left": 3, "right": 4},
@@ -120,6 +127,9 @@ class FalconService:
             4: {"left": 7, "right": 8},
         }
         self.start()
+
+    def set_brightness(self, percent: int):
+        self.brightness_scale = max(0.0, min(1.0, percent / 100.0))
 
     def start(self):
         if self.started:
@@ -145,12 +155,13 @@ class FalconService:
     def _build_frame(self, pixels):
         buf = bytearray(512)
         max_pixels = min(len(pixels), 170)
+        scale = self.brightness_scale
         for i in range(max_pixels):
             r, g, b = pixels[i]
             base = i * 3
-            buf[base + 0] = clamp8(r)
-            buf[base + 1] = clamp8(g)
-            buf[base + 2] = clamp8(b)
+            buf[base + 0] = clamp8(r * scale)
+            buf[base + 1] = clamp8(g * scale)
+            buf[base + 2] = clamp8(b * scale)
         return bytes(buf)
 
     def _send_pixels(self, universe: int, pixels):
@@ -448,19 +459,18 @@ class PixelChallengeConsole:
         self.root = root
         self.root.title("Pixel Challenge Host Console")
         self.root.geometry("1600x900+2020+80")
-        self.root.minsize(1280, 720)  # ensure we always have
+        self.root.minsize(1280, 720)
         self.root.configure(bg="#12061f")
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
-                # grid weights: header fixed, main area grows
         self.root.grid_rowconfigure(0, weight=0)
         self.root.grid_rowconfigure(1, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
 
         self.root.option_add("*TCombobox*Listbox.font", ("Arial", 18, "bold"))
 
+        # -------- runtime state --------
         self.host_state = HostState.IDLE
-
         self.selected_game = tk.StringVar(value="Splash")
         self.players_joined = tk.IntVar(value=0)
         self.animate_enabled = tk.BooleanVar(value=False)
@@ -470,6 +480,9 @@ class PixelChallengeConsole:
         self.selected_themes = set()
         self.last_cycle_switch = time.time()
         self.final_results_active = False
+
+        self.theme_brightness_percent = tk.IntVar(value=100)
+        self.gameplay_brightness_percent = tk.IntVar(value=100)
 
         self.checkin_open = False
         self.players_confirmed = False
@@ -527,8 +540,29 @@ class PixelChallengeConsole:
             "Host boot complete.",
         ]
 
+        # ---- settings (network) ----
+        self.falcon_ip = DEFAULT_FALCON_IP
+        self.wifi_ssid = tk.StringVar(value="")
+        self.wifi_psk = tk.StringVar(value="")
+        self.wifi_static_ip = tk.StringVar(value="")
+        self.wifi_gateway = tk.StringVar(value="")
+        self.eth_static_ip = tk.StringVar(value="")
+        self.eth_gateway = tk.StringVar(value="")
+        self.dns_server = tk.StringVar(value="8.8.8.8")
+        self.ntp_server = tk.StringVar(value="pool.ntp.org")
+        self.hostname = tk.StringVar(value="pixel-challenge")
+        self.auto_start = tk.BooleanVar(value=False)
+        self.backup_restore = tk.BooleanVar(value=False)
+        self.apply_reboot = tk.BooleanVar(value=False)
+        self.setup_geometry = None
+
+        self.setup_window = None
+        self.falcon_console_proc = None
+
+        self.load_settings()
+
         self.viewer = ViewerService("/home/ledgame/easter_game/viewer_command.txt")
-        self.falcon = FalconService(FALCON_IP, PIXELS_PER_LANE)
+        self.falcon = FalconService(self.falcon_ip, PIXELS_PER_LANE)
         self.attract = AttractService(self.falcon)
         self.games = GameRegistry()
 
@@ -572,7 +606,7 @@ class PixelChallengeConsole:
         self.sash_center_ctrl = None
         self.sash_main_info = None
 
-        self.load_settings()
+        self.apply_brightness_for_state()
 
         self.build_ui()
         self.refresh_player_status_panel()
@@ -646,6 +680,23 @@ class PixelChallengeConsole:
             self.sash_left_main = data.get("sash_left_main")
             self.sash_center_ctrl = data.get("sash_center_ctrl")
             self.sash_main_info = data.get("sash_main_info")
+            self.theme_brightness_percent.set(int(data.get("falcon_brightness", 100)))
+            self.gameplay_brightness_percent.set(int(data.get("gameplay_brightness", 100)))
+
+            self.falcon_ip = data.get("falcon_ip", DEFAULT_FALCON_IP)
+            self.wifi_ssid.set(data.get("wifi_ssid", ""))
+            self.wifi_psk.set(data.get("wifi_psk", ""))
+            self.wifi_static_ip.set(data.get("wifi_static_ip", ""))
+            self.wifi_gateway.set(data.get("wifi_gateway", ""))
+            self.eth_static_ip.set(data.get("eth_static_ip", ""))
+            self.eth_gateway.set(data.get("eth_gateway", ""))
+            self.dns_server.set(data.get("dns_server", "8.8.8.8"))
+            self.ntp_server.set(data.get("ntp_server", "pool.ntp.org"))
+            self.hostname.set(data.get("hostname", "pixel-challenge"))
+            self.auto_start.set(bool(data.get("auto_start", False)))
+            self.backup_restore.set(bool(data.get("backup_restore", False)))
+            self.apply_reboot.set(bool(data.get("apply_reboot", False)))
+            self.setup_geometry = data.get("setup_geometry")
         except Exception as e:
             self.log(f"Failed to load settings: {e}")
 
@@ -659,6 +710,22 @@ class PixelChallengeConsole:
             "sash_left_main": self.sash_left_main,
             "sash_center_ctrl": self.sash_center_ctrl,
             "sash_main_info": self.sash_main_info,
+            "falcon_brightness": int(self.theme_brightness_percent.get()),
+            "gameplay_brightness": int(self.gameplay_brightness_percent.get()),
+            "falcon_ip": self.falcon_ip,
+            "wifi_ssid": self.wifi_ssid.get(),
+            "wifi_psk": self.wifi_psk.get(),
+            "wifi_static_ip": self.wifi_static_ip.get(),
+            "wifi_gateway": self.wifi_gateway.get(),
+            "eth_static_ip": self.eth_static_ip.get(),
+            "eth_gateway": self.eth_gateway.get(),
+            "dns_server": self.dns_server.get(),
+            "ntp_server": self.ntp_server.get(),
+            "hostname": self.hostname.get(),
+            "auto_start": bool(self.auto_start.get()),
+            "backup_restore": bool(self.backup_restore.get()),
+            "apply_reboot": bool(self.apply_reboot.get()),
+            "setup_geometry": self.setup_geometry,
         }
         try:
             with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
@@ -667,12 +734,19 @@ class PixelChallengeConsole:
             self.log(f"Failed to save settings: {e}")
 
     # ---------- helpers ----------
+    def apply_brightness_for_state(self):
+        if self.host_state == HostState.GAME_RUNNING:
+            self.falcon.set_brightness(int(self.gameplay_brightness_percent.get()))
+        else:
+            self.falcon.set_brightness(int(self.theme_brightness_percent.get()))
+
     def set_state(self, new_state: HostState, reason: str = ""):
         self.host_state = new_state
         self.state_var.set(f"STATE: {self.host_state.name}")
         if reason:
             self.log(f"HostState -> {self.host_state.name}: {reason}")
         self.refresh_checkin_button()
+        self.apply_brightness_for_state()
 
     def current_game(self):
         return self.games.get(self.selected_game.get())
@@ -710,9 +784,6 @@ class PixelChallengeConsole:
         else:
             self.viewer_show_splash()
             self.log(f"No splash asset for {game.get_name()}: {splash_path}")
-
-    def _scoreboard_placeholder_path(self):
-        return f"{ASSETS_DIR}/scoreboard_placeholder.png"
 
     def _write_scoreboard_data(self, payload: dict):
         try:
@@ -883,6 +954,22 @@ class PixelChallengeConsole:
         self.log(f"Duration Cycle seconds set to {self.cycle_seconds.get()}.")
         self.save_settings()
 
+    def on_theme_brightness_changed(self, value):
+        pct = int(float(value))
+        self.theme_brightness_percent.set(pct)
+        if self.host_state != HostState.GAME_RUNNING and not self.all_lanes_test_active:
+            self.falcon.set_brightness(pct)
+        self.log(f"Theme brightness set to {pct}%.")
+        self.save_settings()
+
+    def on_gameplay_brightness_changed(self, value):
+        pct = int(float(value))
+        self.gameplay_brightness_percent.set(pct)
+        if self.host_state == HostState.GAME_RUNNING:
+            self.falcon.set_brightness(pct)
+        self.log(f"Gameplay brightness set to {pct}%.")
+        self.save_settings()
+
     def toggle_animate(self):
         self.animate_enabled.set(not self.animate_enabled.get())
         self.update_animate_button()
@@ -911,6 +998,7 @@ class PixelChallengeConsole:
         else:
             if self.attract.active:
                 self.attract.stop(self)
+        self.apply_brightness_for_state()
 
     # ---------- UI ----------
     def build_ui(self):
@@ -1007,13 +1095,9 @@ class PixelChallengeConsole:
             pass
         self.save_settings()
 
-    def reset_layout(self):
-        self.sash_left_main = None
-        self.sash_center_ctrl = None
-        self.sash_main_info = None
-        self.restore_sashes()
-        self.save_settings()
-        self.log("Layout reset to defaults.")
+    def save_layout_now(self):
+        self.save_sash_positions()
+        self.log("Layout saved.")
 
     def build_top_bar(self):
         top = tk.Frame(self.root, bg="#0f0617", bd=2, relief="groove")
@@ -1026,13 +1110,13 @@ class PixelChallengeConsole:
         left = tk.Frame(top, bg="#0f0617")
         left.grid(row=0, column=0, sticky="w", padx=12, pady=8)
         tk.Label(left, text="HOST CONSOLE", bg="#0f0617", fg="white", font=("Arial", 22, "bold")).pack(anchor="w")
-        tk.Label(left, textvariable=self.state_var, bg="#0f0617", fg="#6cff66", font=("Arial", 20, "bold")).pack(anchor="w")
+        tk.Label(left, textvariable=self.state_var, bg="#0f0617", fg="#6cff66", font=("Arial", 20, "bold")).pack(anchor="w", padx=(10, 0))
 
         center = tk.Frame(top, bg="#0f0617")
-        center.grid(row=0, column=1, sticky="", padx=70)
+        center.grid(row=0, column=1, sticky="", padx=30)
         center.grid_columnconfigure(1, weight=1)
 
-        tk.Label(center, text="SELECTED GAME", bg="#0f0617", fg="white", font=("Arial", 18, "bold")).grid(row=0, column=0, padx=(0, 12))
+        tk.Label(center, text="GAME", bg="#0f0617", fg="white", font=("Arial", 18, "bold")).grid(row=0, column=0, padx=(0, 8))
 
         self.game_box = ttk.Combobox(
             center,
@@ -1063,10 +1147,40 @@ class PixelChallengeConsole:
         ).pack(side="left", padx=(0, 8))
         self.neon_button(btns, "VIEW INTRO", self.on_view_intro, bg="#1b63ff").pack(side="left", padx=8)
         self.neon_button(btns, "START", self.on_start_game, bg="#2ea62e").pack(side="left", padx=8)
-        self.neon_button(btns, "PAUSE", self.on_stop_game, bg="#d4a10f", fg="black").pack(side="left", padx=8)
+        tk.Button(
+            btns,
+            text="STOP",
+            command=self.on_stop_game,
+            bg="#c93b1e",
+            fg="white",
+            activebackground="#c93b1e",
+            activeforeground="white",
+            relief="raised",
+            bd=3,
+            font=("Arial", 16, "bold"),
+            width=7,
+            padx=12,
+            pady=8,
+            cursor="hand2",
+        ).pack(side="left", padx=8)
 
-        reset_btn = self.neon_button(top, "RESET LAYOUT", self.reset_layout, bg="#9440ff")
-        reset_btn.grid(row=0, column=3, padx=8)
+        save_btn = tk.Button(
+            top,
+            text="Save Layout",
+            command=self.save_layout_now,
+            bg="#9440ff",
+            fg="white",
+            activebackground="#9440ff",
+            activeforeground="white",
+            relief="raised",
+            bd=2,
+            font=("Arial", 12, "bold"),
+            width=10,
+            padx=8,
+            pady=4,
+            cursor="hand2",
+        )
+        save_btn.grid(row=0, column=3, padx=8)
 
     def build_attract_area(self, parent):
         parent.grid_rowconfigure(0, weight=1)
@@ -1074,7 +1188,7 @@ class PixelChallengeConsole:
         left_panel, left_body = self.panel(parent, "ATTRACT MODE")
         left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 0), pady=(0, 0))
         left_panel.grid_rowconfigure(0, weight=1)
-        left_body.grid_rowconfigure(5, weight=1)
+        left_body.grid_rowconfigure(7, weight=1)
 
         anim_row = tk.Frame(left_body, bg="#17071f")
         anim_row.pack(fill="x", pady=6)
@@ -1082,6 +1196,8 @@ class PixelChallengeConsole:
         self.cycle_btn.pack(side="left", padx=(0, 6))
         self.animate_btn = self.neon_button(anim_row, "ANIMATE", self.toggle_animate, bg="#c93b1e", width=10)
         self.animate_btn.pack(side="left", padx=(0, 6))
+        self.lanes_test_btn = self.neon_button(anim_row, "ALL LANES TEST", self.on_all_lanes_test, bg="#1b63ff", width=14)
+        self.lanes_test_btn.pack(side="left", padx=(0, 6))
 
         tk.Label(left_body, text="DURATION CYCLE (secs)", bg="#17071f", fg="#cccccc", font=("Arial", 14, "bold")).pack(anchor="center", pady=(6, 2))
         self.cycle_scale = tk.Scale(
@@ -1099,7 +1215,43 @@ class PixelChallengeConsole:
             command=self.on_cycle_changed,
             length=520,
         )
-        self.cycle_scale.pack(fill="x", pady=(0, 12))
+        self.cycle_scale.pack(fill="x", pady=(0, 8))
+
+        tk.Label(left_body, text="THEME BRIGHTNESS (%)", bg="#17071f", fg="#cccccc", font=("Arial", 14, "bold")).pack(anchor="center", pady=(4, 2))
+        self.theme_brightness_scale = tk.Scale(
+            left_body,
+            from_=0,
+            to=100,
+            resolution=1,
+            orient="horizontal",
+            variable=self.theme_brightness_percent,
+            bg="#17071f",
+            fg="white",
+            troughcolor="#071a30",
+            highlightthickness=0,
+            font=("Arial", 12, "bold"),
+            command=self.on_theme_brightness_changed,
+            length=520,
+        )
+        self.theme_brightness_scale.pack(fill="x", pady=(0, 6))
+
+        tk.Label(left_body, text="GAMEPLAY BRIGHTNESS (%)", bg="#17071f", fg="#cccccc", font=("Arial", 14, "bold")).pack(anchor="center", pady=(4, 2))
+        self.game_brightness_scale = tk.Scale(
+            left_body,
+            from_=0,
+            to=100,
+            resolution=1,
+            orient="horizontal",
+            variable=self.gameplay_brightness_percent,
+            bg="#17071f",
+            fg="white",
+            troughcolor="#071a30",
+            highlightthickness=0,
+            font=("Arial", 12, "bold"),
+            command=self.on_gameplay_brightness_changed,
+            length=520,
+        )
+        self.game_brightness_scale.pack(fill="x", pady=(0, 12))
 
         tk.Label(left_body, text="THEMES (check to include in CYCLE)", bg="#17071f", fg="#cccccc", font=("Arial", 16, "bold")).pack(anchor="center", pady=(2, 6))
         theme_frame = tk.Frame(left_body, bg="#17071f")
@@ -1148,6 +1300,9 @@ class PixelChallengeConsole:
                 length=220,
             )
             slider.pack(side="right", padx=(6, 0))
+            slider.bind("<MouseWheel>", lambda e, n=name: self.on_theme_speed_wheel(n, e))
+            slider.bind("<Button-4>", lambda e, n=name: self.on_theme_speed_wheel(n, e, delta=120))
+            slider.bind("<Button-5>", lambda e, n=name: self.on_theme_speed_wheel(n, e, delta=-120))
             self.theme_vars[name] = var
             self.theme_speed_vars[name] = speed_var
 
@@ -1206,8 +1361,18 @@ class PixelChallengeConsole:
         parent.grid_columnconfigure(0, weight=1)
         parent.grid_rowconfigure(0, weight=1)
 
-        info_panel = tk.Frame(parent, bg="#3a1b53", bd=2, relief="groove")
-        info_panel.grid(row=0, column=0, sticky="nsew")
+        # Paned window for adjustable width of info area
+        self.bottom_paned = tk.PanedWindow(parent, orient="horizontal", sashwidth=6, sashrelief="raised", bg="#0b0314")
+        self.bottom_paned.grid(row=0, column=0, sticky="nsew")
+
+        info_panel = tk.Frame(self.bottom_paned, bg="#3a1b53", bd=2, relief="groove")
+        info_panel.grid_rowconfigure(0, weight=1)
+        info_panel.grid_columnconfigure(0, weight=1)
+
+        filler_frame = tk.Frame(self.bottom_paned, bg="#12061f")
+
+        self.bottom_paned.add(info_panel, minsize=400)
+        self.bottom_paned.add(filler_frame, minsize=120)
 
         info_body = tk.Frame(info_panel, bg="#17071f")
         info_body.pack(fill="both", expand=True, padx=6, pady=8)
@@ -1236,12 +1401,204 @@ class PixelChallengeConsole:
         self.info_text.tag_configure("p3", foreground="#88ff66")
         self.info_text.tag_configure("p4", foreground="#dd88ff")
 
-        redeem_row = tk.Frame(parent, bg="#12061f")
-        redeem_row.grid(row=1, column=0, sticky="ew", pady=(4, 0))
-        self.neon_button(redeem_row, "REDEEM POINTS", self.on_redeem_points, bg="#d48a10", fg="black").pack()
+        button_row = tk.Frame(parent, bg="#12061f")
+        button_row.grid(row=1, column=0, sticky="ew", pady=(4, 0))
+        button_row.grid_columnconfigure(0, weight=1)
+        button_row.grid_columnconfigure(1, weight=1)
+        button_row.grid_columnconfigure(2, weight=1)
+
+        self.neon_button(button_row, "SETUP", self.open_setup_window, bg="#1b63ff", width=12).grid(row=0, column=0, sticky="w", padx=8)
+        self.neon_button(button_row, "FALCON CONSOLE", self.toggle_falcon_console, bg="#1b63ff", width=14).grid(row=0, column=1, sticky="n", padx=8)
+        self.neon_button(button_row, "REDEEM POINTS", self.on_redeem_points, bg="#d48a10", fg="black", width=16).grid(row=0, column=2, sticky="e", padx=8)
 
         version_label = tk.Label(parent, text=VERSION_LABEL, bg="#12061f", fg="#9a9a9a", font=("Arial", 12, "bold"))
         version_label.grid(row=2, column=0, sticky="e", pady=(4, 2))
+
+    # ---------- SETUP pop-up ----------
+    def open_setup_window(self):
+        if self.setup_window and tk.Toplevel.winfo_exists(self.setup_window):
+            self.setup_window.focus_set()
+            return
+        self.setup_window = tk.Toplevel(self.root, bg="#0f0617", highlightbackground="#ffd74f", highlightthickness=2)
+        self.setup_window.title("Setup")
+        if self.setup_geometry:
+            self.setup_window.geometry(self.setup_geometry)
+        else:
+            self.setup_window.geometry("900x620+2100+120")
+        self.setup_window.transient(self.root)
+        self.setup_window.grab_set()
+
+        close_btn = self.neon_button(self.setup_window, "CLOSE", self.close_setup_window, bg="#c93b1e", width=8)
+        close_btn.place(relx=1.0, rely=0.0, x=-16, y=12, anchor="ne")
+
+        header = tk.Label(self.setup_window, text="SYSTEM SETUP", bg="#0f0617", fg="white", font=("Arial", 24, "bold"))
+        header.pack(pady=(12, 6))
+
+        body = tk.Frame(self.setup_window, bg="#0f0617")
+        body.pack(fill="both", expand=True, padx=18, pady=(0, 12))
+        body.grid_columnconfigure(0, weight=1)
+        body.grid_columnconfigure(1, weight=1)
+
+        def labeled_entry(parent, text, var, row, col=0, placeholder=""):
+            frame = tk.Frame(parent, bg="#12061f", bd=1, relief="solid")
+            frame.grid(row=row, column=col, sticky="ew", padx=6, pady=6)
+            frame.grid_columnconfigure(1, weight=1)
+            tk.Label(frame, text=text, bg="#12061f", fg="#dcdcdc", font=("Arial", 12, "bold")).grid(row=0, column=0, padx=6, pady=6, sticky="w")
+            ent = tk.Entry(frame, textvariable=var, bg="#0f0f1f", fg="white", insertbackground="white", font=("Arial", 12))
+            ent.grid(row=0, column=1, sticky="ew", padx=6, pady=6)
+            if placeholder and not var.get():
+                ent.insert(0, placeholder)
+            return ent
+
+        falcon_frame = tk.LabelFrame(body, text="Falcon Controller", bg="#0f0617", fg="white", font=("Arial", 14, "bold"))
+        falcon_frame.grid(row=0, column=0, columnspan=2, sticky="ew", padx=4, pady=8)
+        falcon_frame.grid_columnconfigure(0, weight=1)
+        falcon_entry = labeled_entry(falcon_frame, "Falcon IP", tk.StringVar(value=self.falcon_ip), 0, 0)
+        test_btn = self.neon_button(falcon_frame, "TEST FALCON", lambda: self.test_falcon(falcon_entry.get()), bg="#2ea62e", width=14)
+        test_btn.grid(row=0, column=1, padx=8, pady=6, sticky="e")
+        tk.Label(falcon_frame, text="(applies immediately on Save/Apply)", bg="#0f0617", fg="#aaaaaa", font=("Arial", 10)).grid(row=1, column=0, sticky="w", padx=12, pady=(0, 4))
+
+        wifi = tk.LabelFrame(body, text="Raspberry Pi Wi‑Fi", bg="#0f0617", fg="white", font=("Arial", 14, "bold"))
+        wifi.grid(row=1, column=0, sticky="nsew", padx=4, pady=8)
+        wifi.grid_columnconfigure(0, weight=1)
+        labeled_entry(wifi, "SSID", self.wifi_ssid, 0)
+        labeled_entry(wifi, "Password (PSK)", self.wifi_psk, 1)
+        labeled_entry(wifi, "Static IP (optional)", self.wifi_static_ip, 2, placeholder="192.168.1.50/24")
+        labeled_entry(wifi, "Gateway", self.wifi_gateway, 3, placeholder="192.168.1.1")
+        labeled_entry(wifi, "DNS Server", self.dns_server, 4, placeholder="8.8.8.8")
+
+        eth = tk.LabelFrame(body, text="Raspberry Pi Ethernet", bg="#0f0617", fg="white", font=("Arial", 14, "bold"))
+        eth.grid(row=1, column=1, sticky="nsew", padx=4, pady=8)
+        eth.grid_columnconfigure(0, weight=1)
+        labeled_entry(eth, "Static IP", self.eth_static_ip, 0, placeholder="192.168.2.50/24")
+        labeled_entry(eth, "Gateway", self.eth_gateway, 1, placeholder="192.168.2.1")
+        labeled_entry(eth, "DNS Server", self.dns_server, 2, placeholder="8.8.8.8")
+
+        misc = tk.LabelFrame(body, text="General", bg="#0f0617", fg="white", font=("Arial", 14, "bold"))
+        misc.grid(row=2, column=0, columnspan=2, sticky="ew", padx=4, pady=8)
+        misc.grid_columnconfigure(1, weight=1)
+        labeled_entry(misc, "Hostname", self.hostname, 0, placeholder="pixel-challenge")
+        labeled_entry(misc, "NTP Server", self.ntp_server, 1, placeholder="pool.ntp.org")
+        tk.Checkbutton(
+            misc,
+            text="Auto-start console on boot (suggested)",
+            variable=self.auto_start,
+            bg="#0f0617",
+            fg="white",
+            activebackground="#0f0617",
+            activeforeground="white",
+            selectcolor="#17071f",
+            font=("Arial", 12, "bold"),
+        ).grid(row=0, column=2, padx=12, pady=6, sticky="w")
+
+        tk.Checkbutton(
+            misc,
+            text="Backup / Restore config JSON",
+            variable=self.backup_restore,
+            bg="#0f0617",
+            fg="white",
+            activebackground="#0f0617",
+            activeforeground="white",
+            selectcolor="#17071f",
+            font=("Arial", 12, "bold"),
+        ).grid(row=1, column=2, padx=12, pady=4, sticky="w")
+
+        tk.Checkbutton(
+            misc,
+            text="Apply network settings & reboot",
+            variable=self.apply_reboot,
+            bg="#0f0617",
+            fg="white",
+            activebackground="#0f0617",
+            activeforeground="white",
+            selectcolor="#17071f",
+            font=("Arial", 12, "bold"),
+        ).grid(row=2, column=2, padx=12, pady=4, sticky="w")
+
+        suggestion_box = tk.Frame(misc, bg="#0f0617")
+        suggestion_box.grid(row=3, column=0, columnspan=3, sticky="ew", padx=6, pady=(6, 4))
+        tk.Label(
+            suggestion_box,
+            text="Suggestions for setup screen:\n"
+            "• Test Falcon connection (ping)\n"
+            "• Apply network settings & reboot option\n"
+            "• Backup/restore config JSON\n"
+            "• View current IPs & link status\n"
+            "• Toggle SSH on/off for support",
+            bg="#0f0617",
+            fg="#bbbbbb",
+            justify="left",
+            font=("Arial", 11),
+        ).pack(anchor="w")
+
+        btn_row = tk.Frame(self.setup_window, bg="#0f0617")
+        btn_row.pack(fill="x", pady=(4, 12))
+        btn_row.grid_columnconfigure(0, weight=1)
+        btn_row.grid_columnconfigure(1, weight=1)
+        self.neon_button(btn_row, "SAVE & APPLY", lambda: self.save_setup(falcon_entry), bg="#2ea62e", width=14).grid(row=0, column=0, sticky="e", padx=10)
+        self.neon_button(btn_row, "CANCEL", self.close_setup_window, bg="#c93b1e", width=10).grid(row=0, column=1, sticky="w", padx=10)
+
+    def close_setup_window(self):
+        if self.setup_window and tk.Toplevel.winfo_exists(self.setup_window):
+            self.setup_window.grab_release()
+            self.setup_window.destroy()
+        self.setup_window = None
+
+    def save_setup(self, falcon_entry=None):
+        if falcon_entry is not None:
+            self.falcon_ip = falcon_entry.get().strip() or DEFAULT_FALCON_IP
+        try:
+            self.setup_geometry = self.setup_window.geometry()
+        except Exception:
+            pass
+
+        self.save_settings()
+
+        try:
+            self.falcon.stop()
+        except Exception:
+            pass
+        self.falcon = FalconService(self.falcon_ip, PIXELS_PER_LANE)
+        self.attract.falcon = self.falcon
+        self.apply_brightness_for_state()
+        self.log(f"Setup saved. Falcon IP set to {self.falcon_ip}. (Network changes for Pi require manual scripts/reboot.)")
+        messagebox.showinfo("Setup", "Settings saved. Apply network changes on the Pi via your deployment scripts.")
+        self.close_setup_window()
+
+    def test_falcon(self, ip_addr: str):
+        ip = ip_addr.strip() or self.falcon_ip
+        try:
+            import subprocess
+            result = subprocess.run(["ping", "-c", "1", "-W", "1", ip], capture_output=True, text=True)
+            if result.returncode == 0:
+                self.log(f"Falcon test OK: {ip}")
+                messagebox.showinfo("Falcon Test", f"Falcon reachable at {ip}")
+            else:
+                self.log(f"Falcon test FAILED: {ip}")
+                messagebox.showwarning("Falcon Test", f"No response from {ip}")
+        except Exception as e:
+            self.log(f"Falcon test error: {e}")
+            messagebox.showerror("Falcon Test", f"Error testing {ip}: {e}")
+
+    # ---------- Falcon console ----------
+    def toggle_falcon_console(self):
+        if self.falcon_console_proc and self.falcon_console_proc.poll() is None:
+            if messagebox.askyesno("Falcon Console", "Close the Falcon console browser?"):
+                try:
+                    self.falcon_console_proc.terminate()
+                except Exception:
+                    pass
+                self.falcon_console_proc = None
+            return
+        url = f"http://{self.falcon_ip}/"
+        try:
+            self.falcon_console_proc = subprocess.Popen(["chromium-browser", "--kiosk", url])
+            self.log(f"Opened Falcon console at {url}")
+        except Exception:
+            # fallback to default browser
+            webbrowser.open(url)
+            self.falcon_console_proc = None
+            self.log(f"Opened Falcon console in default browser: {url}")
 
     # ---------- theme interactions ----------
     def on_theme_checked(self):
@@ -1264,6 +1621,17 @@ class PixelChallengeConsole:
         if self.attract.current_theme == theme_name and self.attract.active:
             self.attract.step = 0
         self.log(f"Speed for '{theme_name}' set to {self.per_theme_speed[theme_name]}.")
+
+    def on_theme_speed_wheel(self, theme_name: str, event, delta=None):
+        d = delta if delta is not None else event.delta
+        step = 1 if d > 0 else -1
+        var = self.theme_speed_vars.get(theme_name)
+        if var is None:
+            return "break"
+        new_val = max(1, min(10, var.get() + step))
+        var.set(new_val)
+        self.on_theme_speed_changed(theme_name, new_val)
+        return "break"
 
     def on_theme_selected_manual(self, theme_name: str):
         self.theme_select_box.selection_clear(0, "end")
@@ -1366,7 +1734,7 @@ class PixelChallengeConsole:
             return
         self.show_scoreboard_temporarily(10, payload, final=False)
 
-    # ---------- start / pause ----------
+    # ---------- start / stop ----------
     def on_start_game(self):
         self.cancel_viewer_return()
         self.rescan_controllers()
@@ -1401,6 +1769,7 @@ class PixelChallengeConsole:
 
             self.active_game_key = None
             self.begin_dot_dash_button_learning(1)
+            self.apply_brightness_for_state()
             self.log("Dot Dash: waiting for button learning.")
             self.refresh_player_status_panel()
             self.refresh_controller_panel()
@@ -1430,26 +1799,43 @@ class PixelChallengeConsole:
                 self.controller_status[idx]["enabled"] = False
 
         self.set_state(HostState.GAME_RUNNING, f"{game.get_name()} started.")
+        self.apply_brightness_for_state()
         game.on_start(self)
         self.refresh_player_status_panel()
         self.refresh_controller_panel()
 
     def on_stop_game(self):
-        if self.host_state != HostState.GAME_RUNNING:
-            self.log("Pause ignored: no game currently running.")
-            return
         self.cancel_viewer_return()
-        if self.active_game_key == "dot_dash" and self.game_manager.current_session:
-            self.abort_current_module_round()
-            self.session_started = False
-            self.show_pause_lanes_red()
-            self.set_state(HostState.GAME_SELECTED, "Round paused. Press START to restart.")
-            self.log("Dot Dash paused and reset.")
-            return
-        self.current_game().on_stop(self)
+        if self.game_manager.current_session:
+            try:
+                self.game_manager.finish_current_game(force=True)
+            except Exception:
+                pass
+            self.game_manager.current_session = None
+        try:
+            self.current_game().on_stop(self)
+        except Exception:
+            pass
         self.session_started = False
-        self.show_pause_lanes_red()
-        self.set_state(HostState.GAME_SELECTED, "Round paused. Press START to restart.")
+        self.active_game_key = None
+        self.final_results_active = False
+        self.attract.stop(self)
+        self.all_lanes_test_active = False
+        self.update_lanes_test_button()
+        self.falcon.clear_all_lanes(self)
+
+        for idx in range(1, 5):
+            if self.player_status[idx]["state"] != "REMOVED":
+                was_checked = self.player_status[idx]["checked_in"]
+                self.player_status[idx]["state"] = "JOINED" if was_checked else "WAITING"
+                self.player_status[idx]["confirmed"] = False
+        self.players_confirmed = False
+        self.host_state = HostState.IDLE
+        self.set_state(HostState.IDLE, "STOP pressed; session reset to idle.")
+        self.apply_brightness_for_state()
+        self.refresh_player_status_panel()
+        self.refresh_controller_panel()
+        self.viewer_show_splash()
 
     # ---------- UI helpers ----------
     def panel(self, parent, title: str):
@@ -1590,22 +1976,11 @@ class PixelChallengeConsole:
         footer = tk.Frame(self.ctrl_body, bg="#17071f")
         footer.grid(row=2, column=0, columnspan=2, pady=(8, 0))
 
-        self.neon_button(footer, "TEST", self.on_test_controller, bg="#1b63ff", width=8).pack(side="left", padx=4)
         self.neon_button(footer, "SCAN", self.on_scan_controllers, bg="#1b63ff", width=8).pack(side="left", padx=4)
 
         self.reassign_btn = self.neon_button(footer, "REASSIGN", self.on_reassign_toggle, bg="#1b63ff", width=10)
         self.reassign_btn.pack(side="left", padx=4)
         self.update_reassign_button()
-
-        self.lanes_test_btn = self.neon_button(footer, "ALL LANES TEST", self.on_all_lanes_test, bg="#1b63ff", width=14)
-        self.lanes_test_btn.pack(side="left", padx=4)
-        self.update_lanes_test_button()
-
-        available = [v for v in self.controller_status.values() if not v["locked"]]
-        all_enabled = all(v["enabled"] for v in available) if available else False
-        toggle_text = "DISABLE ALL" if all_enabled else "ENABLE ALL"
-        toggle_bg = "#c93b1e" if all_enabled else "#2ea62e"
-        self.neon_button(footer, toggle_text, self.on_enable_all, bg=toggle_bg, width=12).pack(side="left", padx=4)
 
     def refresh_info_window(self):
         self.info_text.configure(state="normal")
@@ -1865,10 +2240,11 @@ class PixelChallengeConsole:
 
     # ---------- animations / test ----------
     def update_lanes_test_button(self):
-        if self.all_lanes_test_active:
-            self.lanes_test_btn.configure(text="STOP LANES TEST", bg="#c93b1e", activebackground="#c93b1e")
-        else:
-            self.lanes_test_btn.configure(text="ALL LANES TEST", bg="#1b63ff", activebackground="#1b63ff")
+        if hasattr(self, "lanes_test_btn"):
+            if self.all_lanes_test_active:
+                self.lanes_test_btn.configure(text="STOP LANES TEST", bg="#c93b1e", activebackground="#c93b1e")
+            else:
+                self.lanes_test_btn.configure(text="ALL LANES TEST", bg="#1b63ff", activebackground="#1b63ff")
 
     def on_all_lanes_test(self):
         if self.all_lanes_test_active:
@@ -1992,19 +2368,7 @@ class PixelChallengeConsole:
             self.start_assignment_mode()
 
     def on_test_controller(self):
-        self.log("Controller test requested.")
-        self.rescan_controllers()
-        if self.selected_controller is None:
-            self.log("Controller test requested without a selected controller.")
-            return
-        idx = self.selected_controller
-        if self.controller_status[idx]["locked"]:
-            self.log(f"Controller {idx} test blocked because it is locked.")
-            return
-        self.controller_status[idx]["status"] = "TESTING"
-        self.log(f"Testing selected controller {idx}.")
-        self.refresh_controller_panel()
-        self.root.after(800, lambda i=idx: self.finish_controller_test(i))
+        self.log("Controller test requested (UI button removed).")
 
     def finish_controller_test(self, idx: int):
         if self.controller_status[idx]["locked"]:
@@ -2045,7 +2409,7 @@ class PixelChallengeConsole:
         self.refresh_player_status_panel()
         self.refresh_controller_panel()
 
-# --- begin_dot_dash_button_learning (fix indentation) ---
+    # --- begin_dot_dash_button_learning ---
     def begin_dot_dash_button_learning(self, player_id: int = 1):
         self.dot_dash_learning_active = True
         self.dot_dash_learning_player = player_id
@@ -2188,6 +2552,7 @@ class PixelChallengeConsole:
         self.game_manager.handle_input(player_num, "select_color_b", color_b)
         self.active_game_key = "dot_dash"
         self.set_state(HostState.GAME_RUNNING, "Dot Dash module started.")
+        self.apply_brightness_for_state()
         self.log("Dot Dash: Ready")
         self.refresh_player_status_panel()
         self.refresh_controller_panel()
@@ -2261,6 +2626,7 @@ class PixelChallengeConsole:
             self.controller_status[idx]["status"] = "ONLINE" if connected else "MISSING"
         self.selected_controller = None
         self.set_state(HostState.IDLE, "Session redeemed and reset.")
+        self.apply_brightness_for_state()
         self.refresh_player_status_panel()
         self.refresh_controller_panel()
         self.viewer_show_splash()
@@ -2303,6 +2669,11 @@ class PixelChallengeConsole:
         try:
             self.falcon.clear_all_lanes(self)
             self.falcon.stop()
+        except Exception:
+            pass
+        try:
+            if self.falcon_console_proc and self.falcon_console_proc.poll() is None:
+                self.falcon_console_proc.terminate()
         except Exception:
             pass
         self.root.destroy()
