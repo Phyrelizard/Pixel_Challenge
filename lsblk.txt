@@ -1,8 +1,0 @@
-NAME         SIZE FSTYPE MOUNTPOINT             LABEL  MODEL
-loop0          2G swap                                 
-sda         57.7G                                      Patriot Memory
-└─sda1      57.7G ntfs   /media/ledgame/RFV4_11 RFV4_1 
-mmcblk0     29.8G                                      
-├─mmcblk0p1  512M vfat   /boot/firmware         bootfs 
-└─mmcblk0p2 29.3G ext4   /                      rootfs 
-zram0          2G swap   [SWAP]                 zram0  

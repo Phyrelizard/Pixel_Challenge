@@ -1,7 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Pixel Challenge Console
-Exec=/home/ledgame/easter_game/start_console.sh
-StartupNotify=false
-Terminal=false
-X-GNOME-Autostart-enabled=true

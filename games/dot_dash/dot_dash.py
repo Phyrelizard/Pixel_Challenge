@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Dot Dash Game Module v20
+Dot Dash Game Module v21
 Players select 2 colors using their controller buttons, then alternate 
 pressing those two colors to:
 1. Move a dot outbound on the left lane (one pixel per correct press)
@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Tuple
 
 from games.base import GameMeta, GameModule, GamePhase, GameResult, GameSession, PlayerConfig
 
-VERSION_LABEL = "dot_dash_v20"
+VERSION_LABEL = "dot_dash_v21"
 
 # Type alias for RGB colors
 Color = Tuple[int, int, int]
@@ -168,7 +168,7 @@ class DotDashSession(GameSession):
             ps.selected_colors = []
             ps.setup_complete = False
         
-        self.host.log("=== DOT DASH v20 ===")
+        self.host.log("=== DOT DASH v21 ===")
         self.host.log(f"Players: {[p.player_id for p in self.players]}")
         self.host.log("Waiting for players to select 2 colors each...")
         self.host.log("Press any colored button to select that color.")
@@ -183,14 +183,19 @@ class DotDashSession(GameSession):
         Action format: "P{n}_{COLOR}" e.g., "P1_RED", "P2_BLUE"
         """
         if player_id not in self.state:
-            self.host.log(f"[INPUT] Unknown player_id: {player_id}")
+            if hasattr(self.host, 'debug_logging') and self.host.debug_logging.get():
+                self.host.log(f"[INPUT] Unknown player_id: {player_id}")
             return
 
         # Parse the action string to extract the color name
         color_name = self._parse_color_from_action(action)
         if color_name is None:
-            self.host.log(f"[INPUT] Could not parse color from: '{action}'")
+            if hasattr(self.host, 'debug_logging') and self.host.debug_logging.get():
+                self.host.log(f"[INPUT] Could not parse color from: '{action}'")
             return
+
+        if hasattr(self.host, 'debug_logging') and self.host.debug_logging.get():
+            self.host.log(f"[INPUT] P{player_id} pressed {color_name} (phase={self.phase})")
 
         ps = self.state[player_id]
 
@@ -448,7 +453,7 @@ class DotDashSession(GameSession):
         self._update_viewer()
 
     def _check_timeout(self, now: float) -> None:
-        """Check if round has timed out and handle accordingly."""
+        """Check if round has timed out."""
         if self.round_deadline and now > self.round_deadline:
             for ps in self.state.values():
                 if not ps.is_finished():
@@ -457,11 +462,10 @@ class DotDashSession(GameSession):
                     ps.finished_at = self.round_deadline
                     ps.finish_blink_until = now + self.finish_blink_duration_sec
                     self.host.log(f"[GAME] P{ps.player_id} TIMED OUT!")
-            
             self.host.play_sound("timeout")
 
     def _all_finished(self) -> bool:
-        """Check if all players have finished (completed or timed out)."""
+        """Check if all players have finished."""
         return all(ps.is_finished() for ps in self.state.values())
 
     def _all_blinks_done(self, now: float) -> bool:
@@ -471,301 +475,204 @@ class DotDashSession(GameSession):
                 return False
         return True
 
+    # -----------------------------------------------------------------------
+    # Rendering
+    # -----------------------------------------------------------------------
     def _render_lights(self) -> None:
         """Render LED lights for all players based on current state."""
         now = self.host.now()
-
+        
         for pid, ps in self.state.items():
             left = [BLACK] * self.lane_pixel_count
             right = [BLACK] * self.lane_pixel_count
-
-            # === SETUP / READY: Show selected colors ===
-            if self.phase in (GamePhase.SETUP, GamePhase.READY) or ps.phase in ("setup", "ready"):
-                c1 = ps.get_color_rgb(0)  # First selected color
-                c2 = ps.get_color_rgb(1)  # Second selected color
-                brightness = self.brightness["setup"]
+            
+            # SETUP: Show selected colors on left/right lanes
+            if self.phase == GamePhase.SETUP or self.phase == GamePhase.READY:
+                c1 = ps.get_color_rgb(0)
+                c2 = ps.get_color_rgb(1)
                 
-                # Fill lanes with selected colors (or dim grey if not selected)
-                left = [self._scale(c1, brightness)] * self.lane_pixel_count
-                right = [self._scale(c2, brightness)] * self.lane_pixel_count
+                left = [self._scale(c1, self.brightness["setup"])] * self.lane_pixel_count
+                right = [self._scale(c2, self.brightness["setup"])] * self.lane_pixel_count
 
-            # === COUNTDOWN: Blinking red ===
-            elif self.phase == GamePhase.COUNTDOWN or ps.phase == "countdown":
-                blink_on = self._blink_on(now, self.countdown_blink_half_period_sec)
-                c = DIM_RED if blink_on else BLACK
+            # COUNTDOWN: Red blink
+            elif self.phase == GamePhase.COUNTDOWN:
+                elapsed = now - self.countdown_started_at if self.countdown_started_at else 0
+                is_beat = int(elapsed / self.countdown_blink_half_period_sec) % 2 == 0
+                
+                c = FULL_RED if is_beat else BLACK
                 c = self._scale(c, self.brightness["countdown"])
                 left = [c] * self.lane_pixel_count
                 right = [c] * self.lane_pixel_count
 
-            # === RUNNING: Game in progress ===
+            # GAMEPLAY
             elif self.phase == GamePhase.RUNNING:
                 c1 = ps.get_color_rgb(0)
                 c2 = ps.get_color_rgb(1)
                 
-                # Determine the "active" color based on last successful press
-                # If current_target_index is 1, that means we just pressed color 0, so show color 0
-                # If current_target_index is 0, that means we just pressed color 1, so show color 1
-                if ps.valid_presses > 0:
-                    last_pressed_index = 1 if ps.current_target_index == 0 else 0
-                    active_color = ps.get_color_rgb(last_pressed_index)
+                # Determine the "active" color (the one we just pressed)
+                if ps.current_target_index == 0:
+                    active_color = c2  # We just pressed color 2, now expecting color 1
                 else:
-                    active_color = c1  # Default to first color
-
+                    active_color = c1  # We just pressed color 1, now expecting color 2
+                
                 if ps.phase == "armed":
-                    # Green light = waiting for first press
+                    # Green light for GO
                     g = self._scale(FULL_GREEN, self.brightness["gameplay"])
                     left = [g] * self.lane_pixel_count
                     right = [g] * self.lane_pixel_count
-
+                
                 elif ps.phase == "outbound":
-                    # Single dot moving outward on left lane
+                    # Single dot moving outward
                     idx = min(ps.outbound_index, self.lane_pixel_count - 1)
                     left[idx] = self._scale(active_color, self.brightness["gameplay"])
-
+                    
                 elif ps.phase == "return":
-                    # Dash (multiple pixels) moving back on right lane
-                    head = ps.return_head_index
+                    # Dash moving back
+                    head = max(-5, min(ps.return_head_index, self.lane_pixel_count - 1))
                     dash_c = self._scale(active_color, self.brightness["gameplay"])
                     for i in range(self.dash_length):
                         px = head - i
                         if 0 <= px < self.lane_pixel_count:
                             right[px] = dash_c
-
+                
                 elif ps.phase == "finished":
-                    # Blinking finish indicator
-                    blink_on = self._blink_on(now, self.finish_blink_half_period_sec)
+                    # Blink effect for finished players
+                    is_beat = int(now / self.finish_blink_half_period_sec) % 2 == 0
                     if ps.timed_out:
-                        # Red blink for timeout
-                        c = DIM_RED if blink_on else BLACK
+                        c = FULL_RED if is_beat else BLACK
                     else:
-                        # Green blink for success
-                        c = FULL_GREEN if blink_on else BLACK
+                        c = FULL_GREEN if is_beat else BLACK
                     c = self._scale(c, self.brightness["finish"])
                     left = [c] * self.lane_pixel_count
                     right = [c] * self.lane_pixel_count
 
-            # Send pixels to hardware
             self.host.set_player_lane_pixels(pid, "left", left)
             self.host.set_player_lane_pixels(pid, "right", right)
 
     def _update_viewer(self) -> None:
-        """Send current state to the viewer display."""
+        """Update the viewer display with current game state."""
         payload = {
             "game_key": "dot_dash",
             "phase": self.phase.value,
             "title": "Dot Dash",
             "instruction": "",
-            "players": [],
+            "players": []
         }
-
-        # Set instruction text based on phase
+        
         if self.phase == GamePhase.SETUP:
             payload["instruction"] = "SELECT 2 COLORS"
         elif self.phase == GamePhase.READY:
-            payload["instruction"] = "GET READY..."
+            payload["instruction"] = "GET READY!"
         elif self.phase == GamePhase.COUNTDOWN:
-            if self.countdown_started_at:
-                remaining = self.countdown_seconds - int(self.host.now() - self.countdown_started_at)
-                payload["instruction"] = str(max(1, remaining))
-                payload["countdown_value"] = max(0, remaining)
+            elapsed = self.host.now() - self.countdown_started_at if self.countdown_started_at else 0
+            remaining = max(1, self.countdown_seconds - int(elapsed))
+            payload["instruction"] = str(remaining)
         elif self.phase == GamePhase.RUNNING:
             payload["instruction"] = "GO!"
-        elif self.phase in (GamePhase.ROUND_COMPLETE, GamePhase.COMPLETE):
-            if self.first_finisher_id:
-                payload["instruction"] = f"PLAYER {self.first_finisher_id} WINS!"
-            else:
-                payload["instruction"] = "ROUND COMPLETE"
-
-        # Add player data
+        elif self.phase == GamePhase.ROUND_COMPLETE:
+            payload["instruction"] = "ROUND COMPLETE!"
+        
         for pid, ps in self.state.items():
             p_data = {
-                "player_id": pid,
-                "phase": ps.phase,
+                "id": pid,
+                "score": ps.valid_presses * 10,
                 "colors": ps.selected_colors,
-                "color_rgb_1": ps.get_color_rgb(0),
-                "color_rgb_2": ps.get_color_rgb(1),
-                "setup_complete": ps.setup_complete,
-                "valid_presses": ps.valid_presses,
-                "total_presses": ps.total_presses,
-                "outbound_index": ps.outbound_index,
-                "return_head_index": max(0, ps.return_head_index),
-                "progress_percent": self._calculate_progress(ps),
                 "finished": ps.is_finished(),
                 "timed_out": ps.timed_out,
                 "first_finisher": ps.first_finisher,
             }
             payload["players"].append(p_data)
-
+            
         self.host.show_viewer_state("dot_dash", payload)
-
-    def _calculate_progress(self, ps: DotDashPlayerState) -> float:
-        """Calculate completion progress as a percentage (0-100)."""
-        total_steps = self.lane_pixel_count * 2  # Out and back
-        
-        if ps.phase in ("setup", "ready", "countdown", "armed"):
-            return 0.0
-        elif ps.phase == "outbound":
-            return (ps.outbound_index / total_steps) * 100
-        elif ps.phase == "return":
-            outbound_done = self.lane_pixel_count
-            return_done = self.lane_pixel_count - ps.return_head_index
-            return ((outbound_done + return_done) / total_steps) * 100
-        elif ps.phase == "finished":
-            return 100.0 if not ps.timed_out else self._calculate_progress_at_timeout(ps)
-        return 0.0
-
-    def _calculate_progress_at_timeout(self, ps: DotDashPlayerState) -> float:
-        """Calculate progress percentage at the point of timeout."""
-        total_steps = self.lane_pixel_count * 2
-        if ps.outbound_index < self.lane_pixel_count:
-            return (ps.outbound_index / total_steps) * 100
-        else:
-            outbound_done = self.lane_pixel_count
-            return_done = self.lane_pixel_count - max(0, ps.return_head_index)
-            return ((outbound_done + return_done) / total_steps) * 100
 
     @staticmethod
     def _scale(color: Color, factor: float) -> Color:
-        """Scale a color by a brightness factor (0.0 to 1.0)."""
-        return (
-            int(color[0] * factor),
-            int(color[1] * factor),
-            int(color[2] * factor)
-        )
+        """Scale a color by a brightness factor."""
+        return (int(color[0] * factor), int(color[1] * factor), int(color[2] * factor))
 
-    @staticmethod
-    def _blink_on(now_monotonic: float, half_period_sec: float) -> bool:
-        """Determine if we're in the 'on' phase of a blink cycle."""
-        if half_period_sec <= 0:
-            return True
-        return int(now_monotonic / half_period_sec) % 2 == 0
-
+    # -----------------------------------------------------------------------
+    # Results & Cleanup
+    # -----------------------------------------------------------------------
     def is_complete(self) -> bool:
         """Check if the game session is complete."""
         return self.phase == GamePhase.COMPLETE
 
     def get_result(self) -> GameResult:
-        """Calculate and return the game result with scores."""
+        """Build and return the game result."""
         player_results = {}
         winner_id = None
         best_score = -1
-
+        
         for pid, ps in self.state.items():
-            # Calculate timing metrics
-            reaction_time = None
+            # Calculate metrics
+            reaction = 0.0
             if ps.first_valid_press_at and ps.armed_at:
-                reaction_time = round(ps.first_valid_press_at - ps.armed_at, 3)
-
-            completion_time = None
+                reaction = ps.first_valid_press_at - ps.armed_at
+            
+            completion = 0.0
             if ps.finished_at and ps.armed_at:
-                completion_time = round(ps.finished_at - ps.armed_at, 3)
-
-            # Calculate accuracy (valid presses / total presses)
+                completion = ps.finished_at - ps.armed_at
+                
             accuracy = 0.0
             if ps.total_presses > 0:
-                accuracy = round(ps.valid_presses / ps.total_presses, 4)
-
-            # Calculate consistency (based on variance in reaction intervals)
-            consistency = None
-            if len(ps.reaction_intervals) >= 2:
+                accuracy = ps.valid_presses / ps.total_presses
+            
+            consistency = 0.0
+            if len(ps.reaction_intervals) > 1:
                 try:
-                    std = pstdev(ps.reaction_intervals)
-                    avg = mean(ps.reaction_intervals)
-                    if avg > 0:
-                        # Lower variance = higher consistency (0 to 1 scale)
-                        consistency = round(max(0.0, 1.0 - min(1.0, std / avg)), 4)
+                    consistency = 1.0 - min(1.0, pstdev(ps.reaction_intervals) / mean(ps.reaction_intervals))
                 except Exception:
                     pass
-
+                
             # Calculate score
-            score = self._calculate_score(ps, reaction_time, completion_time, accuracy, consistency)
-
-            # Track winner (highest score among non-timed-out players)
+            score = ps.valid_presses * 50
+            if ps.first_finisher:
+                score += 200
+            if ps.timed_out:
+                score = 0
+            
             if score > best_score and not ps.timed_out:
                 best_score = score
                 winner_id = pid
-
+                
             player_results[pid] = {
                 "score": score,
-                "reaction_time_sec": reaction_time,
-                "completion_time_sec": completion_time,
-                "accuracy": accuracy,
-                "consistency": consistency,
+                "reaction_time_sec": round(reaction, 3),
+                "completion_time_sec": round(completion, 3),
+                "accuracy": round(accuracy, 2),
+                "consistency": round(consistency, 2),
                 "valid_presses": ps.valid_presses,
                 "total_presses": ps.total_presses,
                 "finished": ps.is_finished(),
                 "timed_out": ps.timed_out,
                 "first_finisher": ps.first_finisher,
-                "colors_selected": ps.selected_colors,
             }
-
+            
         return GameResult(
             game_key="dot_dash",
             completed=True,
             winner_player_id=winner_id,
             player_results=player_results,
-            viewer_payload={"screen": "results"},
+            viewer_payload={"screen": "results"}
         )
 
-    def _calculate_score(self, ps: DotDashPlayerState, reaction_time, completion_time, accuracy, consistency) -> int:
-        """Calculate the player's score based on performance metrics."""
-        if ps.timed_out:
-            return 0  # No points for timeout
-
-        score = 1000  # Base score for completing
-
-        # Reaction time bonus (up to 240 points for < 0.5s reaction)
-        if reaction_time is not None:
-            reaction_bonus = int(max(0.0, 2.0 - reaction_time) * 120)
-            score += reaction_bonus
-
-        # Completion time bonus (up to 600 points for < 10s completion)
-        if completion_time is not None:
-            completion_bonus = int(max(0.0, 15.0 - completion_time) * 40)
-            score += completion_bonus
-
-        # Accuracy bonus (up to 300 points for 100% accuracy)
-        accuracy_bonus = int(accuracy * 300)
-        score += accuracy_bonus
-
-        # Consistency bonus (up to 200 points for perfect consistency)
-        if consistency is not None:
-            consistency_bonus = int(consistency * 200)
-            score += consistency_bonus
-
-        # First finisher bonus
-        if ps.first_finisher:
-            score += 200
-
-        return max(0, score)
-
     def on_exit(self) -> None:
-        """Clean up when the game session ends."""
-        self.host.log("[GAME] Dot Dash session ending, cleaning up...")
+        """Clean up when game session ends."""
         self.host.clear_all_pixels()
-        
-        # Save SLA results for players who finished
-        result = self.get_result()
-        for player_id, metrics in result.player_results.items():
-            if metrics.get("finished") and not metrics.get("timed_out"):
-                self.host.save_sla_result(player_id, "dot_dash", metrics)
+        self.host.log("[GAME] Dot Dash session exited.")
 
 
 class DotDashModule(GameModule):
-    """
-    Dot Dash game module.
-    Provides metadata and factory method for creating game sessions.
-    """
+    """Game module for Dot Dash."""
     META = GameMeta(
         key="dot_dash",
         title="Dot Dash",
         min_players=1,
         max_players=4,
         requires_color_selection=True,
-        supports_sla=True,
-        description="Select 2 colors, then alternate pressing them to race a dot out and a dash back!",
+        supports_sla=False,
+        description="Select 2 colors, then alternate buttons to race your dot!"
     )
 
     def create_session(self, host, players, settings=None) -> DotDashSession:
-        """Create a new Dot Dash game session."""
-        return DotDashSession(host=host, players=players, settings=settings)
+        return DotDashSession(host=host, players=players, settings=settings or {})

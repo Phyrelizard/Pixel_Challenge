@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v19.0.0
-- Full integration with GameManager and game modules
-- Fixed joystick input routing to active game sessions
-- Proper game tick loop for real-time game updates
-- Color-based button input system for Dot Dash
+Pixel Challenge Host Console v21.1.0
+- Countdown 3-2-1-GO before game starts
+- Bottom log panel left side now adjustable
+- Animate state restores after game ends
+- Full SETUP window restored with network settings
 """
 import os
 import sys
@@ -17,6 +17,7 @@ from tkinter import messagebox, ttk
 from enum import Enum, auto
 import subprocess
 import webbrowser
+import traceback
 
 import pygame
 import sacn
@@ -25,11 +26,9 @@ from host_api import ConsoleHostAPI
 from game_manager import GameManager
 from games.base import PlayerConfig
 
-# Console Version
-VERSION_LABEL = "v19.0.0"
+VERSION_LABEL = "v21.1.0"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
-# System Paths
 DEFAULT_FALCON_IP = "192.168.2.113"
 PIXELS_PER_LANE = 100
 ASSIGNMENTS_FILE = "/home/ledgame/easter_game/controller_assignments.json"
@@ -39,7 +38,6 @@ ASSETS_DIR = "/home/ledgame/easter_game/assets"
 SETTINGS_FILE = "/home/ledgame/easter_game/attract_theme_maps.json"
 GAMES_ROOT = "/home/ledgame/easter_game/games"
 
-# --- Version Detection Logic for Log ---
 DOT_DASH_PATH = os.path.join(GAMES_ROOT, "dot_dash", "dot_dash.py")
 DOT_DASH_VERSION_LABEL = "dot_dash.py (not found)"
 
@@ -61,6 +59,7 @@ MIN_CENTER = 600
 MIN_CONTROLLERS = 360
 MIN_INFO_HEIGHT = 150
 MIN_MAIN_HEIGHT = 400
+MIN_LOG_WIDTH = 300
 
 BUTTON_MAP_ORDER = ["white", "red", "green", "blue", "orange", "yellow"]
 
@@ -97,6 +96,7 @@ class HostState(Enum):
     PLAYERS_CONFIRMED = auto()
     GAME_SELECTED = auto()
     READY_TO_START = auto()
+    COUNTDOWN = auto()
     GAME_RUNNING = auto()
     ROUND_COMPLETE = auto()
     RESULTS_READY = auto()
@@ -132,7 +132,18 @@ class ViewerService:
         self._write(f"PLAY_VIDEO|{video_path}")
 
     def show_final_results(self):
-        self._write("SHOW_FINAL_RESULTS")
+        self._write("SHOW_SCOREBOARD")
+
+    def show_countdown(self, number: int):
+        """Show countdown number (3, 2, 1) or 'GO' (0)"""
+        if number == 0:
+            self._write("SHOW_COUNTDOWN|GO")
+        else:
+            self._write(f"SHOW_COUNTDOWN|{number}")
+
+    def show_game_active(self):
+        """Tell viewer game is now active"""
+        self._write("SHOW_GAME_ACTIVE")
 
 
 class FalconService:
@@ -156,13 +167,16 @@ class FalconService:
     def start(self):
         if self.started:
             return
-        self.sender = sacn.sACNsender(source_name="PixelChallengeHost")
-        self.sender.start()
-        for universe in range(1, 9):
-            self.sender.activate_output(universe)
-            self.sender[universe].destination = self.falcon_ip
-            self.sender[universe].dmx_data = bytes(512)
-        self.started = True
+        try:
+            self.sender = sacn.sACNsender(source_name="PixelChallengeHost")
+            self.sender.start()
+            for universe in range(1, 9):
+                self.sender.activate_output(universe)
+                self.sender[universe].destination = self.falcon_ip
+                self.sender[universe].dmx_data = bytes(512)
+            self.started = True
+        except Exception as e:
+            print(f"FalconService start error: {e}")
 
     def stop(self):
         if self.sender is not None:
@@ -187,8 +201,11 @@ class FalconService:
         return bytes(buf)
 
     def _send_pixels(self, universe: int, pixels):
-        if self.sender and universe in self.sender:
-            self.sender[universe].dmx_data = self._build_frame(pixels)
+        if self.sender and self.started:
+            try:
+                self.sender[universe].dmx_data = self._build_frame(pixels)
+            except Exception:
+                pass
 
     def blank_pixels(self):
         return [(0, 0, 0)] * self.pixels_per_lane
@@ -219,45 +236,38 @@ class FalconService:
 
     def render_theme_frame(self, theme_name: str, step: int):
         lane_slots = [
-            (1, "left"), (1, "right"),
-            (2, "left"), (2, "right"),
-            (3, "left"), (3, "right"),
-            (4, "left"), (4, "right"),
+            (1, "left"), (1, "right"), (2, "left"), (2, "right"),
+            (3, "left"), (3, "right"), (4, "left"), (4, "right"),
         ]
         theme_name = theme_name.lower()
         for slot_index, (player_id, lane) in enumerate(lane_slots):
             pixels = self._theme_pixels(theme_name, slot_index, step)
             self.send_lane_pixels(player_id, lane, pixels)
 
+    def flash_all_lanes(self, color_name: str):
+        """Flash all lanes with a single color for countdown effect"""
+        color = COLOR_MAP.get(color_name.lower(), (255, 255, 255))
+        pixels = [color] * self.pixels_per_lane
+        for player_id in self.lane_map:
+            for lane in ("left", "right"):
+                self.send_lane_pixels(player_id, lane, pixels)
+
     def _theme_pixels(self, theme_name: str, lane_slot: int, step: int):
         n = self.pixels_per_lane
         if theme_name == "rainbow pulse":
-            return [
-                hsv_rgb((i / n) + (step * 0.02) + (lane_slot * 0.08), 1.0, 0.35 + 0.30 * (0.5 + 0.5 * math.sin(step * 0.18)))
-                for i in range(n)
-            ]
+            return [hsv_rgb((i / n) + (step * 0.02) + (lane_slot * 0.08), 1.0, 0.35 + 0.30 * (0.5 + 0.5 * math.sin(step * 0.18))) for i in range(n)]
         if theme_name == "fire burst":
             pixels = []
             for i in range(n):
                 heat = 0.35 + 0.45 * (0.5 + 0.5 * math.sin((i * 0.23) + (step * 0.35) + lane_slot))
-                if heat > 0.72:
-                    base = COLOR_MAP["yellow"]
-                elif heat > 0.55:
-                    base = COLOR_MAP["orange"]
-                else:
-                    base = COLOR_MAP["red"]
+                base = COLOR_MAP["yellow"] if heat > 0.72 else COLOR_MAP["orange"] if heat > 0.55 else COLOR_MAP["red"]
                 pixels.append(scale_color(base, heat))
             return pixels
         if theme_name == "ice burst":
             pixels = []
             for i in range(n):
                 wave = 0.25 + 0.60 * (0.5 + 0.5 * math.sin((i * 0.18) - (step * 0.28) + lane_slot))
-                if wave > 0.72:
-                    base = COLOR_MAP["white"]
-                elif wave > 0.48:
-                    base = COLOR_MAP["cyan"]
-                else:
-                    base = COLOR_MAP["blue"]
+                base = COLOR_MAP["white"] if wave > 0.72 else COLOR_MAP["cyan"] if wave > 0.48 else COLOR_MAP["blue"]
                 pixels.append(scale_color(base, wave))
             return pixels
         if theme_name == "galaxy wave":
@@ -274,40 +284,26 @@ class FalconService:
             return pixels
         if theme_name == "team colors":
             palette = [COLOR_MAP["red"], COLOR_MAP["green"], COLOR_MAP["blue"], COLOR_MAP["orange"], COLOR_MAP["white"]]
-            pixels = []
-            for i in range(n):
-                band = ((i // 6) + step // 2 + lane_slot) % len(palette)
-                pixels.append(scale_color(palette[band], 0.65))
-            return pixels
+            return [scale_color(palette[((i // 6) + step // 2 + lane_slot) % len(palette)], 0.65) for i in range(n)]
         if theme_name == "lane chase lr":
             palette = [COLOR_MAP["red"], COLOR_MAP["orange"], COLOR_MAP["yellow"], COLOR_MAP["green"], COLOR_MAP["blue"], COLOR_MAP["purple"], COLOR_MAP["cyan"], COLOR_MAP["white"]]
             active_slot = step % 8
             base = palette[(step + lane_slot) % len(palette)]
-            if lane_slot == active_slot:
-                return [scale_color(base, 1.0)] * n
-            return [scale_color(base, 0.08)] * n
+            return [scale_color(base, 1.0 if lane_slot == active_slot else 0.08)] * n
         if theme_name == "lane chase rl":
             palette = [COLOR_MAP["cyan"], COLOR_MAP["white"], COLOR_MAP["purple"], COLOR_MAP["blue"], COLOR_MAP["green"], COLOR_MAP["yellow"], COLOR_MAP["orange"], COLOR_MAP["red"]]
             active_slot = 7 - (step % 8)
             base = palette[(step + lane_slot) % len(palette)]
-            if lane_slot == active_slot:
-                return [scale_color(base, 1.0)] * n
-            return [scale_color(base, 0.08)] * n
+            return [scale_color(base, 1.0 if lane_slot == active_slot else 0.08)] * n
         if theme_name == "bounce chase":
             cycle = list(range(8)) + list(range(6, 0, -1))
             active_slot = cycle[step % len(cycle)]
             colors = [COLOR_MAP["red"], COLOR_MAP["green"], COLOR_MAP["blue"], COLOR_MAP["orange"], COLOR_MAP["white"], COLOR_MAP["purple"], COLOR_MAP["yellow"], COLOR_MAP["cyan"]]
             base = colors[(lane_slot + step) % len(colors)]
-            if lane_slot == active_slot:
-                return [scale_color(base, 1.0)] * n
-            return [scale_color(base, 0.06)] * n
+            return [scale_color(base, 1.0 if lane_slot == active_slot else 0.06)] * n
         if theme_name == "color wash":
-            pixels = []
             hue = (step * 0.015) + (lane_slot * 0.06)
-            for i in range(n):
-                pixels.append(hsv_rgb(hue + (i * 0.002), 1.0, 0.50))
-            return pixels
-        # Default: Calm Mode
+            return [hsv_rgb(hue + (i * 0.002), 1.0, 0.50) for i in range(n)]
         pixels = []
         for i in range(n):
             v = 0.10 + 0.18 * (0.5 + 0.5 * math.sin((step * 0.10) + (lane_slot * 0.7) + (i * 0.05)))
@@ -337,7 +333,7 @@ class AttractService:
         if self.active:
             self.falcon.render_theme_frame(theme_name, self.step)
             if host:
-                host.log(f"AttractService: theme changed live to '{theme_name}'.")
+                host.log(f"AttractService: theme changed to '{theme_name}'.")
 
     def tick(self, host=None):
         if not self.active or not self.current_theme:
@@ -362,8 +358,7 @@ class BaseGameModule:
         return self.get_name().lower().replace(" ", "_")
 
     def get_intro_video_path(self) -> str:
-        filename = self._asset_stem() + "_intro.mp4"
-        return f"{ASSETS_DIR}/{filename}"
+        return f"{ASSETS_DIR}/{self._asset_stem()}_intro.mp4"
 
     def get_splash_image_path(self) -> str:
         return f"{ASSETS_DIR}/{self._asset_stem()}_splash.png"
@@ -379,8 +374,6 @@ class BaseGameModule:
     def validate_ready_to_start(self, host):
         if host.players_joined.get() == 0:
             return False, "No players have joined."
-        if not host.players_confirmed:
-            return False, "Players are not confirmed."
         return True, ""
 
     def on_enter_setup(self, host):
@@ -435,6 +428,9 @@ class GameRegistry:
         return list(self.games.keys())
 
 
+# ===========================================================================
+# MAIN CONSOLE CLASS
+# ===========================================================================
 class PixelChallengeConsole:
     def __init__(self, root: tk.Tk):
         self.root = root
@@ -447,13 +443,13 @@ class PixelChallengeConsole:
         self.root.grid_rowconfigure(0, weight=0)
         self.root.grid_rowconfigure(1, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
-
         self.root.option_add("*TCombobox*Listbox.font", ("Arial", 18, "bold"))
 
         self.host_state = HostState.IDLE
         self.selected_game = tk.StringVar(value="Splash")
         self.players_joined = tk.IntVar(value=0)
         self.animate_enabled = tk.BooleanVar(value=False)
+        self.animate_was_enabled_before_game = False  # Track animate state before game
         self.cycle_enabled = tk.BooleanVar(value=False)
         self.cycle_seconds = tk.IntVar(value=60)
         self.per_theme_speed = {}
@@ -467,17 +463,19 @@ class PixelChallengeConsole:
         self.checkin_open = False
         self.players_confirmed = False
         self.session_started = False
-        self.white_button_index = 4
 
         self.button_map_mode = False
         self.map_current_controller = 1
         self.map_current_button_idx = 0
 
         self.all_lanes_test_active = False
+        self.game_tick_active = False
+        
+        # Countdown state
+        self.countdown_value = 0
+        self.countdown_after_id = None
+        self.pending_players = []
 
-        self.assignment_mode = False
-        self.assignment_step = 1
-        self.assignment_used_signatures = set()
         self.assignment_map = self.load_assignments()
         self.saved_assignments = self.assignment_map
 
@@ -509,10 +507,7 @@ class PixelChallengeConsole:
         self.theme_vars = {}
         self.theme_speed_vars = {}
 
-        self.info_lines = [
-            "P1 | U1/U2", "P2 | U3/U4", "P3 | U5/U6", "P4 | U7/U8",
-            "Host boot complete.",
-        ]
+        self.info_lines = ["P1 | U1/U2", "P2 | U3/U4", "P3 | U5/U6", "P4 | U7/U8", "Host boot complete."]
 
         self.falcon_ip = DEFAULT_FALCON_IP
         self.wifi_ssid = tk.StringVar(value="")
@@ -539,24 +534,23 @@ class PixelChallengeConsole:
 
         self.state_var = tk.StringVar(value=f"STATE: {self.host_state.name}")
 
-        self.sash_left_main = None
+        # Sash positions
+        self.sash_left_attract_bottom = None
         self.sash_center_ctrl = None
         self.sash_main_info = None
+        self.sash_bottom_log = None
 
         self.load_settings()
         self.write_startup_log()
 
-        # Initialize services
         self.viewer = ViewerService("/home/ledgame/easter_game/viewer_command.txt")
         self.falcon = FalconService(self.falcon_ip, PIXELS_PER_LANE)
         self.attract = AttractService(self.falcon)
         self.games = GameRegistry()
 
-        # Initialize host API and game manager
         self.host_api = ConsoleHostAPI(self)
         self.game_manager = GameManager(self.host_api)
 
-        # Joystick tracking
         self.joysticks = {}
         self.joystick_player_map = {}
         self.button_last_state = {}
@@ -569,9 +563,8 @@ class PixelChallengeConsole:
         self.refresh_controller_panel()
         self.refresh_info_window()
 
-        # Initialize joysticks and start polling
         self.init_joysticks()
-        self.root.after(50, self.poll_joysticks)
+        self.root.after(16, self.poll_joysticks)
         self.root.after(self.current_animation_interval_ms(), self.animation_tick)
 
         self.set_state(HostState.IDLE, "System ready.")
@@ -584,19 +577,11 @@ class PixelChallengeConsole:
     def write_startup_log(self):
         header = f"""
 ==============================================
-
-                start 
-
-                CONSOLE
-
----      {CONSOLE_FILENAME}
-
----------------------------------------------
-
-                GAME: 
-
----      {DOT_DASH_VERSION_LABEL}
-
+          CONSOLE START - {VERSION_LABEL}
+---   {CONSOLE_FILENAME}
+----------------------------------------------
+          GAME MODULE:
+---   {DOT_DASH_VERSION_LABEL}
 ==============================================
 """
         try:
@@ -605,19 +590,15 @@ class PixelChallengeConsole:
         except Exception:
             pass
 
-    # =========================================================================
-    # PERSISTENCE METHODS
-    # =========================================================================
     def load_assignments(self):
         if not os.path.exists(ASSIGNMENTS_FILE):
             return {}
         try:
             with open(ASSIGNMENTS_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            if isinstance(data, dict):
-                return data
-        except Exception as e:
-            print(f"Warning: failed to load assignments: {e}")
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            pass
         return {}
 
     def save_assignments(self):
@@ -627,7 +608,7 @@ class PixelChallengeConsole:
             self.saved_assignments = dict(self.assignment_map)
             self.log("Controller assignments saved.")
         except Exception as e:
-            self.log(f"Failed to save controller assignments: {e}")
+            self.log(f"Failed to save assignments: {e}")
 
     def load_score_history(self):
         if not os.path.exists(SCORE_HISTORY_FILE):
@@ -637,8 +618,8 @@ class PixelChallengeConsole:
                 data = json.load(f)
             if isinstance(data, dict) and isinstance(data.get("rounds", []), list):
                 return data
-        except Exception as e:
-            print(f"Warning: failed to load score history: {e}")
+        except Exception:
+            pass
         return {"rounds": []}
 
     def save_score_history(self):
@@ -660,9 +641,10 @@ class PixelChallengeConsole:
             self.per_theme_speed = data.get("per_theme_speed", {})
             saved_selected = data.get("selected_themes", [])
             self.selected_themes = set(saved_selected) if isinstance(saved_selected, list) else set()
-            self.sash_left_main = data.get("sash_left_main")
+            self.sash_left_attract_bottom = data.get("sash_left_attract_bottom")
             self.sash_center_ctrl = data.get("sash_center_ctrl")
             self.sash_main_info = data.get("sash_main_info")
+            self.sash_bottom_log = data.get("sash_bottom_log")
             self.theme_brightness_percent.set(int(data.get("falcon_brightness", 100)))
             self.gameplay_brightness_percent.set(int(data.get("gameplay_brightness", 100)))
             self.falcon_ip = data.get("falcon_ip", DEFAULT_FALCON_IP)
@@ -679,8 +661,8 @@ class PixelChallengeConsole:
             self.backup_restore.set(bool(data.get("backup_restore", False)))
             self.apply_reboot.set(bool(data.get("apply_reboot", False)))
             self.setup_geometry = data.get("setup_geometry")
-        except Exception as e:
-            print(f"Failed to load settings: {e}")
+        except Exception:
+            pass
 
     def save_settings(self):
         data = {
@@ -689,9 +671,10 @@ class PixelChallengeConsole:
             "cycle_seconds": int(self.cycle_seconds.get()),
             "per_theme_speed": self.per_theme_speed,
             "selected_themes": list(self.selected_themes),
-            "sash_left_main": self.sash_left_main,
+            "sash_left_attract_bottom": self.sash_left_attract_bottom,
             "sash_center_ctrl": self.sash_center_ctrl,
             "sash_main_info": self.sash_main_info,
+            "sash_bottom_log": self.sash_bottom_log,
             "falcon_brightness": int(self.theme_brightness_percent.get()),
             "gameplay_brightness": int(self.gameplay_brightness_percent.get()),
             "falcon_ip": self.falcon_ip,
@@ -712,34 +695,46 @@ class PixelChallengeConsole:
         try:
             with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
-        except Exception as e:
-            print(f"Failed to save settings: {e}")
+        except Exception:
+            pass
 
-    # =========================================================================
-    # HELPER METHODS
-    # =========================================================================
     def log(self, message: str):
-        line = message
-        self.info_lines.append(line)
+        self.info_lines.append(message)
+        if len(self.info_lines) > 500:
+            self.info_lines = self.info_lines[-500:]
         self.refresh_info_window()
         if hasattr(self, 'info_text'):
-            self.info_text.see("end")
+            try:
+                self.info_text.see("end")
+            except Exception:
+                pass
         try:
             with open(self.log_file, "a", encoding="utf-8") as f:
-                f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {line}\n")
+                f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {message}\n")
         except Exception:
             pass
 
     def play_sound(self, sound_key: str):
-        """Play a sound effect - stub for now."""
         pass
+
+    def now(self):
+        return time.monotonic()
 
     def push_viewer_state(self, state_name: str, payload: dict):
         try:
             with open(self.viewer_state_file, "w", encoding="utf-8") as f:
                 json.dump(payload, f, indent=2)
-        except Exception as e:
-            self.log(f"push_viewer_state error: {e}")
+        except Exception:
+            pass
+
+    def show_viewer_state(self, state_name: str, payload: dict):
+        self.push_viewer_state(state_name, payload)
+
+    def clear_all_pixels(self):
+        self.falcon.clear_all_lanes(None)
+
+    def set_player_lane_pixels(self, player_id: int, lane: str, pixels):
+        self.falcon.send_lane_pixels(player_id, lane, pixels)
 
     def apply_brightness_for_state(self):
         if self.host_state == HostState.GAME_RUNNING:
@@ -770,16 +765,8 @@ class PixelChallengeConsole:
     def viewer_show_splash(self):
         try:
             self.viewer.show_splash()
-            self.log("ViewerService: requested splash.")
-        except Exception as e:
-            self.log(f"ViewerService splash failed: {e}")
-
-    def viewer_play_intro(self, path: str):
-        try:
-            self.viewer.play_intro(path)
-            self.log(f"ViewerService: play intro -> {path}")
-        except Exception as e:
-            self.log(f"ViewerService intro failed: {e}")
+        except Exception:
+            pass
 
     def cancel_viewer_return(self):
         if self.viewer_return_after_id is not None:
@@ -797,13 +784,12 @@ class PixelChallengeConsole:
             splash_path = game.get_splash_image_path()
             if os.path.exists(splash_path):
                 self.viewer.show_image(splash_path)
-                self.log(f"ViewerService: show splash -> {splash_path}")
             else:
                 self.viewer_show_splash()
-                self.log(f"No splash asset for {game.get_name()}: {splash_path}")
         else:
             self.viewer_show_splash()
-                # =========================================================================
+
+    # =========================================================================
     # SCOREBOARD METHODS
     # =========================================================================
     def _write_scoreboard_data(self, payload: dict):
@@ -821,25 +807,12 @@ class PixelChallengeConsole:
                 try:
                     player_id = int(player_key)
                 except Exception:
-                    player_id = int(player_key[1:]) if str(player_key).startswith("P") else None
-                if player_id is None:
                     continue
-                reaction = metrics.get("reaction_time_sec")
-                completion = metrics.get("completion_time_sec")
                 score = metrics.get("score", 0) or 0
-                accuracy = metrics.get("accuracy") or 0.0
-                consistency = metrics.get("consistency") or 0.0
-                rating = float(score)
-                if reaction is not None:
-                    rating += max(0.0, 2.0 - float(reaction)) * 120.0
-                if completion is not None:
-                    rating += max(0.0, 15.0 - float(completion)) * 35.0
-                rating += float(accuracy) * 250.0
-                rating += float(consistency) * 200.0
-                rankings[player_id] = rankings.get(player_id, 0.0) + rating
+                rankings[player_id] = rankings.get(player_id, 0) + score
                 counts[player_id] = counts.get(player_id, 0) + 1
         for player_id in list(rankings):
-            rankings[player_id] = int(round(rankings[player_id] / max(1, counts[player_id])))
+            rankings[player_id] = int(rankings[player_id] / max(1, counts[player_id]))
         return rankings
 
     def build_scoreboard_payload(self, result=None, title="Scoreboard"):
@@ -856,7 +829,6 @@ class PixelChallengeConsole:
             if self.last_scoreboard_payload is not None:
                 payload.update(self.last_scoreboard_payload)
                 payload["title"] = title
-                payload["show_ranking"] = bool(self.show_ranking.get())
                 return payload
             rounds = self.score_history.get("rounds", [])
             if not rounds:
@@ -866,7 +838,7 @@ class PixelChallengeConsole:
             payload["game"] = latest.get("game_key", self.selected_game.get())
             payload["winner_player_id"] = latest.get("winner_player_id")
             for player_key, metrics in result_rows.items():
-                player_id = int(player_key) if str(player_key).isdigit() else int(str(player_key).replace("P", ""))
+                player_id = int(player_key) if str(player_key).isdigit() else 0
                 row = {"player_id": player_id}
                 row.update(metrics)
                 if payload["show_ranking"]:
@@ -908,17 +880,19 @@ class PixelChallengeConsole:
         if final:
             self.final_results_active = True
             self.viewer.show_final_results()
-            self.log("ViewerService: show Final Results.")
         else:
             self.viewer.show_scoreboard()
             self.final_results_active = False
-            self.log("ViewerService: show dynamic scoreboard.")
-        self.log(f"Scoreboard ({'Final' if final else 'Round'}): winner={payload.get('winner_player_id')}")
         self.viewer_return_after_id = self.root.after(int(seconds * 1000), self.finish_results_screen)
 
     def finish_results_screen(self):
         self.final_results_active = False
         self.show_selected_game_splash()
+        # Restore animate if it was enabled before game
+        if self.animate_was_enabled_before_game:
+            self.animate_enabled.set(True)
+            self.update_animate_button()
+            self.log("Animate restored after game.")
 
     # =========================================================================
     # THEME HELPERS
@@ -948,8 +922,37 @@ class PixelChallengeConsole:
     def lights_should_run(self) -> bool:
         has_theme = len(self.get_checked_theme_names()) > 0
         splash_and_anim = self.selected_game.get() == "Splash" and self.animate_enabled.get()
-        final_results = self.final_results_active
-        return has_theme and (splash_and_anim or final_results)
+        return has_theme and (splash_and_anim or self.final_results_active)
+
+    def get_checked_theme_names(self):
+        return [name for name, var in self.theme_vars.items() if var.get()]
+
+    def cycle_allowed(self):
+        return self.cycle_enabled.get() and self.lights_should_run() and self.host_state != HostState.GAME_RUNNING
+
+    def apply_attract_state(self):
+        if self.all_lanes_test_active or self.host_state in (HostState.GAME_RUNNING, HostState.COUNTDOWN):
+            return
+        if self.lights_should_run():
+            if not self.attract.active:
+                self.attract.start_theme(self, self.current_theme_name())
+        else:
+            if self.attract.active:
+                self.attract.stop(self)
+        self.apply_brightness_for_state()
+
+    def rotate_theme(self):
+        checked = self.get_checked_theme_names()
+        if not checked:
+            return
+        current = self.attract.current_theme or self.current_theme_name()
+        if current not in checked:
+            next_theme = checked[0]
+        else:
+            idx = checked.index(current)
+            next_theme = checked[(idx + 1) % len(checked)]
+        self.attract.apply_live_theme_change(self, next_theme)
+        self.on_theme_selected_manual(next_theme)
 
     def update_animate_button(self):
         if not hasattr(self, 'animate_btn'):
@@ -974,8 +977,17 @@ class PixelChallengeConsole:
         )
         self.save_settings()
 
+    def toggle_animate(self):
+        self.animate_enabled.set(not self.animate_enabled.get())
+        self.update_animate_button()
+
+    def toggle_cycle(self):
+        self.cycle_enabled.set(not self.cycle_enabled.get())
+        self.update_cycle_button()
+        self.last_cycle_switch = time.time()
+
     def on_cycle_changed(self, value):
-        self.cycle_seconds.set(int(value))
+        self.cycle_seconds.set(int(float(value)))
         self.save_settings()
 
     def on_theme_brightness_changed(self, value):
@@ -992,43 +1004,38 @@ class PixelChallengeConsole:
             self.falcon.set_brightness(pct)
         self.save_settings()
 
-    def toggle_animate(self):
-        self.animate_enabled.set(not self.animate_enabled.get())
-        self.update_animate_button()
+    def on_theme_checked(self):
+        self.selected_themes = {name for name, var in self.theme_vars.items() if var.get()}
+        self.save_settings()
+        self.apply_attract_state()
 
-    def toggle_cycle(self):
-        self.cycle_enabled.set(not self.cycle_enabled.get())
-        self.update_cycle_button()
-        self.last_cycle_switch = time.time()
-
-    def start_attract_with_current_theme(self):
-        theme = self.current_theme_name()
-        self.attract.start_theme(self, theme)
-
-    def get_checked_theme_names(self):
-        return [name for name, var in self.theme_vars.items() if var.get()]
-
-    def cycle_allowed(self):
-        return self.cycle_enabled.get() and self.lights_should_run() and self.host_state != HostState.GAME_RUNNING
-
-    def apply_attract_state(self):
-        if self.all_lanes_test_active:
+    def on_theme_selected(self, event=None):
+        name = self.theme_listbox_selection()
+        if not name:
             return
-        if self.host_state == HostState.GAME_RUNNING:
-            return
-        if self.lights_should_run():
-            if not self.attract.active:
-                self.start_attract_with_current_theme()
-        else:
-            if self.attract.active:
-                self.attract.stop(self)
-        self.apply_brightness_for_state()
+        if self.lights_should_run() and self.animate_enabled.get() and not self.all_lanes_test_active:
+            self.attract.apply_live_theme_change(self, name)
+        self.save_settings()
+
+    def on_theme_speed_changed(self, theme_name: str, value):
+        self.per_theme_speed[theme_name] = int(float(value))
+        self.save_settings()
+        if self.attract.current_theme == theme_name and self.attract.active:
+            self.attract.step = 0
+
+    def on_theme_selected_manual(self, theme_name: str):
+        if hasattr(self, 'theme_select_box'):
+            self.theme_select_box.selection_clear(0, "end")
+            try:
+                idx = self.theme_names.index(theme_name)
+                self.theme_select_box.selection_set(idx)
+            except Exception:
+                pass
 
     # =========================================================================
     # JOYSTICK / CONTROLLER METHODS
     # =========================================================================
     def init_joysticks(self):
-        """Initialize pygame joystick system."""
         try:
             pygame.init()
             pygame.joystick.init()
@@ -1038,7 +1045,6 @@ class PixelChallengeConsole:
         self.rescan_controllers()
 
     def rescan_controllers(self):
-        """Rescan for connected controllers."""
         try:
             pygame.joystick.quit()
             pygame.joystick.init()
@@ -1066,8 +1072,7 @@ class PixelChallengeConsole:
                     "signature": sig,
                     "num_buttons": js.get_numbuttons(),
                 })
-                # Initialize button state tracking
-                self.button_last_state[js_index] = [False] * js.get_numbuttons()
+                self.button_last_state[js_index] = {}
                 self.log(f"  JS{js_index}: {js.get_name()} ({js.get_numbuttons()} buttons)")
             except Exception as e:
                 self.log(f"Failed to init js{js_index}: {e}")
@@ -1077,7 +1082,6 @@ class PixelChallengeConsole:
         self.refresh_player_status_panel()
 
     def apply_assignments(self):
-        """Apply saved controller assignments."""
         self.joystick_player_map = {}
         for pid in range(1, 5):
             self.controller_status[pid]["status"] = "MISSING"
@@ -1085,7 +1089,6 @@ class PixelChallengeConsole:
             self.controller_status[pid]["signature"] = ""
             self.controller_status[pid]["name"] = ""
 
-        # Try to match saved assignments to discovered devices
         for p_str, data in self.assignment_map.items():
             try:
                 pid = int(p_str)
@@ -1101,7 +1104,6 @@ class PixelChallengeConsole:
                     self.controller_status[pid]["name"] = dev["name"]
                     break
 
-        # Auto-assign any unassigned joysticks to unassigned players
         assigned_js = set(self.joystick_player_map.keys())
         assigned_players = set(self.joystick_player_map.values())
         for dev in self.discovered_devices:
@@ -1113,90 +1115,70 @@ class PixelChallengeConsole:
                         self.controller_status[pid]["enabled"] = True
                         self.controller_status[pid]["signature"] = dev["signature"]
                         self.controller_status[pid]["name"] = dev["name"]
+                        self.assignment_map[str(pid)] = {"signature": dev["signature"], "buttons": {}}
                         assigned_js.add(dev["js_index"])
                         assigned_players.add(pid)
                         self.log(f"Auto-assigned JS{dev['js_index']} to Player {pid}")
                         break
 
-    def poll_joysticks(self):
-        """Poll joystick events and route to appropriate handlers."""
-        try:
-            pygame.event.pump()
-
-            for js_index, js in self.joysticks.items():
-                player_id = self.joystick_player_map.get(js_index)
-                num_buttons = js.get_numbuttons()
-
-                for btn_idx in range(num_buttons):
-                    try:
-                        current_state = js.get_button(btn_idx)
-                    except Exception:
-                        continue
-
-                    previous_state = self.button_last_state[js_index][btn_idx] if btn_idx < len(self.button_last_state[js_index]) else False
-
-                    # Detect button press (transition from not pressed to pressed)
-                    if current_state and not previous_state:
-                        # Button mapping mode
-                        if self.button_map_mode:
-                            if player_id == self.map_current_controller:
-                                self.handle_map_input(player_id, btn_idx)
-                        # Check-in mode
-                        elif self.host_state == HostState.CHECKIN_OPEN and player_id:
-                            color_name = self._button_index_to_color(player_id, btn_idx)
-                            if color_name and color_name.upper() == "WHITE":
-                                self.perform_checkin(player_id)
-                            elif color_name:
-                                self.log(f"P{player_id} pressed {color_name} (press WHITE to check in)")
-                        # Game running - route to game manager
-                        elif self.host_state == HostState.GAME_RUNNING and player_id:
-                            color_name = self._button_index_to_color(player_id, btn_idx)
-                            if color_name:
-                                action = f"P{player_id}_{color_name.upper()}"
-                                self.game_manager.handle_input(player_id, action)
-                                self.log(f"Game input: {action}")
-
-                    if btn_idx < len(self.button_last_state[js_index]):
-                        self.button_last_state[js_index][btn_idx] = current_state
-
-        except Exception as e:
-            self.log(f"Joystick poll error: {e}")
-
-        # Schedule next poll
-        self.root.after(16, self.poll_joysticks)
-
-    def _button_index_to_color(self, player_id: int, btn_idx: int) -> str | None:
-        """Map a button index to a color name based on saved mappings or defaults."""
-        # Check saved button map for this player
+    def _button_index_to_color(self, player_id: int, btn_idx: int) -> str:
         p_str = str(player_id)
         if p_str in self.assignment_map:
             btn_map = self.assignment_map[p_str].get("buttons", {})
             for color_name, mapped_idx in btn_map.items():
                 if mapped_idx == btn_idx:
                     return color_name
+        default_map = {0: "white", 1: "red", 2: "green", 3: "blue", 4: "orange", 5: "yellow", 6: "purple", 7: "cyan"}
+        return default_map.get(btn_idx, "")
 
-        # Default mapping - adjust this to match your controllers!
-        default_map = {
-            0: "white",
-            1: "red",
-            2: "green",
-            3: "blue",
-            4: "orange",
-            5: "yellow",
-            6: "purple",
-            7: "cyan",
-        }
-        return default_map.get(btn_idx)
+    def poll_joysticks(self):
+        try:
+            pygame.event.pump()
+            for js_index, js in self.joysticks.items():
+                player_id = self.joystick_player_map.get(js_index)
+                num_buttons = js.get_numbuttons()
+                for btn_idx in range(num_buttons):
+                    try:
+                        current_state = js.get_button(btn_idx)
+                    except Exception:
+                        continue
+                    previous_state = self.button_last_state[js_index].get(btn_idx, False)
+                    if current_state and not previous_state:
+                        if self.button_map_mode:
+                            if player_id == self.map_current_controller:
+                                self.handle_map_input(player_id, btn_idx)
+                        elif player_id:
+                            color_name = self._button_index_to_color(player_id, btn_idx)
+                            if color_name:
+                                self.handle_button_press(player_id, color_name)
+                    self.button_last_state[js_index][btn_idx] = current_state
+        except Exception as e:
+            self.log(f"Joystick poll error: {e}")
+        self.root.after(16, self.poll_joysticks)
+
+    def handle_button_press(self, player_id: int, color_name: str):
+        color_upper = color_name.upper()
+        if self.host_state == HostState.CHECKIN_OPEN:
+            if color_upper == "WHITE":
+                self.perform_checkin(player_id)
+            return
+        if self.host_state == HostState.COUNTDOWN:
+            # Ignore inputs during countdown
+            return
+        if self.host_state == HostState.GAME_RUNNING:
+            if self.game_manager.is_running():
+                action = f"P{player_id}_{color_upper}"
+                self.log(f"[INPUT] {action}")
+                self.game_manager.handle_input(player_id, action)
+            return
 
     def perform_checkin(self, player_id: int):
-        """Check in a player via white button press."""
         if not self.player_status[player_id]["checked_in"]:
             self.player_status[player_id]["checked_in"] = True
             self.player_status[player_id]["state"] = "JOINED"
             self.players_joined.set(sum(1 for i in range(1, 5) if self.player_status[i]["checked_in"]))
-            self.log(f"Player {player_id} CHECKED IN via White Button.")
+            self.log(f"Player {player_id} CHECKED IN")
             self.refresh_player_status_panel()
-            self.play_sound("button_learned")
             self.refresh_checkin_button()
 
     # =========================================================================
@@ -1231,32 +1213,26 @@ class PixelChallengeConsole:
             self.save_assignments()
             self.log("--- MAPPING COMPLETE & SAVED ---")
             return
-
         if self.controller_status[self.map_current_controller]["status"] != "ONLINE":
             self.log(f"Skipping P{self.map_current_controller} (Not Connected)")
             self.map_current_controller += 1
             self.map_current_button_idx = 0
             self.prompt_next_map_step()
             return
-
         color_name = BUTTON_MAP_ORDER[self.map_current_button_idx]
         self.log(f"PLAYER {self.map_current_controller}: Press the {color_name.upper()} button.")
 
     def handle_map_input(self, player_id: int, button_index: int):
         if player_id != self.map_current_controller:
             return
-
         color_name = BUTTON_MAP_ORDER[self.map_current_button_idx]
         p_str = str(player_id)
         if p_str not in self.assignment_map:
-            self.assignment_map[p_str] = {}
+            self.assignment_map[p_str] = {"signature": self.controller_status[player_id].get("signature", ""), "buttons": {}}
         if "buttons" not in self.assignment_map[p_str]:
             self.assignment_map[p_str]["buttons"] = {}
-
         self.assignment_map[p_str]["buttons"][color_name] = button_index
-        self.play_sound("button_learned")
         self.log(f"  -> Mapped {color_name.upper()} to button index {button_index}")
-
         self.map_current_button_idx += 1
         if self.map_current_button_idx >= len(BUTTON_MAP_ORDER):
             self.log(f"Player {player_id} mapping finished.")
@@ -1265,106 +1241,120 @@ class PixelChallengeConsole:
         self.prompt_next_map_step()
 
     # =========================================================================
+    # COUNTDOWN SEQUENCE (3-2-1-GO)
+    # =========================================================================
+    def start_countdown(self, players):
+        """Start the 3-2-1-GO countdown before game begins"""
+        self.pending_players = players
+        self.countdown_value = 3
+        self.set_state(HostState.COUNTDOWN, "Countdown starting...")
+        self.run_countdown_step()
+
+    def run_countdown_step(self):
+        """Execute one step of the countdown"""
+        if self.countdown_value > 0:
+            # Show number on viewer
+            self.viewer.show_countdown(self.countdown_value)
+            self.log(f"COUNTDOWN: {self.countdown_value}")
+            
+            # Flash lanes with countdown color
+            countdown_colors = {3: "red", 2: "yellow", 1: "green"}
+            color = countdown_colors.get(self.countdown_value, "white")
+            self.falcon.flash_all_lanes(color)
+            
+            self.countdown_value -= 1
+            self.countdown_after_id = self.root.after(1000, self.run_countdown_step)
+        elif self.countdown_value == 0:
+            # Show GO!
+            self.viewer.show_countdown(0)  # 0 means "GO"
+            self.log("COUNTDOWN: GO!")
+            self.falcon.flash_all_lanes("green")
+            
+            self.countdown_value = -1
+            self.countdown_after_id = self.root.after(500, self.run_countdown_step)
+        else:
+            # Countdown complete - start the actual game
+            self.countdown_after_id = None
+            self.actually_start_game(self.pending_players)
+            self.pending_players = []
+
+    def cancel_countdown(self):
+        """Cancel any running countdown"""
+        if self.countdown_after_id:
+            try:
+                self.root.after_cancel(self.countdown_after_id)
+            except Exception:
+                pass
+            self.countdown_after_id = None
+        self.countdown_value = 0
+        self.pending_players = []
+
+    # =========================================================================
     # GAME TICK LOOP
     # =========================================================================
     def game_tick(self):
-        """Called periodically during gameplay to update game state."""
         if self.host_state != HostState.GAME_RUNNING:
+            self.game_tick_active = False
             return
         if not self.game_manager.is_running():
+            self.game_tick_active = False
             return
-
-        # Update the game
-        self.game_manager.tick()
-
-        # Check if game is complete
-        if self.game_manager.is_current_game_complete():
-            result = self.game_manager.finish_current_game()
-            if result:
-                self.log(f"Game complete! Winner: Player {result.winner_player_id}")
-                self.record_score_history(result)
-                payload = self.build_scoreboard_payload(result, title="Final Results")
-                self.show_scoreboard_temporarily(seconds=10, payload=payload, final=True)
-
-            self.set_state(HostState.RESULTS_READY, "Game complete")
-            self.session_started = False
-
-            # Restart attract mode after a delay
-            self.root.after(500, lambda: self.attract.start_theme(self, self.current_theme_name()))
-            return
-
-        # Schedule next tick (~30 Hz)
+        try:
+            self.game_manager.tick()
+            if self.game_manager.is_current_game_complete():
+                result = self.game_manager.finish_current_game()
+                if result:
+                    self.log(f"Game complete! Winner: Player {result.winner_player_id}")
+                    self.record_score_history(result)
+                    payload = self.build_scoreboard_payload(result, title="Final Results")
+                    self.show_scoreboard_temporarily(seconds=10, payload=payload, final=True)
+                self.set_state(HostState.RESULTS_READY, "Game complete")
+                self.session_started = False
+                self.game_tick_active = False
+                self.root.after(500, lambda: self.attract.start_theme(self, self.current_theme_name()))
+                return
+        except Exception as e:
+            self.log(f"Game tick error: {e}")
+            self.log(traceback.format_exc())
         self.root.after(33, self.game_tick)
 
     # =========================================================================
     # ANIMATION TICK (ATTRACT MODE)
     # =========================================================================
     def animation_tick(self):
-        """Main animation loop for attract mode themes."""
         try:
-            # Don't run attract during gameplay - game handles its own rendering
-            if self.host_state == HostState.GAME_RUNNING:
+            if self.host_state in (HostState.GAME_RUNNING, HostState.COUNTDOWN):
                 self.root.after(self.current_animation_interval_ms(), self.animation_tick)
                 return
-
             self.apply_attract_state()
-
             if self.cycle_allowed():
                 now = time.time()
                 if now - self.last_cycle_switch >= self.cycle_seconds.get():
                     self.rotate_theme()
                     self.last_cycle_switch = now
-
             if self.attract.active and self.lights_should_run() and not self.all_lanes_test_active:
                 self.attract.tick(self)
-
         except Exception as e:
             self.log(f"Animation tick error: {e}")
-
         self.root.after(self.current_animation_interval_ms(), self.animation_tick)
-
-    def rotate_theme(self):
-        checked = self.get_checked_theme_names()
-        if not checked:
-            return
-        current = self.attract.current_theme or self.current_theme_name()
-        if current not in checked:
-            next_theme = checked[0]
-        else:
-            idx = checked.index(current)
-            next_theme = checked[(idx + 1) % len(checked)]
-        self.attract.apply_live_theme_change(self, next_theme)
-        self.on_theme_selected_manual(next_theme)
-        self.log(f"CYCLE -> {next_theme}")
 
     # =========================================================================
     # GAME START / STOP
     # =========================================================================
     def on_start_game(self):
-        """Start the selected game."""
         self.cancel_viewer_return()
         self.rescan_controllers()
-
         game_name = self.selected_game.get()
-
         if game_name == "Splash":
-            messagebox.showinfo("Splash", "Splash is display-only and cannot be started as a game.")
+            messagebox.showinfo("Splash", "Splash is display-only.")
             return
-
-        # Check if we have players
         if self.players_joined.get() == 0:
-            messagebox.showwarning("No Players", "No players have joined. Open check-in first.")
+            messagebox.showwarning("No Players", "No players have joined.")
             return
-
-        # Convert game name to key
         game_key = game_name.lower().replace(" ", "_")
-
-        # Check if game is in the game manager registry
         if game_key not in self.game_manager.registry:
-            messagebox.showerror("Error", f"Game '{game_name}' is not implemented yet.")
+            messagebox.showerror("Error", f"Game '{game_name}' not implemented.")
             return
-
-        # Build player list from checked-in players
         players = []
         for player_id in range(1, 5):
             ps = self.player_status.get(player_id, {})
@@ -1380,67 +1370,83 @@ class PixelChallengeConsole:
                 )
                 players.append(player)
                 self.player_status[player_id]["state"] = "ACTIVE"
-
         if not players:
-            messagebox.showwarning("No Players", "No players are checked in.")
+            messagebox.showwarning("No Players", "No players checked in.")
             return
 
-        # Stop attract mode
+        # Remember animate state before turning it off
+        self.animate_was_enabled_before_game = self.animate_enabled.get()
+        if self.animate_enabled.get():
+            self.animate_enabled.set(False)
+            self.update_animate_button()
+
         self.attract.stop(self)
         self.all_lanes_test_active = False
         self.update_lanes_test_button()
-
-        # Set state
-        self.set_state(HostState.GAME_RUNNING, f"Starting {game_name}")
         self.session_started = True
         self.checkin_open = False
-
-        # Apply gameplay brightness
         self.falcon.set_brightness(int(self.gameplay_brightness_percent.get()))
 
-        # Start the game via game manager
-        success = self.game_manager.start_game(game_key, players)
-        if not success:
-            self.set_state(HostState.IDLE, "Failed to start game")
-            self.attract.start_theme(self, self.current_theme_name())
-            return
-
-        self.log(f"Started {game_name} with {len(players)} player(s): {[p.player_id for p in players]}")
-
-        # Start game tick loop
-        self.root.after(33, self.game_tick)
-
+        self.log(f"Starting {game_name} with {len(players)} player(s)")
         self.refresh_player_status_panel()
         self.refresh_controller_panel()
 
-    def on_stop_game(self):
-        """Stop/abort the current game."""
-        self.cancel_viewer_return()
+        # Start countdown sequence
+        self.start_countdown(players)
 
+    def actually_start_game(self, players):
+        """Called after countdown completes to actually start the game"""
+        game_key = self.selected_game.get().lower().replace(" ", "_")
+        
+        self.set_state(HostState.GAME_RUNNING, f"Game started: {self.selected_game.get()}")
+        self.viewer.show_game_active()
+        
+        success = self.game_manager.start_game(game_key, players)
+        if not success:
+            self.log("Failed to start game!")
+            self.set_state(HostState.IDLE, "Failed to start game")
+            self.attract.start_theme(self, self.current_theme_name())
+            # Restore animate if it was on
+            if self.animate_was_enabled_before_game:
+                self.animate_enabled.set(True)
+                self.update_animate_button()
+            return
+
+        self.game_tick_active = True
+        self.root.after(33, self.game_tick)
+
+    def on_stop_game(self):
+        self.cancel_viewer_return()
+        self.cancel_countdown()
+        
         if self.game_manager.is_running():
             self.game_manager.abort_game()
             self.log("Game aborted by operator.")
-
+        
         self.session_started = False
         self.final_results_active = False
+        self.game_tick_active = False
         self.all_lanes_test_active = False
         self.update_lanes_test_button()
-
-        # Reset player states
+        
         for idx in range(1, 5):
             if self.player_status[idx]["state"] != "REMOVED":
                 was_checked = self.player_status[idx]["checked_in"]
                 self.player_status[idx]["state"] = "JOINED" if was_checked else "WAITING"
                 self.player_status[idx]["confirmed"] = False
         self.players_confirmed = False
-
+        
         self.set_state(HostState.IDLE, "Game stopped by operator")
-
-        # Clear pixels and restart attract
         self.falcon.clear_all_lanes(self)
         self.attract.start_theme(self, self.current_theme_name())
         self.show_selected_game_splash()
-
+        
+        # Restore animate if it was on before
+        if self.animate_was_enabled_before_game:
+            self.animate_enabled.set(True)
+            self.update_animate_button()
+            self.log("Animate restored.")
+        
         self.refresh_player_status_panel()
         self.refresh_controller_panel()
 
@@ -1453,18 +1459,15 @@ class PixelChallengeConsole:
         self.cancel_viewer_return()
         self.show_selected_game_splash()
         self.log(f"Game selected: {game_name}")
-
         if self.host_state in {HostState.PLAYERS_CONFIRMED, HostState.GAME_SELECTED, HostState.READY_TO_START}:
             self.set_state(HostState.GAME_SELECTED, f"{game_name} selected.")
             game = self.current_game()
             if game:
                 game.on_enter_setup(self)
-
         if game_name != "Splash":
             self.final_results_active = False
             if not self.animate_enabled.get():
                 self.attract.stop(self)
-
         self.apply_attract_state()
 
     def on_view_intro(self):
@@ -1474,7 +1477,7 @@ class PixelChallengeConsole:
             return
         slides = game.get_instruction_slide_paths()
         if not slides:
-            self.log(f"No slides assigned for {self.selected_game.get()}.")
+            self.log(f"No slides for {self.selected_game.get()}.")
             self.show_selected_game_splash()
             return
         self.current_intro_index += 1
@@ -1484,12 +1487,11 @@ class PixelChallengeConsole:
             return
         slide_path = slides[self.current_intro_index]
         self.viewer.show_image(slide_path)
-        self.log(f"ViewerService: show intro slide -> {slide_path}")
 
     def on_view_scoreboard(self):
         payload = self.build_scoreboard_payload()
         if payload is None:
-            self.log("Scoreboard unavailable: no rounds recorded yet.")
+            self.log("Scoreboard unavailable.")
             return
         self.show_scoreboard_temporarily(10, payload, final=False)
 
@@ -1498,12 +1500,12 @@ class PixelChallengeConsole:
     # =========================================================================
     def on_player_checkin(self):
         self.rescan_controllers()
-        if self.host_state == HostState.GAME_RUNNING:
-            self.log("Check-in blocked because a game is already active.")
+        if self.host_state in (HostState.GAME_RUNNING, HostState.COUNTDOWN):
+            self.log("Check-in blocked during game.")
             return
         if self.host_state == HostState.CHECKIN_OPEN:
             self.checkin_open = False
-            self.set_state(HostState.IDLE, "Player check-in closed.")
+            self.set_state(HostState.IDLE, "Check-in closed.")
         else:
             if self.animate_enabled.get():
                 self.animate_enabled.set(False)
@@ -1513,13 +1515,13 @@ class PixelChallengeConsole:
             self.falcon.clear_all_lanes(self)
             self.checkin_open = True
             self.players_confirmed = False
-            self.set_state(HostState.CHECKIN_OPEN, "Player check-in opened. Press WHITE button to join.")
+            self.set_state(HostState.CHECKIN_OPEN, "Check-in opened. Press WHITE to join.")
         self.refresh_player_status_panel()
 
     def on_confirm_players(self):
         self.rescan_controllers()
         if self.players_joined.get() == 0:
-            self.log("Confirm blocked: no players joined.")
+            self.log("No players joined.")
             return
         self.checkin_open = False
         self.players_confirmed = True
@@ -1543,24 +1545,18 @@ class PixelChallengeConsole:
     def on_player_tile_click(self, player_index: int):
         state = self.player_status[player_index]["state"]
         if state == "REMOVED":
-            if self.host_state == HostState.GAME_RUNNING:
-                self.log(f"Player {player_index} cannot be restored during an active game.")
+            if self.host_state in (HostState.GAME_RUNNING, HostState.COUNTDOWN):
+                self.log(f"Cannot restore P{player_index} during game.")
                 return
-            if messagebox.askyesno("Restore Player", f"Restore and unlock Player {player_index}?"):
+            if messagebox.askyesno("Restore Player", f"Restore Player {player_index}?"):
                 self.restore_player(player_index)
             return
-
-        if not self.player_status[player_index]["checked_in"] and self.host_state != HostState.GAME_RUNNING:
-            if self.controller_status[player_index]["locked"]:
-                self.log(f"Player {player_index} is locked.")
-            else:
-                self.log(f"Player {player_index} has not joined yet.")
+        if not self.player_status[player_index]["checked_in"] and self.host_state not in (HostState.GAME_RUNNING, HostState.COUNTDOWN):
             return
-
-        if messagebox.askyesno("Remove Player", f"Remove Player {player_index} from this session?"):
+        if messagebox.askyesno("Remove Player", f"Remove Player {player_index}?"):
             self.player_status[player_index]["state"] = "REMOVED"
             self.player_status[player_index]["confirmed"] = False
-            if self.host_state != HostState.GAME_RUNNING:
+            if self.host_state not in (HostState.GAME_RUNNING, HostState.COUNTDOWN):
                 self.player_status[player_index]["checked_in"] = False
             self.controller_status[player_index]["enabled"] = False
             self.controller_status[player_index]["locked"] = True
@@ -1568,9 +1564,9 @@ class PixelChallengeConsole:
             self.controller_status[player_index]["status"] = "LOCKED"
             if self.selected_controller == player_index:
                 self.selected_controller = None
-            if self.host_state != HostState.GAME_RUNNING:
+            if self.host_state not in (HostState.GAME_RUNNING, HostState.COUNTDOWN):
                 self.players_joined.set(sum(1 for i in range(1, 5) if self.player_status[i]["checked_in"]))
-            self.log(f"Player {player_index} removed from session. Controller locked.")
+            self.log(f"Player {player_index} removed.")
             self.refresh_player_status_panel()
             self.refresh_controller_panel()
 
@@ -1585,7 +1581,7 @@ class PixelChallengeConsole:
         if self.selected_controller == player_index:
             self.selected_controller = None
         self.players_joined.set(sum(1 for i in range(1, 5) if self.player_status[i]["checked_in"]))
-        self.log(f"Player {player_index} restored and unlocked.")
+        self.log(f"Player {player_index} restored.")
         self.refresh_player_status_panel()
         self.refresh_controller_panel()
 
@@ -1594,19 +1590,16 @@ class PixelChallengeConsole:
             self.controller_status[controller_idx]["selected"] = False
         self.controller_status[idx]["selected"] = True
         self.selected_controller = idx
-        self.log(f"Controller {idx} selected.")
         self.refresh_controller_panel()
 
     def toggle_controller(self, idx: int):
         if self.controller_status[idx]["locked"]:
-            self.log(f"Controller {idx} toggle blocked because it is locked.")
             return
         self.controller_status[idx]["enabled"] = not self.controller_status[idx]["enabled"]
-        self.log(f"Controller {idx} {'enabled' if self.controller_status[idx]['enabled'] else 'disabled'}.")
         self.refresh_controller_panel()
 
     def on_scan_controllers(self):
-        self.log("Controller scan requested.")
+        self.log("Scanning controllers...")
         self.rescan_controllers()
 
     # =========================================================================
@@ -1615,16 +1608,15 @@ class PixelChallengeConsole:
     def update_lanes_test_button(self):
         if hasattr(self, "lanes_test_btn"):
             if self.all_lanes_test_active:
-                self.lanes_test_btn.configure(text="STOP LANES TEST", bg="#c93b1e", activebackground="#c93b1e")
+                self.lanes_test_btn.configure(text="STOP TEST", bg="#c93b1e", activebackground="#c93b1e")
             else:
-                self.lanes_test_btn.configure(text="ALL LANES TEST", bg="#1b63ff", activebackground="#1b63ff")
+                self.lanes_test_btn.configure(text="LANES TEST", bg="#1b63ff", activebackground="#1b63ff")
 
     def on_all_lanes_test(self):
         if self.all_lanes_test_active:
             self.all_lanes_test_active = False
             self.update_lanes_test_button()
             self.falcon.clear_all_lanes(self)
-            self.log("All lanes test stopped.")
             if self.lights_should_run():
                 self.attract.start_theme(self, self.current_theme_name())
             return
@@ -1632,13 +1624,13 @@ class PixelChallengeConsole:
         self.update_lanes_test_button()
         self.attract.active = False
         self.falcon.all_lanes_test_frame()
-        self.log("All lanes test started.")
+        self.log("Lanes test started.")
 
     # =========================================================================
     # REDEEM POINTS
     # =========================================================================
     def on_redeem_points(self):
-        if not messagebox.askyesno("Redeem Points", "Confirm tickets were awarded and clear the session?"):
+        if not messagebox.askyesno("Redeem Points", "Clear session?"):
             return
         self.cancel_viewer_return()
         self.players_joined.set(0)
@@ -1659,7 +1651,7 @@ class PixelChallengeConsole:
             self.controller_status[idx]["locked"] = False
             self.controller_status[idx]["selected"] = False
         self.selected_controller = None
-        self.set_state(HostState.IDLE, "Session redeemed and reset.")
+        self.set_state(HostState.IDLE, "Session reset.")
         self.apply_brightness_for_state()
         self.refresh_player_status_panel()
         self.refresh_controller_panel()
@@ -1669,103 +1661,134 @@ class PixelChallengeConsole:
     # =========================================================================
     # UI BUILDING
     # =========================================================================
+
     def build_ui(self):
-        self.root.grid_rowconfigure(0, weight=1)
-        self.root.grid_columnconfigure(0, weight=1)
-
         self.build_top_bar()
-
-        self.main_vertical = tk.PanedWindow(self.root, orient="vertical", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
-        self.main_vertical.grid(row=1, column=0, sticky="nsew")
-        self.main_vertical.grid_propagate(False)
-
-        upper_frame = tk.Frame(self.main_vertical, bg="#12061f")
-        self.main_vertical.add(upper_frame, minsize=MIN_MAIN_HEIGHT)
-
-        bottom_frame = tk.Frame(self.main_vertical, bg="#12061f")
-        self.main_vertical.add(bottom_frame, minsize=MIN_INFO_HEIGHT)
-
-        self.main_horizontal = tk.PanedWindow(upper_frame, orient="horizontal", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
-        self.main_horizontal.pack(fill="both", expand=True)
-        self.main_horizontal.pack_propagate(False)
-
-        self.attract_container = tk.Frame(self.main_horizontal, bg="#12061f")
-        self.main_horizontal.add(self.attract_container, minsize=MIN_LEFT)
-
-        right_container = tk.Frame(self.main_horizontal, bg="#12061f")
-        self.main_horizontal.add(right_container, minsize=MIN_CENTER + MIN_CONTROLLERS)
-
-        self.right_horizontal = tk.PanedWindow(right_container, orient="horizontal", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
+        
+        # Main container below top bar
+        main_container = tk.Frame(self.root, bg="#12061f")
+        main_container.grid(row=1, column=0, sticky="nsew")
+        main_container.grid_rowconfigure(0, weight=1)
+        main_container.grid_columnconfigure(0, weight=0)  # Left column (attract) - fixed width initially
+        main_container.grid_columnconfigure(1, weight=1)  # Right column (center + controllers + info)
+        
+        # LEFT SIDE: Attract mode with its own vertical paned window
+        self.left_vertical = tk.PanedWindow(main_container, orient="vertical", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
+        self.left_vertical.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
+        
+        # Attract container (top of left side)
+        self.attract_container = tk.Frame(self.left_vertical, bg="#12061f")
+        self.left_vertical.add(self.attract_container, minsize=300)
+        
+        # Left bottom filler (below attract, can be empty or used later)
+        left_bottom_filler = tk.Frame(self.left_vertical, bg="#12061f")
+        self.left_vertical.add(left_bottom_filler, minsize=50)
+        
+        # RIGHT SIDE: Everything else in a horizontal+vertical structure
+        right_container = tk.Frame(main_container, bg="#12061f")
+        right_container.grid(row=0, column=1, sticky="nsew")
+        right_container.grid_rowconfigure(0, weight=1)
+        right_container.grid_columnconfigure(0, weight=1)
+        
+        # Right side vertical split (top: center+controllers, bottom: info)
+        self.right_vertical = tk.PanedWindow(right_container, orient="vertical", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
+        self.right_vertical.pack(fill="both", expand=True)
+        
+        # Top part of right side: center + controllers (horizontal split)
+        right_top_frame = tk.Frame(self.right_vertical, bg="#12061f")
+        self.right_vertical.add(right_top_frame, minsize=MIN_MAIN_HEIGHT)
+        
+        self.right_horizontal = tk.PanedWindow(right_top_frame, orient="horizontal", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
         self.right_horizontal.pack(fill="both", expand=True)
-        self.right_horizontal.pack_propagate(False)
-
+        
         self.center_container = tk.Frame(self.right_horizontal, bg="#12061f")
         self.right_horizontal.add(self.center_container, minsize=MIN_CENTER)
-
+        
         self.controllers_container = tk.Frame(self.right_horizontal, bg="#12061f")
         self.right_horizontal.add(self.controllers_container, minsize=MIN_CONTROLLERS)
-
-        self.bottom_container = bottom_frame
-
+        
+        # Bottom part of right side: info panel
+        self.bottom_container = tk.Frame(self.right_vertical, bg="#12061f")
+        self.right_vertical.add(self.bottom_container, minsize=MIN_INFO_HEIGHT)
+        
+        # Horizontal paned window between left and right (for adjusting attract width)
+        # We need to restructure to allow this - let me use a different approach
+        
+        # Build all the areas
         self.build_attract_area(self.attract_container)
         self.build_center_area(self.center_container)
         self.build_controllers_area(self.controllers_container)
         self.build_bottom_area(self.bottom_container)
-
+        
         self.restore_sashes()
-
-        self.main_horizontal.bind("<ButtonRelease-1>", self.save_sash_positions)
+        
+        # Bind sash movements
+        self.left_vertical.bind("<ButtonRelease-1>", self.save_sash_positions)
+        self.right_vertical.bind("<ButtonRelease-1>", self.save_sash_positions)
         self.right_horizontal.bind("<ButtonRelease-1>", self.save_sash_positions)
-        self.main_vertical.bind("<ButtonRelease-1>", self.save_sash_positions)
+
 
     def restore_sashes(self):
         self.root.update_idletasks()
-        total_w = max(1, self.root.winfo_width())
         total_h = max(1, self.root.winfo_height())
-
-        default_left = max(MIN_LEFT, int(total_w * 0.30))
-        default_center_ctrl = max(MIN_CENTER, int(total_w * 0.60))
-        default_info = total_h - MIN_INFO_HEIGHT
-
+        
+        # Left vertical (attract mode bottom edge)
         try:
-            x = int(self.sash_left_main) if self.sash_left_main is not None else default_left
-            x = max(MIN_LEFT, min(x, total_w - MIN_CONTROLLERS - 100))
-            self.main_horizontal.sash_place(0, x, 0)
+            if self.sash_left_attract_bottom:
+                self.left_vertical.sash_place(0, 0, int(self.sash_left_attract_bottom))
+            else:
+                self.left_vertical.sash_place(0, 0, total_h - 200)
         except Exception:
-            self.main_horizontal.sash_place(0, default_left, 0)
-
+            pass
+        
+        # Right vertical (info panel top edge)
         try:
-            x = int(self.sash_center_ctrl) if self.sash_center_ctrl is not None else default_center_ctrl
-            x = max(MIN_CENTER, min(x, total_w - MIN_CONTROLLERS))
-            self.right_horizontal.sash_place(0, x, 0)
+            if self.sash_main_info:
+                self.right_vertical.sash_place(0, 0, int(self.sash_main_info))
+            else:
+                self.right_vertical.sash_place(0, 0, total_h - MIN_INFO_HEIGHT - 100)
         except Exception:
-            self.right_horizontal.sash_place(0, default_center_ctrl, 0)
-
+            pass
+        
+        # Right horizontal (center vs controllers)
         try:
-            y = int(self.sash_main_info) if self.sash_main_info is not None else default_info
-            y = max(MIN_MAIN_HEIGHT, min(y, total_h - MIN_INFO_HEIGHT))
-            self.main_vertical.sash_place(0, 0, y)
+            if self.sash_center_ctrl:
+                self.right_horizontal.sash_place(0, int(self.sash_center_ctrl), 0)
+            else:
+                self.right_horizontal.sash_place(0, MIN_CENTER, 0)
         except Exception:
-            self.main_vertical.sash_place(0, 0, default_info)
+            pass
+        
+        # Bottom log panel left edge
+        try:
+            if self.sash_bottom_log and hasattr(self, 'bottom_paned'):
+                self.bottom_paned.sash_place(0, int(self.sash_bottom_log), 0)
+        except Exception:
+            pass
 
     def save_sash_positions(self, event=None):
         try:
-            self.sash_left_main = self.main_horizontal.sash_coord(0)[0]
+            if hasattr(self, 'left_vertical'):
+                self.sash_left_attract_bottom = self.left_vertical.sash_coord(0)[1]
         except Exception:
             pass
         try:
-            self.sash_center_ctrl = self.right_horizontal.sash_coord(0)[0]
+            if hasattr(self, 'right_vertical'):
+                self.sash_main_info = self.right_vertical.sash_coord(0)[1]
         except Exception:
             pass
         try:
-            self.sash_main_info = self.main_vertical.sash_coord(0)[1]
+            if hasattr(self, 'right_horizontal'):
+                self.sash_center_ctrl = self.right_horizontal.sash_coord(0)[0]
+        except Exception:
+            pass
+        try:
+            if hasattr(self, 'bottom_paned'):
+                self.sash_bottom_log = self.bottom_paned.sash_coord(0)[0]
         except Exception:
             pass
         self.save_settings()
 
-    def save_layout_now(self):
-        self.save_sash_positions()
-        self.log("Layout saved.")
 
     def build_top_bar(self):
         top = tk.Frame(self.root, bg="#0f0617", bd=2, relief="groove")
@@ -1773,93 +1796,45 @@ class PixelChallengeConsole:
         top.grid_columnconfigure(0, weight=1)
         top.grid_columnconfigure(1, weight=2)
         top.grid_columnconfigure(2, weight=1)
-        top.grid_columnconfigure(3, weight=0)
-
         left = tk.Frame(top, bg="#0f0617")
         left.grid(row=0, column=0, sticky="w", padx=12, pady=8)
         tk.Label(left, text="HOST CONSOLE", bg="#0f0617", fg="white", font=("Arial", 22, "bold")).pack(anchor="w")
         tk.Label(left, textvariable=self.state_var, bg="#0f0617", fg="#6cff66", font=("Arial", 20, "bold")).pack(anchor="w", padx=(10, 0))
-
         center = tk.Frame(top, bg="#0f0617")
         center.grid(row=0, column=1, sticky="", padx=30)
-        center.grid_columnconfigure(1, weight=1)
-
         tk.Label(center, text="GAME", bg="#0f0617", fg="white", font=("Arial", 18, "bold")).grid(row=0, column=0, padx=(0, 8))
-
-        self.game_box = ttk.Combobox(
-            center, textvariable=self.selected_game, values=self.games.list_names(),
-            font=("Arial", 18, "bold"), state="readonly", width=16,
-        )
+        self.game_box = ttk.Combobox(center, textvariable=self.selected_game, values=self.games.list_names(), font=("Arial", 18, "bold"), state="readonly", width=16)
         self.game_box.grid(row=0, column=1, sticky="w")
         self.game_box.bind("<<ComboboxSelected>>", self.on_game_selected)
-
         self.config_btn = self.neon_button(center, "CONFIG", self.open_config_window, bg="#9440ff", width=8)
         self.config_btn.grid(row=0, column=2, padx=10)
-
         btns = tk.Frame(top, bg="#0f0617")
         btns.grid(row=0, column=2, sticky="e", padx=12)
-        self.neon_button(btns, "VIEW SCOREBOARD", self.on_view_scoreboard, bg="#1b63ff").pack(side="left", padx=8)
-        tk.Checkbutton(
-            btns, text="Show Ranking", variable=self.show_ranking, bg="#0f0617", fg="white",
-            activebackground="#0f0617", activeforeground="white", selectcolor="#17071f",
-            font=("Arial", 14, "bold"), highlightthickness=0, bd=0,
-        ).pack(side="left", padx=(0, 8))
-        self.neon_button(btns, "VIEW INTRO", self.on_view_intro, bg="#1b63ff").pack(side="left", padx=8)
+        self.neon_button(btns, "SCOREBOARD", self.on_view_scoreboard, bg="#1b63ff").pack(side="left", padx=8)
+        tk.Checkbutton(btns, text="Ranking", variable=self.show_ranking, bg="#0f0617", fg="white", activebackground="#0f0617", activeforeground="white", selectcolor="#17071f", font=("Arial", 14, "bold")).pack(side="left", padx=(0, 8))
+        self.neon_button(btns, "INTRO", self.on_view_intro, bg="#1b63ff").pack(side="left", padx=8)
         self.neon_button(btns, "START", self.on_start_game, bg="#2ea62e").pack(side="left", padx=8)
-        tk.Button(
-            btns, text="STOP", command=self.on_stop_game, bg="#c93b1e", fg="white",
-            activebackground="#c93b1e", activeforeground="white", relief="raised", bd=3,
-            font=("Arial", 16, "bold"), width=7, padx=12, pady=8, cursor="hand2",
-        ).pack(side="left", padx=8)
-
-        save_btn = tk.Button(
-            top, text="Save Layout", command=self.save_layout_now, bg="#9440ff", fg="white",
-            activebackground="#9440ff", activeforeground="white", relief="raised", bd=2,
-            font=("Arial", 12, "bold"), width=10, padx=8, pady=4, cursor="hand2",
-        )
-        save_btn.grid(row=0, column=3, padx=8)
+        tk.Button(btns, text="STOP", command=self.on_stop_game, bg="#c93b1e", fg="white", activebackground="#c93b1e", activeforeground="white", relief="raised", bd=3, font=("Arial", 16, "bold"), width=7, padx=12, pady=8, cursor="hand2").pack(side="left", padx=8)
 
     def build_attract_area(self, parent):
         parent.grid_rowconfigure(0, weight=1)
         parent.grid_columnconfigure(0, weight=1)
         left_panel, left_body = self.panel(parent, "ATTRACT MODE")
-        left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 0), pady=(0, 0))
-        left_panel.grid_rowconfigure(0, weight=1)
-        left_body.grid_rowconfigure(7, weight=1)
-
+        left_panel.grid(row=0, column=0, sticky="nsew")
         anim_row = tk.Frame(left_body, bg="#17071f")
         anim_row.pack(fill="x", pady=6)
         self.cycle_btn = self.neon_button(anim_row, "CYCLE", self.toggle_cycle, bg="#c93b1e", width=6)
         self.cycle_btn.pack(side="left", padx=(0, 6))
         self.animate_btn = self.neon_button(anim_row, "ANIMATE", self.toggle_animate, bg="#c93b1e", width=10)
         self.animate_btn.pack(side="left", padx=(0, 6))
-        self.lanes_test_btn = self.neon_button(anim_row, "ALL LANES TEST", self.on_all_lanes_test, bg="#1b63ff", width=14)
+        self.lanes_test_btn = self.neon_button(anim_row, "LANES TEST", self.on_all_lanes_test, bg="#1b63ff", width=12)
         self.lanes_test_btn.pack(side="left", padx=(0, 6))
-
-        tk.Label(left_body, text="DURATION CYCLE (secs)", bg="#17071f", fg="#cccccc", font=("Arial", 14, "bold")).pack(anchor="center", pady=(6, 2))
-        self.cycle_scale = tk.Scale(
-            left_body, from_=20, to=200, resolution=20, orient="horizontal", variable=self.cycle_seconds,
-            bg="#17071f", fg="white", troughcolor="#071a30", highlightthickness=0, font=("Arial", 12, "bold"),
-            command=self.on_cycle_changed, length=520,
-        )
-        self.cycle_scale.pack(fill="x", pady=(0, 8))
-
+        tk.Label(left_body, text="CYCLE DURATION (secs)", bg="#17071f", fg="#cccccc", font=("Arial", 14, "bold")).pack(anchor="center", pady=(6, 2))
+        tk.Scale(left_body, from_=20, to=200, resolution=20, orient="horizontal", variable=self.cycle_seconds, bg="#17071f", fg="white", troughcolor="#071a30", highlightthickness=0, font=("Arial", 12, "bold"), command=self.on_cycle_changed, length=520).pack(fill="x", pady=(0, 8))
         tk.Label(left_body, text="THEME BRIGHTNESS (%)", bg="#17071f", fg="#cccccc", font=("Arial", 14, "bold")).pack(anchor="center", pady=(4, 2))
-        self.theme_brightness_scale = tk.Scale(
-            left_body, from_=0, to=100, resolution=1, orient="horizontal", variable=self.theme_brightness_percent,
-            bg="#17071f", fg="white", troughcolor="#071a30", highlightthickness=0, font=("Arial", 12, "bold"),
-            command=self.on_theme_brightness_changed, length=520,
-        )
-        self.theme_brightness_scale.pack(fill="x", pady=(0, 6))
-
+        tk.Scale(left_body, from_=0, to=100, resolution=1, orient="horizontal", variable=self.theme_brightness_percent, bg="#17071f", fg="white", troughcolor="#071a30", highlightthickness=0, font=("Arial", 12, "bold"), command=self.on_theme_brightness_changed, length=520).pack(fill="x", pady=(0, 6))
         tk.Label(left_body, text="GAMEPLAY BRIGHTNESS (%)", bg="#17071f", fg="#cccccc", font=("Arial", 14, "bold")).pack(anchor="center", pady=(4, 2))
-        self.game_brightness_scale = tk.Scale(
-            left_body, from_=0, to=100, resolution=1, orient="horizontal", variable=self.gameplay_brightness_percent,
-            bg="#17071f", fg="white", troughcolor="#071a30", highlightthickness=0, font=("Arial", 12, "bold"),
-            command=self.on_gameplay_brightness_changed, length=520,
-        )
-        self.game_brightness_scale.pack(fill="x", pady=(0, 12))
-
+        tk.Scale(left_body, from_=0, to=100, resolution=1, orient="horizontal", variable=self.gameplay_brightness_percent, bg="#17071f", fg="white", troughcolor="#071a30", highlightthickness=0, font=("Arial", 12, "bold"), command=self.on_gameplay_brightness_changed, length=520).pack(fill="x", pady=(0, 12))
         tk.Label(left_body, text="THEMES (check to include in CYCLE)", bg="#17071f", fg="#cccccc", font=("Arial", 16, "bold")).pack(anchor="center", pady=(2, 6))
         theme_frame = tk.Frame(left_body, bg="#17071f")
         theme_frame.pack(fill="both", expand=True, pady=(0, 6))
@@ -1871,31 +1846,18 @@ class PixelChallengeConsole:
         canvas.configure(yscrollcommand=vsb.set)
         canvas.pack(side="left", fill="both", expand=True)
         vsb.pack(side="right", fill="y")
-
         for name in self.theme_names:
             var = tk.BooleanVar(value=(name in self.selected_themes))
             speed_var = tk.IntVar(value=self.theme_speed(name))
             row = tk.Frame(self.theme_listbox, bg="#17071f")
             row.pack(fill="x", pady=4, padx=4)
-            chk = tk.Checkbutton(
-                row, text=name, variable=var, bg="#17071f", fg="white",
-                activebackground="#17071f", activeforeground="white", selectcolor="#071a30",
-                font=("Arial", 14, "bold"), command=self.on_theme_checked, anchor="w", padx=4,
-            )
+            chk = tk.Checkbutton(row, text=name, variable=var, bg="#17071f", fg="white", activebackground="#17071f", activeforeground="white", selectcolor="#071a30", font=("Arial", 14, "bold"), command=self.on_theme_checked, anchor="w", padx=4)
             chk.pack(side="left", fill="x", expand=True)
-            slider = tk.Scale(
-                row, from_=1, to=10, orient="horizontal", variable=speed_var, bg="#17071f", fg="white",
-                troughcolor="#071a30", highlightthickness=0, font=("Arial", 10, "bold"),
-                command=lambda v, n=name: self.on_theme_speed_changed(n, v), length=220,
-            )
+            slider = tk.Scale(row, from_=1, to=10, orient="horizontal", variable=speed_var, bg="#17071f", fg="white", troughcolor="#071a30", highlightthickness=0, font=("Arial", 10, "bold"), command=lambda v, n=name: self.on_theme_speed_changed(n, v), length=220)
             slider.pack(side="right", padx=(6, 0))
             self.theme_vars[name] = var
             self.theme_speed_vars[name] = speed_var
-
-        self.theme_select_box = tk.Listbox(
-            left_body, height=2, font=("Arial", 12), bg="#071a30", fg="white",
-            selectbackground="#135dff", activestyle="none", bd=2, relief="sunken",
-        )
+        self.theme_select_box = tk.Listbox(left_body, height=2, font=("Arial", 12), bg="#071a30", fg="white", selectbackground="#135dff", activestyle="none", bd=2, relief="sunken")
         for name in self.theme_names:
             self.theme_select_box.insert("end", name)
         self.theme_select_box.selection_set(0)
@@ -1905,32 +1867,25 @@ class PixelChallengeConsole:
     def build_center_area(self, parent):
         parent.grid_rowconfigure(2, weight=1)
         parent.grid_columnconfigure(0, weight=1)
-
         enroll_panel, enroll_body = self.panel(parent, "")
         enroll_panel.grid(row=0, column=0, sticky="ew", pady=(0, 10))
-
         self.checkin_button = self.neon_button(enroll_body, "PLAYER CHECK-IN", self.on_player_checkin, bg="#1b63ff")
         self.checkin_button.pack(fill="x", pady=(4, 16))
-
         joined_row = tk.Frame(enroll_body, bg="#17071f")
         joined_row.pack(fill="x", pady=(0, 10))
         tk.Label(joined_row, text="PLAYERS JOINED:", bg="#17071f", fg="#ffd74f", font=("Arial", 26, "bold")).pack(side="left")
         tk.Label(joined_row, textvariable=self.players_joined, bg="#24101f", fg="#ffd74f", font=("Arial", 28, "bold"), width=3).pack(side="right")
-
         self.neon_button(enroll_body, "CONFIRM PLAYERS", self.on_confirm_players, bg="#1b63ff").pack(fill="x")
-
         status_panel, status_body = self.panel(parent, "PLAYER STATUS")
         status_panel.grid(row=1, column=0, sticky="ew")
         status_body.grid_columnconfigure((0, 1, 2, 3), weight=1)
         self.status_body = status_body
-
         filler = tk.Frame(parent, bg="#12061f")
         filler.grid(row=2, column=0, sticky="nsew")
 
     def build_controllers_area(self, parent):
         parent.grid_rowconfigure(0, weight=1)
         parent.grid_columnconfigure(0, weight=1)
-
         ctrl_panel, ctrl_body = self.panel(parent, "CONTROLLERS")
         ctrl_panel.grid(row=0, column=0, sticky="nsew", padx=(10, 0))
         ctrl_body.grid_columnconfigure((0, 1), weight=1)
@@ -1939,56 +1894,64 @@ class PixelChallengeConsole:
     def build_bottom_area(self, parent):
         parent.grid_columnconfigure(0, weight=1)
         parent.grid_rowconfigure(0, weight=1)
+        parent.grid_rowconfigure(1, weight=0)  # Button row doesn't expand
 
-        self.bottom_paned = tk.PanedWindow(parent, orient="horizontal", sashwidth=6, sashrelief="raised", bg="#0b0314")
+        # Top section: PanedWindow for adjustable log panel
+        self.bottom_paned = tk.PanedWindow(parent, orient="horizontal", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
         self.bottom_paned.grid(row=0, column=0, sticky="nsew")
 
+        # Left side - empty/filler (adjustable width)
+        left_filler = tk.Frame(self.bottom_paned, bg="#12061f")
+        self.bottom_paned.add(left_filler, minsize=50)
+
+        # Right side - log panel
         info_panel = tk.Frame(self.bottom_paned, bg="#3a1b53", bd=2, relief="groove")
         info_panel.grid_rowconfigure(0, weight=1)
         info_panel.grid_columnconfigure(0, weight=1)
-
-        filler_frame = tk.Frame(self.bottom_paned, bg="#12061f")
-
-        self.bottom_paned.add(info_panel, minsize=400)
-        self.bottom_paned.add(filler_frame, minsize=120)
 
         info_body = tk.Frame(info_panel, bg="#17071f")
         info_body.pack(fill="both", expand=True, padx=6, pady=8)
         info_body.grid_columnconfigure(0, weight=1)
         info_body.grid_rowconfigure(0, weight=1)
 
-        self.info_text = tk.Text(
-            info_body, height=5, width=68, font=("Arial", 18), bg="#12061f", fg="white",
-            wrap="word", bd=0, relief="flat",
-        )
+        self.info_text = tk.Text(info_body, height=5, width=68, font=("Arial", 16), bg="#12061f", fg="white", wrap="word", bd=0, relief="flat")
         self.info_text.grid(row=0, column=0, sticky="nsew")
-
         scroll = tk.Scrollbar(info_body, command=self.info_text.yview)
         scroll.grid(row=0, column=1, sticky="ns")
         self.info_text.configure(yscrollcommand=scroll.set)
-
         self.info_text.tag_configure("p1", foreground="#ff6a5a")
         self.info_text.tag_configure("p2", foreground="#60b8ff")
         self.info_text.tag_configure("p3", foreground="#88ff66")
         self.info_text.tag_configure("p4", foreground="#dd88ff")
 
+        self.bottom_paned.add(info_panel, minsize=MIN_LOG_WIDTH)
+
+        # Bind sash movement to save
+        self.bottom_paned.bind("<ButtonRelease-1>", self.save_sash_positions)
+
+        # Bottom row: Buttons (fixed at bottom, not in paned window)
         button_row = tk.Frame(parent, bg="#12061f")
-        button_row.grid(row=1, column=0, sticky="ew", pady=(4, 0))
+        button_row.grid(row=1, column=0, sticky="ew", pady=(6, 4), padx=8)
         button_row.grid_columnconfigure(0, weight=1)
         button_row.grid_columnconfigure(1, weight=1)
         button_row.grid_columnconfigure(2, weight=1)
+        button_row.grid_columnconfigure(3, weight=0)
 
-        self.neon_button(button_row, "SETUP", self.open_setup_window, bg="#1b63ff", width=12).grid(row=0, column=0, sticky="w", padx=8)
-        self.neon_button(button_row, "FALCON CONSOLE", self.toggle_falcon_console, bg="#1b63ff", width=14).grid(row=0, column=1, sticky="n", padx=8)
-        self.neon_button(button_row, "REDEEM POINTS", self.on_redeem_points, bg="#d48a10", fg="black", width=16).grid(row=0, column=2, sticky="e", padx=8)
-
-        version_label = tk.Label(parent, text=VERSION_LABEL, bg="#12061f", fg="#9a9a9a", font=("Arial", 12, "bold"))
-        version_label.grid(row=2, column=0, sticky="e", pady=(4, 2))
+        # Left buttons
+        self.neon_button(button_row, "SETUP", self.open_setup_window, bg="#1b63ff", width=10).grid(row=0, column=0, sticky="w", padx=(0, 8))
+        self.neon_button(button_row, "FALCON CONSOLE", self.toggle_falcon_console, bg="#1b63ff", width=14).grid(row=0, column=1, sticky="w", padx=8)
+        
+        # Right button
+        self.neon_button(button_row, "REDEEM POINTS", self.on_redeem_points, bg="#d48a10", width=14).grid(row=0, column=2, sticky="e", padx=8)
+        
+        # Version label far right
+        tk.Label(button_row, text=VERSION_LABEL, bg="#12061f", fg="#9a9a9a", font=("Arial", 12, "bold")).grid(row=0, column=3, sticky="e", padx=(16, 0))
 
     # =========================================================================
     # UI HELPER METHODS
     # =========================================================================
     def panel(self, parent, title: str):
+
         outer = tk.Frame(parent, bg="#3a1b53", bd=2, relief="groove")
         header = tk.Label(outer, text=title, bg="#1a0828", fg="white", font=("Arial", 18, "bold"), pady=10)
         header.pack(fill="x")
@@ -1997,20 +1960,17 @@ class PixelChallengeConsole:
         return outer, body
 
     def neon_button(self, parent, text, command, bg="#1d5cff", fg="white", width=None):
-        return tk.Button(
-            parent, text=text, command=command, bg=bg, fg=fg, activebackground=bg, activeforeground=fg,
-            relief="raised", bd=3, font=("Arial", 16, "bold"), width=width, padx=12, pady=8, cursor="hand2",
-        )
+        return tk.Button(parent, text=text, command=command, bg=bg, fg=fg, activebackground=bg, activeforeground=fg, relief="raised", bd=3, font=("Arial", 16, "bold"), width=width, padx=12, pady=8, cursor="hand2")
 
     def refresh_checkin_button(self):
         if not hasattr(self, 'checkin_button'):
             return
-        if self.host_state == HostState.GAME_RUNNING:
+        if self.host_state in (HostState.GAME_RUNNING, HostState.COUNTDOWN):
             text, bg = "SESSION ACTIVE", "#666666"
         elif self.host_state == HostState.CHECKIN_OPEN:
             text, bg = "CHECK-IN OPEN", "#2ea62e"
         elif self.host_state == HostState.PLAYERS_CONFIRMED:
-            text, bg = "PLAYERS CONFIRMED", "#666666"
+            text, bg = "CONFIRMED", "#666666"
         else:
             text, bg = "PLAYER CHECK-IN", "#1b63ff"
         self.checkin_button.configure(text=text, bg=bg, activebackground=bg)
@@ -2020,26 +1980,17 @@ class PixelChallengeConsole:
             return
         for child in self.status_body.winfo_children():
             child.destroy()
-
         colors = {1: "#a7281a", 2: "#165dbd", 3: "#3f8e13", 4: "#7322a8"}
         state_colors = {"WAITING": "#bbbbbb", "JOINED": "#ffd74f", "CONFIRMED": "#6cff66", "ACTIVE": "#6cff66", "REMOVED": "#ff5959"}
-        ctrl_colors = {"ONLINE": "#6cff66", "MISSING": "#ffaa55", "LOCKED": "#bbbbbb", "FAULT": "#ff5959", "TESTING": "#ffd74f"}
-
+        ctrl_colors = {"ONLINE": "#6cff66", "MISSING": "#ffaa55", "LOCKED": "#bbbbbb"}
         for idx in range(1, 5):
             frame = tk.Frame(self.status_body, bg="#0f0617", bd=2, relief="groove")
             frame.grid(row=0, column=idx - 1, padx=6, pady=4, sticky="nsew")
-
-            btn = tk.Button(
-                frame, text=f"P{idx} / SLA:{self.player_status[idx]['sla']}", bg=colors[idx], fg="white",
-                font=("Arial", 20, "bold"), relief="raised", bd=2,
-                command=lambda i=idx: self.on_player_tile_click(i), cursor="hand2",
-            )
+            btn = tk.Button(frame, text=f"P{idx}", bg=colors[idx], fg="white", font=("Arial", 20, "bold"), relief="raised", bd=2, command=lambda i=idx: self.on_player_tile_click(i), cursor="hand2")
             btn.pack(fill="x", padx=8, pady=(8, 6))
-
             state = self.player_status[idx]["state"]
             fg = state_colors.get(state, "white")
             tk.Label(frame, text=state, bg="#0f0617", fg=fg, font=("Arial", 20, "bold")).pack(pady=(0, 4))
-
             ctrl_status = self.controller_status[idx]["status"]
             tk.Label(frame, text=f"CTRL: {ctrl_status}", bg="#0f0617", fg=ctrl_colors.get(ctrl_status, "#cccccc"), font=("Arial", 12, "bold")).pack(pady=(0, 10))
 
@@ -2048,49 +1999,33 @@ class PixelChallengeConsole:
             return
         for child in self.ctrl_body.winfo_children():
             child.destroy()
-
         for idx in range(1, 5):
             data = self.controller_status[idx]
             border_color = "#ffd74f" if data["selected"] else "#0f0617"
-
             frame = tk.Frame(self.ctrl_body, bg=border_color, bd=3, relief="groove")
             r = 0 if idx <= 2 else 1
             c = 0 if idx in (1, 3) else 1
             frame.grid(row=r, column=c, padx=8, pady=8, sticky="nsew")
-
             inner = tk.Frame(frame, bg="#0f0617")
             inner.pack(fill="both", expand=True, padx=2, pady=2)
             inner.bind("<Button-1>", lambda e, i=idx: self.select_controller(i))
-
-            header = tk.Label(inner, text=f"CONTROLLER {idx}", bg="#0f0617", fg="white", font=("Arial", 16, "bold"), cursor="hand2")
+            header = tk.Label(inner, text=f"CTRL {idx}", bg="#0f0617", fg="white", font=("Arial", 16, "bold"), cursor="hand2")
             header.pack(pady=(8, 6))
             header.bind("<Button-1>", lambda e, i=idx: self.select_controller(i))
-
             if data["locked"]:
                 button_text, button_bg = "LOCKED", "#666666"
             elif data["enabled"]:
                 button_text, button_bg = "ENABLED", "#2ea62e"
             else:
                 button_text, button_bg = "DISABLED", "#c93b1e"
-
-            tk.Button(
-                inner, text=button_text, bg=button_bg, fg="white", font=("Arial", 18, "bold"),
-                relief="raised", bd=2, command=lambda i=idx: self.toggle_controller(i), cursor="hand2",
-            ).pack(fill="x", padx=10, pady=(0, 8))
-
-            status_fg = {"ONLINE": "#6cff66", "TESTING": "#ffd74f", "MISSING": "#ffaa55", "LOCKED": "#bbbbbb", "FAULT": "#ff5959"}.get(data["status"], "#ff5959")
-            status_label = tk.Label(inner, text=data["status"], bg="#0f0617", fg=status_fg, font=("Arial", 18, "bold"), cursor="hand2")
-            status_label.pack(pady=(0, 4))
-            status_label.bind("<Button-1>", lambda e, i=idx: self.select_controller(i))
-
+            tk.Button(inner, text=button_text, bg=button_bg, fg="white", font=("Arial", 18, "bold"), relief="raised", bd=2, command=lambda i=idx: self.toggle_controller(i), cursor="hand2").pack(fill="x", padx=10, pady=(0, 8))
+            status_fg = {"ONLINE": "#6cff66", "MISSING": "#ffaa55", "LOCKED": "#bbbbbb"}.get(data["status"], "#ff5959")
+            tk.Label(inner, text=data["status"], bg="#0f0617", fg=status_fg, font=("Arial", 18, "bold")).pack(pady=(0, 4))
             if data.get("name"):
-                tk.Label(inner, text=data["name"], bg="#0f0617", fg="#cccccc", font=("Arial", 10), wraplength=180, justify="center").pack(pady=(0, 6))
-
+                tk.Label(inner, text=data["name"][:20], bg="#0f0617", fg="#cccccc", font=("Arial", 10)).pack(pady=(0, 6))
         footer = tk.Frame(self.ctrl_body, bg="#17071f")
         footer.grid(row=2, column=0, columnspan=2, pady=(8, 0))
-
         self.neon_button(footer, "SCAN", self.on_scan_controllers, bg="#1b63ff", width=8).pack(side="left", padx=4)
-
         self.reassign_btn = self.neon_button(footer, "MAP BUTTONS", self.on_reassign_toggle, bg="#9440ff", width=14)
         self.reassign_btn.pack(side="left", padx=4)
         self.update_reassign_button()
@@ -2100,7 +2035,7 @@ class PixelChallengeConsole:
             return
         self.info_text.configure(state="normal")
         self.info_text.delete("1.0", "end")
-        for line in self.info_lines[-100:]:  # Keep last 100 lines
+        for line in self.info_lines[-100:]:
             tag = None
             if line.startswith("P1"):
                 tag = "p1"
@@ -2114,39 +2049,7 @@ class PixelChallengeConsole:
         self.info_text.configure(state="disabled")
 
     # =========================================================================
-    # THEME CALLBACKS
-    # =========================================================================
-    def on_theme_checked(self):
-        self.selected_themes = {name for name, var in self.theme_vars.items() if var.get()}
-        self.save_settings()
-        self.apply_attract_state()
-
-    def on_theme_selected(self, event=None):
-        name = self.theme_listbox_selection()
-        if not name:
-            return
-        self.log(f"Theme selected: {name}")
-        if self.lights_should_run() and self.animate_enabled.get() and not self.all_lanes_test_active:
-            self.attract.apply_live_theme_change(self, name)
-        self.save_settings()
-
-    def on_theme_speed_changed(self, theme_name: str, value):
-        self.per_theme_speed[theme_name] = int(float(value))
-        self.save_settings()
-        if self.attract.current_theme == theme_name and self.attract.active:
-            self.attract.step = 0
-
-    def on_theme_selected_manual(self, theme_name: str):
-        if hasattr(self, 'theme_select_box'):
-            self.theme_select_box.selection_clear(0, "end")
-            try:
-                idx = self.theme_names.index(theme_name)
-                self.theme_select_box.selection_set(idx)
-            except Exception:
-                pass
-
-    # =========================================================================
-    # CONFIG / SETUP WINDOWS
+    # CONFIG WINDOW
     # =========================================================================
     def open_config_window(self):
         if self.config_window and tk.Toplevel.winfo_exists(self.config_window):
@@ -2154,43 +2057,26 @@ class PixelChallengeConsole:
             return
         path = self.config_path_for_current_game()
         os.makedirs(os.path.dirname(path), exist_ok=True)
-
         if not os.path.exists(path):
-            default_payload = {"difficulty": "normal", "show_scoreboard": True, "sound_pack": "default"}
             with open(path, "w", encoding="utf-8") as f:
-                json.dump(default_payload, f, indent=2)
-
-        self.config_window = tk.Toplevel(self.root, bg="#0f0617", highlightbackground="#ffd74f", highlightthickness=2)
-        self.config_window.title("Game Config")
-        self.config_window.geometry("640x520+2140+180")
+                json.dump({"difficulty": "normal"}, f, indent=2)
+        self.config_window = tk.Toplevel(self.root, bg="#0f0617")
+        self.config_window.title("Config")
+        self.config_window.geometry("640x520")
         self.config_window.transient(self.root)
         self.config_window.grab_set()
-
-        tk.Label(self.config_window, text=f"Config for: {self.selected_game.get()}", bg="#0f0617", fg="white", font=("Arial", 18, "bold")).pack(pady=6)
-        tk.Label(self.config_window, text=path, bg="#0f0617", fg="#bbbbbb", font=("Arial", 10)).pack(pady=(0, 6))
-
+        tk.Label(self.config_window, text=f"Config: {self.selected_game.get()}", bg="#0f0617", fg="white", font=("Arial", 18, "bold")).pack(pady=6)
         self.config_text = tk.Text(self.config_window, wrap="none", bg="#12061f", fg="white", insertbackground="white", font=("Consolas", 12), undo=True)
         self.config_text.pack(fill="both", expand=True, padx=8, pady=6)
-
-        self.load_config_file(path)
-
-        btn_frame = tk.Frame(self.config_window, bg="#0f0617")
-        btn_frame.pack(fill="x", pady=(4, 8))
-        self.neon_button(btn_frame, "RELOAD", lambda p=path: self.load_config_file(p), bg="#1b63ff", width=10).pack(side="left", padx=6)
-        self.neon_button(btn_frame, "SAVE", lambda p=path: self.save_config_file(p), bg="#2ea62e", width=8).pack(side="left", padx=6)
-        self.neon_button(btn_frame, "CLOSE", self.close_config_window, bg="#c93b1e", width=8).pack(side="right", padx=6)
-
-    def load_config_file(self, path):
         try:
             with open(path, "r", encoding="utf-8") as f:
-                data = f.read()
-        except Exception as e:
-            messagebox.showerror("Config", f"Failed to read {path}:\n{e}")
-            return
-        if self.config_text:
-            self.config_text.delete("1.0", "end")
-            self.config_text.insert("1.0", data)
-        self.log(f"Config loaded: {path}")
+                self.config_text.insert("1.0", f.read())
+        except Exception:
+            pass
+        btn_frame = tk.Frame(self.config_window, bg="#0f0617")
+        btn_frame.pack(fill="x", pady=(4, 8))
+        self.neon_button(btn_frame, "SAVE", lambda: self.save_config_file(path), bg="#2ea62e", width=8).pack(side="left", padx=6)
+        self.neon_button(btn_frame, "CLOSE", self.close_config_window, bg="#c93b1e", width=8).pack(side="right", padx=6)
 
     def save_config_file(self, path):
         try:
@@ -2200,7 +2086,7 @@ class PixelChallengeConsole:
             self.log(f"Config saved: {path}")
             messagebox.showinfo("Config", "Saved.")
         except Exception as e:
-            messagebox.showerror("Config", f"Failed to save:\n{e}")
+            messagebox.showerror("Config", f"Failed: {e}")
 
     def close_config_window(self):
         if self.config_window and tk.Toplevel.winfo_exists(self.config_window):
@@ -2209,52 +2095,174 @@ class PixelChallengeConsole:
         self.config_window = None
         self.config_text = None
 
+
+    # =========================================================================
+    # SETUP WINDOW
+    # =========================================================================
     def open_setup_window(self):
         if self.setup_window and tk.Toplevel.winfo_exists(self.setup_window):
             self.setup_window.focus_set()
             return
+        
         self.setup_window = tk.Toplevel(self.root, bg="#0f0617", highlightbackground="#ffd74f", highlightthickness=2)
-        self.setup_window.title("Setup")
-        self.setup_window.geometry(self.setup_geometry if self.setup_geometry else "900x620+2100+120")
+        self.setup_window.title("System Setup")
+        
+        # Use saved geometry or default
+        if self.setup_geometry:
+            self.setup_window.geometry(self.setup_geometry)
+        else:
+            self.setup_window.geometry("520x480+2100+150")
+        
+        self.setup_window.minsize(400, 350)
         self.setup_window.transient(self.root)
         self.setup_window.grab_set()
+        
+        # Save geometry when window is moved/resized
+        self.setup_window.bind("<Configure>", self.on_setup_window_configure)
 
-        close_btn = self.neon_button(self.setup_window, "CLOSE", self.close_setup_window, bg="#c93b1e", width=8)
-        close_btn.place(relx=1.0, rely=0.0, x=-16, y=12, anchor="ne")
+        # Main container with padding
+        main_frame = tk.Frame(self.setup_window, bg="#0f0617")
+        main_frame.pack(fill="both", expand=True, padx=12, pady=8)
+        main_frame.grid_rowconfigure(1, weight=1)
+        main_frame.grid_columnconfigure(0, weight=1)
 
-        tk.Label(self.setup_window, text="SYSTEM SETUP", bg="#0f0617", fg="white", font=("Arial", 24, "bold")).pack(pady=(12, 6))
+        # Title
+        tk.Label(main_frame, text="SYSTEM SETUP", bg="#0f0617", fg="white", font=("Arial", 20, "bold")).grid(row=0, column=0, pady=(0, 12))
 
-        body = tk.Frame(self.setup_window, bg="#0f0617")
-        body.pack(fill="both", expand=True, padx=18, pady=(0, 12))
+        # Scrollable content area
+        canvas_frame = tk.Frame(main_frame, bg="#0f0617")
+        canvas_frame.grid(row=1, column=0, sticky="nsew")
+        canvas_frame.grid_rowconfigure(0, weight=1)
+        canvas_frame.grid_columnconfigure(0, weight=1)
 
-        # Falcon IP
-        falcon_frame = tk.LabelFrame(body, text="Falcon Controller", bg="#0f0617", fg="white", font=("Arial", 14, "bold"))
-        falcon_frame.pack(fill="x", pady=8)
-        self.falcon_ip_var = tk.StringVar(value=self.falcon_ip)
-        tk.Label(falcon_frame, text="Falcon IP:", bg="#0f0617", fg="white", font=("Arial", 12)).pack(side="left", padx=8)
-        falcon_entry = tk.Entry(falcon_frame, textvariable=self.falcon_ip_var, font=("Arial", 12), width=20)
-        falcon_entry.pack(side="left", padx=8)
-        self.neon_button(falcon_frame, "TEST", lambda: self.test_falcon(self.falcon_ip_var.get()), bg="#2ea62e", width=8).pack(side="left", padx=8)
+        canvas = tk.Canvas(canvas_frame, bg="#0f0617", highlightthickness=0)
+        scrollbar = tk.Scrollbar(canvas_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg="#0f0617")
 
-        btn_row = tk.Frame(self.setup_window, bg="#0f0617")
-        btn_row.pack(fill="x", pady=(4, 12))
-        self.neon_button(btn_row, "SAVE & APPLY", lambda: self.save_setup(falcon_entry), bg="#2ea62e", width=14).pack(side="left", padx=10)
-        self.neon_button(btn_row, "CANCEL", self.close_setup_window, bg="#c93b1e", width=10).pack(side="left", padx=10)
+        scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas_window = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        
+        # Make scrollable frame expand to canvas width
+        def configure_scroll_width(event):
+            canvas.itemconfig(canvas_window, width=event.width)
+        canvas.bind("<Configure>", configure_scroll_width)
+        
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.grid(row=0, column=0, sticky="nsew")
+        scrollbar.grid(row=0, column=1, sticky="ns")
+
+        # Enable mousewheel scrolling
+        def on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        canvas.bind_all("<MouseWheel>", on_mousewheel)
+
+        # --- Falcon Controller Section ---
+        falcon_frame = tk.LabelFrame(scrollable_frame, text="Falcon Controller", bg="#0f0617", fg="white", font=("Arial", 12, "bold"))
+        falcon_frame.pack(fill="x", padx=8, pady=6)
+
+        falcon_row = tk.Frame(falcon_frame, bg="#0f0617")
+        falcon_row.pack(fill="x", padx=8, pady=6)
+        tk.Label(falcon_row, text="IP:", bg="#0f0617", fg="white", font=("Arial", 11)).pack(side="left")
+        self.falcon_ip_entry = tk.Entry(falcon_row, font=("Arial", 11), width=15)
+        self.falcon_ip_entry.insert(0, self.falcon_ip)
+        self.falcon_ip_entry.pack(side="left", padx=6)
+        tk.Button(falcon_row, text="TEST", command=lambda: self.test_falcon(self.falcon_ip_entry.get()), bg="#2ea62e", fg="white", font=("Arial", 10, "bold"), width=6).pack(side="left", padx=4)
+
+        # --- WiFi Settings Section ---
+        wifi_frame = tk.LabelFrame(scrollable_frame, text="WiFi", bg="#0f0617", fg="white", font=("Arial", 12, "bold"))
+        wifi_frame.pack(fill="x", padx=8, pady=6)
+
+        wifi_grid = tk.Frame(wifi_frame, bg="#0f0617")
+        wifi_grid.pack(fill="x", padx=8, pady=6)
+        wifi_grid.grid_columnconfigure(1, weight=1)
+
+        tk.Label(wifi_grid, text="SSID:", bg="#0f0617", fg="white", font=("Arial", 11)).grid(row=0, column=0, sticky="e", padx=2, pady=2)
+        tk.Entry(wifi_grid, textvariable=self.wifi_ssid, font=("Arial", 11)).grid(row=0, column=1, sticky="ew", padx=2, pady=2)
+
+        tk.Label(wifi_grid, text="Password:", bg="#0f0617", fg="white", font=("Arial", 11)).grid(row=1, column=0, sticky="e", padx=2, pady=2)
+        tk.Entry(wifi_grid, textvariable=self.wifi_psk, font=("Arial", 11), show="*").grid(row=1, column=1, sticky="ew", padx=2, pady=2)
+
+        tk.Label(wifi_grid, text="Static IP:", bg="#0f0617", fg="white", font=("Arial", 11)).grid(row=2, column=0, sticky="e", padx=2, pady=2)
+        tk.Entry(wifi_grid, textvariable=self.wifi_static_ip, font=("Arial", 11)).grid(row=2, column=1, sticky="ew", padx=2, pady=2)
+
+        tk.Label(wifi_grid, text="Gateway:", bg="#0f0617", fg="white", font=("Arial", 11)).grid(row=3, column=0, sticky="e", padx=2, pady=2)
+        tk.Entry(wifi_grid, textvariable=self.wifi_gateway, font=("Arial", 11)).grid(row=3, column=1, sticky="ew", padx=2, pady=2)
+
+        # --- Ethernet Settings Section ---
+        eth_frame = tk.LabelFrame(scrollable_frame, text="Ethernet", bg="#0f0617", fg="white", font=("Arial", 12, "bold"))
+        eth_frame.pack(fill="x", padx=8, pady=6)
+
+        eth_grid = tk.Frame(eth_frame, bg="#0f0617")
+        eth_grid.pack(fill="x", padx=8, pady=6)
+        eth_grid.grid_columnconfigure(1, weight=1)
+
+        tk.Label(eth_grid, text="Static IP:", bg="#0f0617", fg="white", font=("Arial", 11)).grid(row=0, column=0, sticky="e", padx=2, pady=2)
+        tk.Entry(eth_grid, textvariable=self.eth_static_ip, font=("Arial", 11)).grid(row=0, column=1, sticky="ew", padx=2, pady=2)
+
+        tk.Label(eth_grid, text="Gateway:", bg="#0f0617", fg="white", font=("Arial", 11)).grid(row=1, column=0, sticky="e", padx=2, pady=2)
+        tk.Entry(eth_grid, textvariable=self.eth_gateway, font=("Arial", 11)).grid(row=1, column=1, sticky="ew", padx=2, pady=2)
+
+        # --- DNS/NTP Settings Section ---
+        dns_frame = tk.LabelFrame(scrollable_frame, text="DNS / NTP", bg="#0f0617", fg="white", font=("Arial", 12, "bold"))
+        dns_frame.pack(fill="x", padx=8, pady=6)
+
+        dns_grid = tk.Frame(dns_frame, bg="#0f0617")
+        dns_grid.pack(fill="x", padx=8, pady=6)
+        dns_grid.grid_columnconfigure(1, weight=1)
+
+        tk.Label(dns_grid, text="DNS:", bg="#0f0617", fg="white", font=("Arial", 11)).grid(row=0, column=0, sticky="e", padx=2, pady=2)
+        tk.Entry(dns_grid, textvariable=self.dns_server, font=("Arial", 11)).grid(row=0, column=1, sticky="ew", padx=2, pady=2)
+
+        tk.Label(dns_grid, text="NTP:", bg="#0f0617", fg="white", font=("Arial", 11)).grid(row=1, column=0, sticky="e", padx=2, pady=2)
+        tk.Entry(dns_grid, textvariable=self.ntp_server, font=("Arial", 11)).grid(row=1, column=1, sticky="ew", padx=2, pady=2)
+
+        # --- System Settings Section ---
+        sys_frame = tk.LabelFrame(scrollable_frame, text="System", bg="#0f0617", fg="white", font=("Arial", 12, "bold"))
+        sys_frame.pack(fill="x", padx=8, pady=6)
+
+        sys_grid = tk.Frame(sys_frame, bg="#0f0617")
+        sys_grid.pack(fill="x", padx=8, pady=6)
+        sys_grid.grid_columnconfigure(1, weight=1)
+
+        tk.Label(sys_grid, text="Hostname:", bg="#0f0617", fg="white", font=("Arial", 11)).grid(row=0, column=0, sticky="e", padx=2, pady=2)
+        tk.Entry(sys_grid, textvariable=self.hostname, font=("Arial", 11)).grid(row=0, column=1, sticky="ew", padx=2, pady=2)
+
+        tk.Checkbutton(sys_grid, text="Auto-start on boot", variable=self.auto_start, bg="#0f0617", fg="white", activebackground="#0f0617", activeforeground="white", selectcolor="#17071f", font=("Arial", 11)).grid(row=1, column=0, columnspan=2, sticky="w", pady=4)
+
+        # Button row at bottom (not in scrollable area)
+        btn_row = tk.Frame(main_frame, bg="#0f0617")
+        btn_row.grid(row=2, column=0, sticky="ew", pady=(12, 4))
+
+        tk.Button(btn_row, text="SAVE", command=self.save_setup, bg="#2ea62e", fg="white", font=("Arial", 12, "bold"), width=10, cursor="hand2").pack(side="left", padx=4)
+        tk.Button(btn_row, text="CANCEL", command=self.close_setup_window, bg="#c93b1e", fg="white", font=("Arial", 12, "bold"), width=10, cursor="hand2").pack(side="left", padx=4)
+        tk.Button(btn_row, text="REBOOT", command=self.reboot_system, bg="#ff6600", fg="white", font=("Arial", 12, "bold"), width=10, cursor="hand2").pack(side="right", padx=4)
+
+    def on_setup_window_configure(self, event):
+        """Save setup window geometry when moved/resized"""
+        if self.setup_window and event.widget == self.setup_window:
+            self.setup_geometry = self.setup_window.geometry()
 
     def close_setup_window(self):
         if self.setup_window and tk.Toplevel.winfo_exists(self.setup_window):
+            # Save final geometry
+            self.setup_geometry = self.setup_window.geometry()
+            self.save_settings()
             self.setup_window.grab_release()
             self.setup_window.destroy()
         self.setup_window = None
 
-    def save_setup(self, falcon_entry=None):
-        if falcon_entry is not None:
-            self.falcon_ip = falcon_entry.get().strip() or DEFAULT_FALCON_IP
-        try:
+    def save_setup(self):
+        # Update falcon IP from entry
+        if hasattr(self, 'falcon_ip_entry'):
+            self.falcon_ip = self.falcon_ip_entry.get().strip() or DEFAULT_FALCON_IP
+        
+        # Save geometry
+        if self.setup_window:
             self.setup_geometry = self.setup_window.geometry()
-        except Exception:
-            pass
+        
         self.save_settings()
+        
+        # Restart falcon service with new IP
         try:
             self.falcon.stop()
         except Exception:
@@ -2262,27 +2270,38 @@ class PixelChallengeConsole:
         self.falcon = FalconService(self.falcon_ip, PIXELS_PER_LANE)
         self.attract.falcon = self.falcon
         self.apply_brightness_for_state()
-        self.log(f"Setup saved. Falcon IP set to {self.falcon_ip}.")
-        messagebox.showinfo("Setup", "Settings saved.")
+        
+        self.log(f"Setup saved. Falcon IP: {self.falcon_ip}")
+        messagebox.showinfo("Setup", "Settings saved successfully.")
         self.close_setup_window()
+
+    def reboot_system(self):
+        if messagebox.askyesno("Reboot", "Are you sure you want to reboot the system?"):
+            self.log("System reboot requested...")
+            self.save_settings()
+            try:
+                subprocess.run(["sudo", "reboot"], check=False)
+            except Exception as e:
+                self.log(f"Reboot failed: {e}")
+                messagebox.showerror("Reboot", f"Failed to reboot: {e}")
+
 
     def test_falcon(self, ip_addr: str):
         ip = ip_addr.strip() or self.falcon_ip
         try:
             result = subprocess.run(["ping", "-c", "1", "-W", "1", ip], capture_output=True, text=True)
             if result.returncode == 0:
-                self.log(f"Falcon test OK: {ip}")
-                messagebox.showinfo("Falcon Test", f"Falcon reachable at {ip}")
+                self.log(f"Falcon OK: {ip}")
+                messagebox.showinfo("Falcon Test", f"Reachable: {ip}")
             else:
-                self.log(f"Falcon test FAILED: {ip}")
-                messagebox.showwarning("Falcon Test", f"No response from {ip}")
+                self.log(f"Falcon FAILED: {ip}")
+                messagebox.showwarning("Falcon Test", f"No response: {ip}")
         except Exception as e:
-            self.log(f"Falcon test error: {e}")
-            messagebox.showerror("Falcon Test", f"Error testing {ip}: {e}")
+            messagebox.showerror("Falcon Test", f"Error: {e}")
 
     def toggle_falcon_console(self):
         if self.falcon_console_proc and self.falcon_console_proc.poll() is None:
-            if messagebox.askyesno("Falcon Console", "Close the Falcon console browser?"):
+            if messagebox.askyesno("Falcon", "Close Falcon console?"):
                 try:
                     self.falcon_console_proc.terminate()
                 except Exception:
@@ -2292,17 +2311,17 @@ class PixelChallengeConsole:
         url = f"http://{self.falcon_ip}/"
         try:
             self.falcon_console_proc = subprocess.Popen(["chromium-browser", "--kiosk", url])
-            self.log(f"Opened Falcon console at {url}")
+            self.log(f"Opened Falcon console: {url}")
         except Exception:
             webbrowser.open(url)
             self.falcon_console_proc = None
-            self.log(f"Opened Falcon console in default browser: {url}")
 
     # =========================================================================
     # CLOSE / CLEANUP
     # =========================================================================
     def on_close(self):
         self.cancel_viewer_return()
+        self.cancel_countdown()
         self.save_sash_positions()
         self.save_settings()
         try:
