@@ -1,0 +1,100 @@
+2026-03-20 14:03:20 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:03:20 HostState -> PLAYERS_CONFIRMED: Confirmed 2 player(s).
+2026-03-20 14:03:20 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 14:03:20 Dot Dash: setup entered [stub].
+2026-03-20 14:03:28 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:03:28 FalconService: all lanes cleared.
+2026-03-20 14:03:28 AttractService: stopped.
+2026-03-20 14:03:28 HostState -> GAME_RUNNING: Dot Dash started.
+2026-03-20 14:03:28 FalconService: all lanes cleared.
+======================================
+
+BEGIN OF V18.1.0 WITH DOT DASH V5 ================
+
+=================================================
+
+
+2026-03-20 14:29:33 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:29:33 HostState -> IDLE: System ready.
+2026-03-20 14:29:33 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 14:29:45 --- BUTTON MAPPING STARTED ---
+2026-03-20 14:29:45 PLAYER 1: Press the WHITE button.
+2026-03-20 14:29:48   -> Mapped WHITE to ID 4
+2026-03-20 14:29:48 PLAYER 1: Press the RED button.
+2026-03-20 14:29:49   -> Mapped RED to ID 0
+2026-03-20 14:29:49 PLAYER 1: Press the GREEN button.
+2026-03-20 14:29:49   -> Mapped GREEN to ID 1
+2026-03-20 14:29:49 PLAYER 1: Press the BLUE button.
+2026-03-20 14:29:50   -> Mapped BLUE to ID 2
+2026-03-20 14:29:50 PLAYER 1: Press the ORANGE button.
+2026-03-20 14:29:50   -> Mapped ORANGE to ID 3
+2026-03-20 14:29:50 PLAYER 1: Press the YELLOW button.
+2026-03-20 14:29:51   -> Mapped YELLOW to ID 3
+2026-03-20 14:29:51 Player 1 mapping finished.
+2026-03-20 14:29:51 PLAYER 2: Press the WHITE button.
+2026-03-20 14:29:52   -> Mapped WHITE to ID 4
+2026-03-20 14:29:52 PLAYER 2: Press the RED button.
+2026-03-20 14:29:53   -> Mapped RED to ID 0
+2026-03-20 14:29:53 PLAYER 2: Press the GREEN button.
+2026-03-20 14:29:53   -> Mapped GREEN to ID 1
+2026-03-20 14:29:53 PLAYER 2: Press the BLUE button.
+2026-03-20 14:29:53   -> Mapped BLUE to ID 2
+2026-03-20 14:29:53 PLAYER 2: Press the ORANGE button.
+2026-03-20 14:29:54   -> Mapped ORANGE to ID 3
+2026-03-20 14:29:54 PLAYER 2: Press the YELLOW button.
+2026-03-20 14:29:54   -> Mapped YELLOW to ID 3
+2026-03-20 14:29:54 Player 2 mapping finished.
+2026-03-20 14:29:54 PLAYER 3: Press the WHITE button.
+2026-03-20 14:29:56   -> Mapped WHITE to ID 4
+2026-03-20 14:29:56 PLAYER 3: Press the RED button.
+2026-03-20 14:29:56   -> Mapped RED to ID 0
+2026-03-20 14:29:56 PLAYER 3: Press the GREEN button.
+2026-03-20 14:29:57   -> Mapped GREEN to ID 1
+2026-03-20 14:29:57 PLAYER 3: Press the BLUE button.
+2026-03-20 14:29:57   -> Mapped BLUE to ID 2
+2026-03-20 14:29:57 PLAYER 3: Press the ORANGE button.
+2026-03-20 14:29:57   -> Mapped ORANGE to ID 3
+2026-03-20 14:29:57 PLAYER 3: Press the YELLOW button.
+2026-03-20 14:29:58   -> Mapped YELLOW to ID 3
+2026-03-20 14:29:58 Player 3 mapping finished.
+2026-03-20 14:29:58 PLAYER 4: Press the WHITE button.
+2026-03-20 14:30:00   -> Mapped WHITE to ID 4
+2026-03-20 14:30:00 PLAYER 4: Press the RED button.
+2026-03-20 14:30:01   -> Mapped RED to ID 0
+2026-03-20 14:30:01 PLAYER 4: Press the GREEN button.
+2026-03-20 14:30:01   -> Mapped GREEN to ID 1
+2026-03-20 14:30:01 PLAYER 4: Press the BLUE button.
+2026-03-20 14:30:02   -> Mapped BLUE to ID 2
+2026-03-20 14:30:02 PLAYER 4: Press the ORANGE button.
+2026-03-20 14:30:02   -> Mapped ORANGE to ID 3
+2026-03-20 14:30:02 PLAYER 4: Press the YELLOW button.
+2026-03-20 14:30:03   -> Mapped YELLOW to ID 3
+2026-03-20 14:30:03 Player 4 mapping finished.
+2026-03-20 14:30:03 Controller assignments saved.
+2026-03-20 14:30:03 --- MAPPING COMPLETE & SAVED ---
+2026-03-20 14:30:11 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 14:30:11 Game selected: Dot Dash
+2026-03-20 14:30:11 FalconService: all lanes cleared.
+2026-03-20 14:30:11 AttractService: stopped.
+2026-03-20 14:30:19 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:30:23 Start blocked: No players have joined.
+2026-03-20 14:30:25 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:30:26 FalconService: all lanes cleared.
+2026-03-20 14:30:26 AttractService: stopped.
+2026-03-20 14:30:26 FalconService: all lanes cleared.
+2026-03-20 14:30:26 HostState -> CHECKIN_OPEN: Player check-in opened. Waiting for white-button enrollment.
+2026-03-20 14:30:27 Player 1 CHECKED IN via White Button.
+2026-03-20 14:30:28 Player 2 CHECKED IN via White Button.
+2026-03-20 14:30:32 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:30:32 HostState -> PLAYERS_CONFIRMED: Confirmed 2 player(s).
+2026-03-20 14:30:32 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 14:30:32 Dot Dash: setup entered [stub].
+2026-03-20 14:30:37 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:30:37 FalconService: all lanes cleared.
+2026-03-20 14:30:37 AttractService: stopped.
+2026-03-20 14:30:37 HostState -> GAME_RUNNING: Dot Dash started.
+2026-03-20 14:30:37 FalconService: all lanes cleared.
+2026-03-20 14:30:37 Dot Dash session entered.
+2026-03-20 14:31:19 FalconService: all lanes cleared.
+2026-03-20 14:31:19 AttractService: stopped.
+2026-03-20 14:31:19 FalconService: all lanes cleared.

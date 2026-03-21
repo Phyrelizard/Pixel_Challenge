@@ -1,6 +1,30 @@
 {
-  "difficulty": "normal",
+  "countdown_seconds": 3,
+  "lane_pixel_count": 100,
+  "dash_length": 3,
+  "round_timeout_sec": 20,
   "show_scoreboard": true,
   "sound_pack": "default",
-  "notes": "auto-created by console v17.3.0; adjust as needed"
+  "difficulty_preset": "normal",
+  "countdown_blink_interval_ms": 500,
+  "finish_blink_sec": 4.0,
+  "finish_blink_interval_ms": 500,
+  "brightness": {
+    "countdown_red": 0.5,
+    "armed_green": 1.0,
+    "gameplay": 1.0,
+    "finish_red": 1.0
+  },
+  "scoring": {
+    "reaction_weight": 120,
+    "completion_weight": 40,
+    "accuracy_weight": 300,
+    "consistency_weight": 200,
+    "first_finisher_bonus": 200
+  },
+  "difficulty_presets": {
+    "easy": { "round_timeout_sec": 25 },
+    "normal": { "round_timeout_sec": 20 },
+    "hard": { "round_timeout_sec": 15 }
+  }
 }

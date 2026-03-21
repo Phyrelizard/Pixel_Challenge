@@ -1,0 +1,55 @@
+{
+  "game_key": "dot_dash",
+  "title": "Dot Dash",
+  "phase": "setup",
+  "players": [
+    {
+      "player_id": 1,
+      "phase": "setup",
+      "outbound_index": 0,
+      "return_head_index": 0,
+      "valid_presses": 0,
+      "accuracy": 0.0,
+      "consistency": null,
+      "colors_selected": false,
+      "color_a": null,
+      "color_b": null
+    },
+    {
+      "player_id": 2,
+      "phase": "setup",
+      "outbound_index": 0,
+      "return_head_index": 0,
+      "valid_presses": 0,
+      "accuracy": 0.0,
+      "consistency": null,
+      "colors_selected": false,
+      "color_a": null,
+      "color_b": null
+    },
+    {
+      "player_id": 3,
+      "phase": "setup",
+      "outbound_index": 0,
+      "return_head_index": 0,
+      "valid_presses": 0,
+      "accuracy": 0.0,
+      "consistency": null,
+      "colors_selected": false,
+      "color_a": null,
+      "color_b": null
+    },
+    {
+      "player_id": 4,
+      "phase": "setup",
+      "outbound_index": 0,
+      "return_head_index": 0,
+      "valid_presses": 0,
+      "accuracy": 0.0,
+      "consistency": null,
+      "colors_selected": false,
+      "color_a": null,
+      "color_b": null
+    }
+  ]
+}

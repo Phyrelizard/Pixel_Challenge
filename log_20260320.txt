@@ -1,0 +1,1716 @@
+2026-03-20 02:21:30 Controller rescan: detected 4 joystick(s).
+2026-03-20 02:21:30 HostState -> IDLE: System ready.
+2026-03-20 02:21:30 AttractService: theme 'Rainbow Pulse' started.
+2026-03-20 02:21:30 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 02:21:48 AttractService: theme changed live to 'Fire Burst'.
+2026-03-20 02:21:48 CYCLE -> Fire Burst (speed 9)
+2026-03-20 02:21:59 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 02:21:59 Game selected: Dot Dash
+2026-03-20 02:21:59 FalconService: all lanes cleared.
+2026-03-20 02:21:59 AttractService: stopped.
+2026-03-20 02:22:03 Controller rescan: detected 4 joystick(s).
+2026-03-20 02:22:04 FalconService: all lanes cleared.
+2026-03-20 02:22:04 AttractService: stopped.
+2026-03-20 02:22:04 FalconService: all lanes cleared.
+2026-03-20 02:22:04 HostState -> CHECKIN_OPEN: Player check-in opened. Waiting for white-button enrollment.
+2026-03-20 02:22:07 White button pressed on js0 (Controller 1).
+2026-03-20 02:22:07 Player 1 joined check-in.
+2026-03-20 02:22:09 White button pressed on js1 (Controller 2).
+2026-03-20 02:22:09 Player 2 joined check-in.
+2026-03-20 02:22:11 White button pressed on js2 (Controller 3).
+2026-03-20 02:22:11 Player 3 joined check-in.
+2026-03-20 02:22:11 White button pressed on js3 (Controller 4).
+2026-03-20 02:22:11 Player 4 joined check-in.
+2026-03-20 02:22:17 Controller rescan: detected 4 joystick(s).
+2026-03-20 02:22:17 HostState -> PLAYERS_CONFIRMED: Confirmed 4 player(s).
+2026-03-20 02:22:17 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 02:22:17 Dot Dash: setup entered [stub].
+2026-03-20 02:22:24 Controller rescan: detected 4 joystick(s).
+2026-03-20 02:22:25 FalconService: all lanes cleared.
+2026-03-20 02:22:25 AttractService: stopped.
+2026-03-20 02:22:25 Dot Dash: all players press ANY two gameplay buttons (not white) to map A/B. No turn order; do it anytime.
+2026-03-20 02:22:31 Dot Dash: P1 mapped A to raw button 0. Press a different button for B.
+2026-03-20 02:22:31 Joystick poll error: 'PixelChallengeConsole' object has no attribute 'play_sound'
+2026-03-20 02:22:31 Dot Dash: P1 second button must be different.
+2026-03-20 02:22:32 Dot Dash: P1 mapped B to raw button 1.
+2026-03-20 02:22:32 Joystick poll error: 'PixelChallengeConsole' object has no attribute 'play_sound'
+2026-03-20 02:22:38 Dot Dash: P2 mapped A to raw button 0. Press a different button for B.
+2026-03-20 02:22:38 Joystick poll error: 'PixelChallengeConsole' object has no attribute 'play_sound'
+2026-03-20 02:22:38 Dot Dash: P2 second button must be different.
+2026-03-20 02:22:40 Dot Dash: P2 mapped B to raw button 1.
+2026-03-20 02:22:40 Joystick poll error: 'PixelChallengeConsole' object has no attribute 'play_sound'
+2026-03-20 02:22:51 Dot Dash: P3 mapped A to raw button 1. Press a different button for B.
+2026-03-20 02:22:51 Joystick poll error: 'PixelChallengeConsole' object has no attribute 'play_sound'
+2026-03-20 02:22:51 Dot Dash: P3 second button must be different.
+2026-03-20 02:22:52 Dot Dash: P3 mapped B to raw button 2.
+2026-03-20 02:22:52 Joystick poll error: 'PixelChallengeConsole' object has no attribute 'play_sound'
+2026-03-20 02:22:54 Dot Dash: P4 mapped A to raw button 3. Press a different button for B.
+2026-03-20 02:22:54 Joystick poll error: 'PixelChallengeConsole' object has no attribute 'play_sound'
+2026-03-20 02:22:56 P4: white ignored during mapping.
+2026-03-20 02:22:59 Dot Dash: P4 second button must be different.
+2026-03-20 02:23:07 Dot Dash: P4 mapped B to raw button 0.
+2026-03-20 02:23:07 Joystick poll error: 'PixelChallengeConsole' object has no attribute 'play_sound'
+2026-03-20 02:33:04 Controller rescan: detected 4 joystick(s).
+2026-03-20 02:33:04 HostState -> IDLE: System ready.
+2026-03-20 02:33:04 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 02:33:20 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 02:33:20 Game selected: Dot Dash
+2026-03-20 02:33:20 FalconService: all lanes cleared.
+2026-03-20 02:33:20 AttractService: stopped.
+2026-03-20 02:33:25 Controller rescan: detected 4 joystick(s).
+2026-03-20 02:33:25 FalconService: all lanes cleared.
+2026-03-20 02:33:25 AttractService: stopped.
+2026-03-20 02:33:25 FalconService: all lanes cleared.
+2026-03-20 02:33:25 HostState -> CHECKIN_OPEN: Player check-in opened. Waiting for white-button enrollment.
+2026-03-20 02:33:28 White button pressed on js0 (Controller 1).
+2026-03-20 02:33:28 Player 1 joined check-in.
+2026-03-20 02:33:29 White button pressed on js1 (Controller 2).
+2026-03-20 02:33:29 Player 2 joined check-in.
+2026-03-20 02:33:35 Controller rescan: detected 4 joystick(s).
+2026-03-20 02:33:35 HostState -> PLAYERS_CONFIRMED: Confirmed 2 player(s).
+2026-03-20 02:33:35 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 02:33:35 Dot Dash: setup entered [stub].
+2026-03-20 02:33:40 Controller rescan: detected 4 joystick(s).
+2026-03-20 02:33:40 FalconService: all lanes cleared.
+2026-03-20 02:33:40 AttractService: stopped.
+2026-03-20 02:33:40 Dot Dash: all players press ANY two gameplay buttons (not white) to map A/B. No turn order; do it anytime.
+2026-03-20 02:33:59 Dot Dash: P1 mapped A to raw button 0. Press a different button for B.
+2026-03-20 02:34:00 Dot Dash: P1 mapped B to raw button 1.
+2026-03-20 02:34:04 Dot Dash: P2 mapped A to raw button 2. Press a different button for B.
+2026-03-20 02:34:05 Dot Dash: P2 mapped B to raw button 3.
+2026-03-20 02:34:05 FalconService: all lanes cleared.
+2026-03-20 02:34:05 Joystick poll error: 'PixelChallengeConsole' object has no attribute 'push_viewer_state'
+2026-03-20 02:35:37 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 02:35:37 Game selected: Splash
+2026-03-20 02:35:37 HostState -> GAME_SELECTED: Splash selected.
+2026-03-20 02:35:37 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 02:35:37 Splash: setup entered [stub].
+2026-03-20 02:35:39 AttractService: theme 'Rainbow Pulse' started.
+2026-03-20 02:35:47 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 02:35:47 Game selected: Dot Dash
+2026-03-20 02:35:47 HostState -> GAME_SELECTED: Dot Dash selected.
+2026-03-20 02:35:47 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 02:35:47 Dot Dash: setup entered [stub].
+2026-03-20 02:35:47 FalconService: all lanes cleared.
+2026-03-20 02:35:47 AttractService: stopped.
+2026-03-20 02:35:51 Controller rescan: detected 4 joystick(s).
+2026-03-20 02:35:51 FalconService: all lanes cleared.
+2026-03-20 02:35:51 AttractService: stopped.
+2026-03-20 02:35:51 Dot Dash: all players press ANY two gameplay buttons (not white) to map A/B. No turn order; do it anytime.
+2026-03-20 02:35:58 Dot Dash: P2 mapped A to raw button 1. Press a different button for B.
+2026-03-20 02:35:59 Dot Dash: P2 mapped B to raw button 0.
+2026-03-20 02:36:03 Dot Dash: P1 mapped A to raw button 1. Press a different button for B.
+2026-03-20 02:36:03 Dot Dash: P1 mapped B to raw button 2.
+2026-03-20 02:36:03 FalconService: all lanes cleared.
+2026-03-20 02:36:03 Joystick poll error: 'PixelChallengeConsole' object has no attribute 'push_viewer_state'
+2026-03-20 02:47:31 Controller rescan: detected 4 joystick(s).
+2026-03-20 02:47:32 HostState -> IDLE: System ready.
+2026-03-20 02:47:32 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 02:47:45 Layout saved.
+2026-03-20 02:47:54 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 02:47:54 Game selected: Dot Dash
+2026-03-20 02:47:54 FalconService: all lanes cleared.
+2026-03-20 02:47:54 AttractService: stopped.
+2026-03-20 02:47:59 Controller rescan: detected 4 joystick(s).
+2026-03-20 02:47:59 FalconService: all lanes cleared.
+2026-03-20 02:47:59 AttractService: stopped.
+2026-03-20 02:47:59 FalconService: all lanes cleared.
+2026-03-20 02:47:59 HostState -> CHECKIN_OPEN: Player check-in opened. Waiting for white-button enrollment.
+2026-03-20 02:48:01 White button pressed on js0 (Controller 1).
+2026-03-20 02:48:01 Player 1 joined check-in.
+2026-03-20 02:48:03 White button pressed on js1 (Controller 2).
+2026-03-20 02:48:03 Player 2 joined check-in.
+2026-03-20 02:48:05 White button pressed on js2 (Controller 3).
+2026-03-20 02:48:05 Player 3 joined check-in.
+2026-03-20 02:48:06 White button pressed on js3 (Controller 4).
+2026-03-20 02:48:06 Player 4 joined check-in.
+2026-03-20 02:48:11 Controller rescan: detected 4 joystick(s).
+2026-03-20 02:48:11 HostState -> PLAYERS_CONFIRMED: Confirmed 4 player(s).
+2026-03-20 02:48:11 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 02:48:11 Dot Dash: setup entered [stub].
+2026-03-20 02:48:15 Controller rescan: detected 4 joystick(s).
+2026-03-20 02:48:15 FalconService: all lanes cleared.
+2026-03-20 02:48:15 AttractService: stopped.
+2026-03-20 02:48:15 Dot Dash: all players press ANY two gameplay buttons (not white) to map A/B. No turn order; do it anytime.
+2026-03-20 02:48:28 Dot Dash: P1 mapped A to raw button 0. Press a different button for B.
+2026-03-20 02:48:29 Dot Dash: P1 mapped B to raw button 1.
+2026-03-20 02:48:35 Dot Dash: P2 mapped A to raw button 0. Press a different button for B.
+2026-03-20 02:48:36 Dot Dash: P2 mapped B to raw button 1.
+2026-03-20 02:48:40 Dot Dash: P3 mapped A to raw button 2. Press a different button for B.
+2026-03-20 02:48:40 Dot Dash: P3 mapped B to raw button 3.
+2026-03-20 02:48:42 Dot Dash: P4 mapped A to raw button 2. Press a different button for B.
+2026-03-20 02:48:42 Dot Dash: P4 mapped B to raw button 1.
+2026-03-20 02:48:42 FalconService: all lanes cleared.
+2026-03-20 02:48:42 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 02:48:57 HostState -> IDLE: Session redeemed and reset.
+2026-03-20 02:48:57 ViewerService: requested splash.
+2026-03-20 02:48:57 FalconService: all lanes cleared.
+2026-03-20 02:49:00 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 02:49:00 Game selected: Dot Dash
+2026-03-20 02:49:00 FalconService: all lanes cleared.
+2026-03-20 02:49:00 AttractService: stopped.
+2026-03-20 02:49:03 Controller rescan: detected 4 joystick(s).
+2026-03-20 02:49:03 FalconService: all lanes cleared.
+2026-03-20 02:49:03 AttractService: stopped.
+2026-03-20 02:49:03 FalconService: all lanes cleared.
+2026-03-20 02:49:03 HostState -> CHECKIN_OPEN: Player check-in opened. Waiting for white-button enrollment.
+2026-03-20 02:49:04 White button pressed on js0 (Controller 1).
+2026-03-20 02:49:04 Player 1 joined check-in.
+2026-03-20 02:49:07 Controller rescan: detected 4 joystick(s).
+2026-03-20 02:49:07 HostState -> PLAYERS_CONFIRMED: Confirmed 1 player(s).
+2026-03-20 02:49:07 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 02:49:07 Dot Dash: setup entered [stub].
+2026-03-20 02:49:11 Controller rescan: detected 4 joystick(s).
+2026-03-20 02:49:11 FalconService: all lanes cleared.
+2026-03-20 02:49:11 AttractService: stopped.
+2026-03-20 02:49:11 Dot Dash: all players press ANY two gameplay buttons (not white) to map A/B. No turn order; do it anytime.
+2026-03-20 02:49:21 Dot Dash: P1 mapped A to raw button 1. Press a different button for B.
+2026-03-20 02:49:21 Dot Dash: P1 mapped B to raw button 2.
+2026-03-20 02:49:21 FalconService: all lanes cleared.
+2026-03-20 02:49:21 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 03:03:58 Controller rescan: detected 4 joystick(s).
+2026-03-20 03:03:58 HostState -> IDLE: System ready.
+2026-03-20 03:03:58 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 11:52:40 AttractService: theme 'Rainbow Pulse' started.
+2026-03-20 11:52:40 AttractService: theme changed live to 'Fire Burst'.
+2026-03-20 11:52:40 CYCLE -> Fire Burst (speed 9)
+2026-03-20 11:52:49 Theme brightness set to 9%.
+2026-03-20 11:52:49 Theme brightness set to 10%.
+2026-03-20 11:52:49 Theme brightness set to 11%.
+2026-03-20 11:52:49 Theme brightness set to 12%.
+2026-03-20 11:52:49 Theme brightness set to 13%.
+2026-03-20 11:52:49 Theme brightness set to 14%.
+2026-03-20 11:52:49 Theme brightness set to 15%.
+2026-03-20 11:52:49 Theme brightness set to 16%.
+2026-03-20 11:53:00 AttractService: theme changed live to 'Ice Burst'.
+2026-03-20 11:53:00 CYCLE -> Ice Burst (speed 9)
+2026-03-20 11:53:21 AttractService: theme changed live to 'Galaxy Wave'.
+2026-03-20 11:53:21 CYCLE -> Galaxy Wave (speed 4)
+2026-03-20 11:53:41 AttractService: theme changed live to 'Team Colors'.
+2026-03-20 11:53:41 CYCLE -> Team Colors (speed 5)
+2026-03-20 11:54:01 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 11:54:01 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 11:54:21 AttractService: theme changed live to 'Lane Chase RL'.
+2026-03-20 11:54:21 CYCLE -> Lane Chase RL (speed 8)
+2026-03-20 11:54:41 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 11:54:41 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 11:55:01 AttractService: theme changed live to 'Color Wash'.
+2026-03-20 11:55:01 CYCLE -> Color Wash (speed 7)
+2026-03-20 11:55:21 AttractService: theme changed live to 'Rainbow Pulse'.
+2026-03-20 11:55:21 CYCLE -> Rainbow Pulse (speed 3)
+2026-03-20 11:55:41 AttractService: theme changed live to 'Fire Burst'.
+2026-03-20 11:55:41 CYCLE -> Fire Burst (speed 9)
+2026-03-20 11:56:01 AttractService: theme changed live to 'Ice Burst'.
+2026-03-20 11:56:01 CYCLE -> Ice Burst (speed 9)
+2026-03-20 11:56:21 AttractService: theme changed live to 'Galaxy Wave'.
+2026-03-20 11:56:21 CYCLE -> Galaxy Wave (speed 4)
+2026-03-20 11:56:41 AttractService: theme changed live to 'Team Colors'.
+2026-03-20 11:56:41 CYCLE -> Team Colors (speed 5)
+2026-03-20 11:57:01 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 11:57:01 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 11:57:21 AttractService: theme changed live to 'Lane Chase RL'.
+2026-03-20 11:57:21 CYCLE -> Lane Chase RL (speed 8)
+2026-03-20 11:57:41 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 11:57:41 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 11:58:01 AttractService: theme changed live to 'Color Wash'.
+2026-03-20 11:58:01 CYCLE -> Color Wash (speed 7)
+2026-03-20 11:58:22 AttractService: theme changed live to 'Rainbow Pulse'.
+2026-03-20 11:58:22 CYCLE -> Rainbow Pulse (speed 3)
+2026-03-20 11:58:42 AttractService: theme changed live to 'Fire Burst'.
+2026-03-20 11:58:42 CYCLE -> Fire Burst (speed 9)
+2026-03-20 11:59:02 AttractService: theme changed live to 'Ice Burst'.
+2026-03-20 11:59:02 CYCLE -> Ice Burst (speed 9)
+2026-03-20 11:59:22 AttractService: theme changed live to 'Galaxy Wave'.
+2026-03-20 11:59:22 CYCLE -> Galaxy Wave (speed 4)
+2026-03-20 11:59:42 AttractService: theme changed live to 'Team Colors'.
+2026-03-20 11:59:42 CYCLE -> Team Colors (speed 5)
+2026-03-20 12:00:02 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:00:02 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:00:22 AttractService: theme changed live to 'Lane Chase RL'.
+2026-03-20 12:00:22 CYCLE -> Lane Chase RL (speed 8)
+2026-03-20 12:00:42 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:00:42 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:01:02 AttractService: theme changed live to 'Color Wash'.
+2026-03-20 12:01:02 CYCLE -> Color Wash (speed 7)
+2026-03-20 12:01:22 AttractService: theme changed live to 'Rainbow Pulse'.
+2026-03-20 12:01:22 CYCLE -> Rainbow Pulse (speed 3)
+2026-03-20 12:01:42 AttractService: theme changed live to 'Fire Burst'.
+2026-03-20 12:01:42 CYCLE -> Fire Burst (speed 9)
+2026-03-20 12:02:02 AttractService: theme changed live to 'Ice Burst'.
+2026-03-20 12:02:02 CYCLE -> Ice Burst (speed 9)
+2026-03-20 12:02:23 AttractService: theme changed live to 'Galaxy Wave'.
+2026-03-20 12:02:23 CYCLE -> Galaxy Wave (speed 4)
+2026-03-20 12:02:43 AttractService: theme changed live to 'Team Colors'.
+2026-03-20 12:02:43 CYCLE -> Team Colors (speed 5)
+2026-03-20 12:03:03 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:03:03 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:03:23 AttractService: theme changed live to 'Lane Chase RL'.
+2026-03-20 12:03:23 CYCLE -> Lane Chase RL (speed 8)
+2026-03-20 12:03:43 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:03:43 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:04:03 AttractService: theme changed live to 'Color Wash'.
+2026-03-20 12:04:03 CYCLE -> Color Wash (speed 7)
+2026-03-20 12:04:23 AttractService: theme changed live to 'Rainbow Pulse'.
+2026-03-20 12:04:23 CYCLE -> Rainbow Pulse (speed 3)
+2026-03-20 12:04:43 AttractService: theme changed live to 'Fire Burst'.
+2026-03-20 12:04:43 CYCLE -> Fire Burst (speed 9)
+2026-03-20 12:05:03 AttractService: theme changed live to 'Ice Burst'.
+2026-03-20 12:05:03 CYCLE -> Ice Burst (speed 9)
+2026-03-20 12:05:23 AttractService: theme changed live to 'Galaxy Wave'.
+2026-03-20 12:05:23 CYCLE -> Galaxy Wave (speed 4)
+2026-03-20 12:05:43 AttractService: theme changed live to 'Team Colors'.
+2026-03-20 12:05:43 CYCLE -> Team Colors (speed 5)
+2026-03-20 12:06:03 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:06:03 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:06:23 AttractService: theme changed live to 'Lane Chase RL'.
+2026-03-20 12:06:23 CYCLE -> Lane Chase RL (speed 8)
+2026-03-20 12:06:44 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:06:44 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:07:04 AttractService: theme changed live to 'Color Wash'.
+2026-03-20 12:07:04 CYCLE -> Color Wash (speed 7)
+2026-03-20 12:07:24 AttractService: theme changed live to 'Rainbow Pulse'.
+2026-03-20 12:07:24 CYCLE -> Rainbow Pulse (speed 3)
+2026-03-20 12:07:44 AttractService: theme changed live to 'Fire Burst'.
+2026-03-20 12:07:44 CYCLE -> Fire Burst (speed 9)
+2026-03-20 12:08:04 AttractService: theme changed live to 'Ice Burst'.
+2026-03-20 12:08:04 CYCLE -> Ice Burst (speed 9)
+2026-03-20 12:08:24 AttractService: theme changed live to 'Galaxy Wave'.
+2026-03-20 12:08:24 CYCLE -> Galaxy Wave (speed 4)
+2026-03-20 12:08:44 AttractService: theme changed live to 'Team Colors'.
+2026-03-20 12:08:44 CYCLE -> Team Colors (speed 5)
+2026-03-20 12:09:04 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:09:04 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:09:24 AttractService: theme changed live to 'Lane Chase RL'.
+2026-03-20 12:09:24 CYCLE -> Lane Chase RL (speed 8)
+2026-03-20 12:09:44 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:09:44 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:10:04 AttractService: theme changed live to 'Color Wash'.
+2026-03-20 12:10:04 CYCLE -> Color Wash (speed 7)
+2026-03-20 12:10:24 AttractService: theme changed live to 'Rainbow Pulse'.
+2026-03-20 12:10:24 CYCLE -> Rainbow Pulse (speed 3)
+2026-03-20 12:10:45 AttractService: theme changed live to 'Fire Burst'.
+2026-03-20 12:10:45 CYCLE -> Fire Burst (speed 9)
+2026-03-20 12:11:05 AttractService: theme changed live to 'Ice Burst'.
+2026-03-20 12:11:05 CYCLE -> Ice Burst (speed 9)
+2026-03-20 12:11:25 AttractService: theme changed live to 'Galaxy Wave'.
+2026-03-20 12:11:25 CYCLE -> Galaxy Wave (speed 4)
+2026-03-20 12:11:45 AttractService: theme changed live to 'Team Colors'.
+2026-03-20 12:11:45 CYCLE -> Team Colors (speed 5)
+2026-03-20 12:12:05 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:12:05 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:12:25 AttractService: theme changed live to 'Lane Chase RL'.
+2026-03-20 12:12:25 CYCLE -> Lane Chase RL (speed 8)
+2026-03-20 12:12:45 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:12:45 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:13:05 AttractService: theme changed live to 'Color Wash'.
+2026-03-20 12:13:05 CYCLE -> Color Wash (speed 7)
+2026-03-20 12:13:25 AttractService: theme changed live to 'Rainbow Pulse'.
+2026-03-20 12:13:25 CYCLE -> Rainbow Pulse (speed 3)
+2026-03-20 12:13:45 AttractService: theme changed live to 'Fire Burst'.
+2026-03-20 12:13:45 CYCLE -> Fire Burst (speed 9)
+2026-03-20 12:14:05 AttractService: theme changed live to 'Ice Burst'.
+2026-03-20 12:14:05 CYCLE -> Ice Burst (speed 9)
+2026-03-20 12:14:25 AttractService: theme changed live to 'Galaxy Wave'.
+2026-03-20 12:14:25 CYCLE -> Galaxy Wave (speed 4)
+2026-03-20 12:14:45 AttractService: theme changed live to 'Team Colors'.
+2026-03-20 12:14:45 CYCLE -> Team Colors (speed 5)
+2026-03-20 12:15:05 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:15:05 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:15:26 AttractService: theme changed live to 'Lane Chase RL'.
+2026-03-20 12:15:26 CYCLE -> Lane Chase RL (speed 8)
+2026-03-20 12:15:46 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:15:46 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:16:06 AttractService: theme changed live to 'Color Wash'.
+2026-03-20 12:16:06 CYCLE -> Color Wash (speed 7)
+2026-03-20 12:16:26 AttractService: theme changed live to 'Rainbow Pulse'.
+2026-03-20 12:16:26 CYCLE -> Rainbow Pulse (speed 3)
+2026-03-20 12:16:46 AttractService: theme changed live to 'Fire Burst'.
+2026-03-20 12:16:46 CYCLE -> Fire Burst (speed 9)
+2026-03-20 12:17:06 AttractService: theme changed live to 'Ice Burst'.
+2026-03-20 12:17:06 CYCLE -> Ice Burst (speed 9)
+2026-03-20 12:17:26 AttractService: theme changed live to 'Galaxy Wave'.
+2026-03-20 12:17:26 CYCLE -> Galaxy Wave (speed 4)
+2026-03-20 12:17:46 AttractService: theme changed live to 'Team Colors'.
+2026-03-20 12:17:46 CYCLE -> Team Colors (speed 5)
+2026-03-20 12:18:06 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:18:06 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:18:26 AttractService: theme changed live to 'Lane Chase RL'.
+2026-03-20 12:18:26 CYCLE -> Lane Chase RL (speed 8)
+2026-03-20 12:18:46 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:18:46 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:19:06 AttractService: theme changed live to 'Color Wash'.
+2026-03-20 12:19:06 CYCLE -> Color Wash (speed 7)
+2026-03-20 12:19:26 AttractService: theme changed live to 'Rainbow Pulse'.
+2026-03-20 12:19:26 CYCLE -> Rainbow Pulse (speed 3)
+2026-03-20 12:19:47 AttractService: theme changed live to 'Fire Burst'.
+2026-03-20 12:19:47 CYCLE -> Fire Burst (speed 9)
+2026-03-20 12:20:07 AttractService: theme changed live to 'Ice Burst'.
+2026-03-20 12:20:07 CYCLE -> Ice Burst (speed 9)
+2026-03-20 12:20:27 AttractService: theme changed live to 'Galaxy Wave'.
+2026-03-20 12:20:27 CYCLE -> Galaxy Wave (speed 4)
+2026-03-20 12:20:47 AttractService: theme changed live to 'Team Colors'.
+2026-03-20 12:20:47 CYCLE -> Team Colors (speed 5)
+2026-03-20 12:21:07 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:21:07 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:21:27 AttractService: theme changed live to 'Lane Chase RL'.
+2026-03-20 12:21:27 CYCLE -> Lane Chase RL (speed 8)
+2026-03-20 12:21:47 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:21:47 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:22:07 AttractService: theme changed live to 'Color Wash'.
+2026-03-20 12:22:07 CYCLE -> Color Wash (speed 7)
+2026-03-20 12:22:27 AttractService: theme changed live to 'Rainbow Pulse'.
+2026-03-20 12:22:27 CYCLE -> Rainbow Pulse (speed 3)
+2026-03-20 12:22:47 AttractService: theme changed live to 'Fire Burst'.
+2026-03-20 12:22:47 CYCLE -> Fire Burst (speed 9)
+2026-03-20 12:23:07 AttractService: theme changed live to 'Ice Burst'.
+2026-03-20 12:23:07 CYCLE -> Ice Burst (speed 9)
+2026-03-20 12:23:27 AttractService: theme changed live to 'Galaxy Wave'.
+2026-03-20 12:23:27 CYCLE -> Galaxy Wave (speed 4)
+2026-03-20 12:23:47 AttractService: theme changed live to 'Team Colors'.
+2026-03-20 12:23:47 CYCLE -> Team Colors (speed 5)
+2026-03-20 12:24:07 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:24:07 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:24:28 AttractService: theme changed live to 'Lane Chase RL'.
+2026-03-20 12:24:28 CYCLE -> Lane Chase RL (speed 8)
+2026-03-20 12:24:48 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:24:48 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:25:08 AttractService: theme changed live to 'Color Wash'.
+2026-03-20 12:25:08 CYCLE -> Color Wash (speed 7)
+2026-03-20 12:25:28 AttractService: theme changed live to 'Rainbow Pulse'.
+2026-03-20 12:25:28 CYCLE -> Rainbow Pulse (speed 3)
+2026-03-20 12:25:48 AttractService: theme changed live to 'Fire Burst'.
+2026-03-20 12:25:48 CYCLE -> Fire Burst (speed 9)
+2026-03-20 12:26:08 AttractService: theme changed live to 'Ice Burst'.
+2026-03-20 12:26:08 CYCLE -> Ice Burst (speed 9)
+2026-03-20 12:26:28 AttractService: theme changed live to 'Galaxy Wave'.
+2026-03-20 12:26:28 CYCLE -> Galaxy Wave (speed 4)
+2026-03-20 12:26:48 AttractService: theme changed live to 'Team Colors'.
+2026-03-20 12:26:48 CYCLE -> Team Colors (speed 5)
+2026-03-20 12:27:08 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:27:08 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:27:28 AttractService: theme changed live to 'Lane Chase RL'.
+2026-03-20 12:27:28 CYCLE -> Lane Chase RL (speed 8)
+2026-03-20 12:27:48 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:27:48 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:28:08 AttractService: theme changed live to 'Color Wash'.
+2026-03-20 12:28:08 CYCLE -> Color Wash (speed 7)
+2026-03-20 12:28:28 AttractService: theme changed live to 'Rainbow Pulse'.
+2026-03-20 12:28:28 CYCLE -> Rainbow Pulse (speed 3)
+2026-03-20 12:28:49 AttractService: theme changed live to 'Fire Burst'.
+2026-03-20 12:28:49 CYCLE -> Fire Burst (speed 9)
+2026-03-20 12:29:09 AttractService: theme changed live to 'Ice Burst'.
+2026-03-20 12:29:09 CYCLE -> Ice Burst (speed 9)
+2026-03-20 12:29:29 AttractService: theme changed live to 'Galaxy Wave'.
+2026-03-20 12:29:29 CYCLE -> Galaxy Wave (speed 4)
+2026-03-20 12:29:49 AttractService: theme changed live to 'Team Colors'.
+2026-03-20 12:29:49 CYCLE -> Team Colors (speed 5)
+2026-03-20 12:30:09 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:30:09 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:30:29 AttractService: theme changed live to 'Lane Chase RL'.
+2026-03-20 12:30:29 CYCLE -> Lane Chase RL (speed 8)
+2026-03-20 12:30:49 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:30:49 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:31:09 AttractService: theme changed live to 'Color Wash'.
+2026-03-20 12:31:09 CYCLE -> Color Wash (speed 7)
+2026-03-20 12:31:29 AttractService: theme changed live to 'Rainbow Pulse'.
+2026-03-20 12:31:29 CYCLE -> Rainbow Pulse (speed 3)
+2026-03-20 12:31:49 AttractService: theme changed live to 'Fire Burst'.
+2026-03-20 12:31:49 CYCLE -> Fire Burst (speed 9)
+2026-03-20 12:32:09 AttractService: theme changed live to 'Ice Burst'.
+2026-03-20 12:32:09 CYCLE -> Ice Burst (speed 9)
+2026-03-20 12:32:29 AttractService: theme changed live to 'Galaxy Wave'.
+2026-03-20 12:32:29 CYCLE -> Galaxy Wave (speed 4)
+2026-03-20 12:32:49 AttractService: theme changed live to 'Team Colors'.
+2026-03-20 12:32:49 CYCLE -> Team Colors (speed 5)
+2026-03-20 12:33:09 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:33:09 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:33:29 AttractService: theme changed live to 'Lane Chase RL'.
+2026-03-20 12:33:30 CYCLE -> Lane Chase RL (speed 8)
+2026-03-20 12:33:50 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:33:50 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:34:10 AttractService: theme changed live to 'Color Wash'.
+2026-03-20 12:34:10 CYCLE -> Color Wash (speed 7)
+2026-03-20 12:34:30 AttractService: theme changed live to 'Rainbow Pulse'.
+2026-03-20 12:34:30 CYCLE -> Rainbow Pulse (speed 3)
+2026-03-20 12:34:50 AttractService: theme changed live to 'Fire Burst'.
+2026-03-20 12:34:50 CYCLE -> Fire Burst (speed 9)
+2026-03-20 12:35:10 AttractService: theme changed live to 'Ice Burst'.
+2026-03-20 12:35:10 CYCLE -> Ice Burst (speed 9)
+2026-03-20 12:35:30 AttractService: theme changed live to 'Galaxy Wave'.
+2026-03-20 12:35:30 CYCLE -> Galaxy Wave (speed 4)
+2026-03-20 12:35:50 AttractService: theme changed live to 'Team Colors'.
+2026-03-20 12:35:50 CYCLE -> Team Colors (speed 5)
+2026-03-20 12:36:10 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:36:10 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:36:30 AttractService: theme changed live to 'Lane Chase RL'.
+2026-03-20 12:36:30 CYCLE -> Lane Chase RL (speed 8)
+2026-03-20 12:36:50 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:36:50 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:37:10 AttractService: theme changed live to 'Color Wash'.
+2026-03-20 12:37:10 CYCLE -> Color Wash (speed 7)
+2026-03-20 12:37:30 AttractService: theme changed live to 'Rainbow Pulse'.
+2026-03-20 12:37:30 CYCLE -> Rainbow Pulse (speed 3)
+2026-03-20 12:37:51 AttractService: theme changed live to 'Fire Burst'.
+2026-03-20 12:37:51 CYCLE -> Fire Burst (speed 9)
+2026-03-20 12:38:11 AttractService: theme changed live to 'Ice Burst'.
+2026-03-20 12:38:11 CYCLE -> Ice Burst (speed 9)
+2026-03-20 12:38:31 AttractService: theme changed live to 'Galaxy Wave'.
+2026-03-20 12:38:31 CYCLE -> Galaxy Wave (speed 4)
+2026-03-20 12:38:51 AttractService: theme changed live to 'Team Colors'.
+2026-03-20 12:38:51 CYCLE -> Team Colors (speed 5)
+2026-03-20 12:39:11 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:39:11 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:39:31 AttractService: theme changed live to 'Lane Chase RL'.
+2026-03-20 12:39:31 CYCLE -> Lane Chase RL (speed 8)
+2026-03-20 12:39:51 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:39:51 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:40:11 AttractService: theme changed live to 'Color Wash'.
+2026-03-20 12:40:11 CYCLE -> Color Wash (speed 7)
+2026-03-20 12:40:31 AttractService: theme changed live to 'Rainbow Pulse'.
+2026-03-20 12:40:31 CYCLE -> Rainbow Pulse (speed 3)
+2026-03-20 12:40:51 AttractService: theme changed live to 'Fire Burst'.
+2026-03-20 12:40:51 CYCLE -> Fire Burst (speed 9)
+2026-03-20 12:41:11 AttractService: theme changed live to 'Ice Burst'.
+2026-03-20 12:41:11 CYCLE -> Ice Burst (speed 9)
+2026-03-20 12:41:32 AttractService: theme changed live to 'Galaxy Wave'.
+2026-03-20 12:41:32 CYCLE -> Galaxy Wave (speed 4)
+2026-03-20 12:41:52 AttractService: theme changed live to 'Team Colors'.
+2026-03-20 12:41:52 CYCLE -> Team Colors (speed 5)
+2026-03-20 12:42:12 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:42:12 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:42:32 AttractService: theme changed live to 'Lane Chase RL'.
+2026-03-20 12:42:32 CYCLE -> Lane Chase RL (speed 8)
+2026-03-20 12:42:52 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:42:52 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:43:12 AttractService: theme changed live to 'Color Wash'.
+2026-03-20 12:43:12 CYCLE -> Color Wash (speed 7)
+2026-03-20 12:43:32 AttractService: theme changed live to 'Rainbow Pulse'.
+2026-03-20 12:43:32 CYCLE -> Rainbow Pulse (speed 3)
+2026-03-20 12:43:52 AttractService: theme changed live to 'Fire Burst'.
+2026-03-20 12:43:52 CYCLE -> Fire Burst (speed 9)
+2026-03-20 12:44:12 AttractService: theme changed live to 'Ice Burst'.
+2026-03-20 12:44:12 CYCLE -> Ice Burst (speed 9)
+2026-03-20 12:44:32 AttractService: theme changed live to 'Galaxy Wave'.
+2026-03-20 12:44:32 CYCLE -> Galaxy Wave (speed 4)
+2026-03-20 12:44:52 AttractService: theme changed live to 'Team Colors'.
+2026-03-20 12:44:52 CYCLE -> Team Colors (speed 5)
+2026-03-20 12:45:12 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:45:12 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:45:32 AttractService: theme changed live to 'Lane Chase RL'.
+2026-03-20 12:45:32 CYCLE -> Lane Chase RL (speed 8)
+2026-03-20 12:45:52 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:45:52 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:46:12 AttractService: theme changed live to 'Color Wash'.
+2026-03-20 12:46:12 CYCLE -> Color Wash (speed 7)
+2026-03-20 12:46:32 AttractService: theme changed live to 'Rainbow Pulse'.
+2026-03-20 12:46:32 CYCLE -> Rainbow Pulse (speed 3)
+2026-03-20 12:46:53 AttractService: theme changed live to 'Fire Burst'.
+2026-03-20 12:46:53 CYCLE -> Fire Burst (speed 9)
+2026-03-20 12:47:13 AttractService: theme changed live to 'Ice Burst'.
+2026-03-20 12:47:13 CYCLE -> Ice Burst (speed 9)
+2026-03-20 12:47:33 AttractService: theme changed live to 'Galaxy Wave'.
+2026-03-20 12:47:33 CYCLE -> Galaxy Wave (speed 4)
+2026-03-20 12:47:53 AttractService: theme changed live to 'Team Colors'.
+2026-03-20 12:47:53 CYCLE -> Team Colors (speed 5)
+2026-03-20 12:48:13 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:48:13 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:48:33 AttractService: theme changed live to 'Lane Chase RL'.
+2026-03-20 12:48:33 CYCLE -> Lane Chase RL (speed 8)
+2026-03-20 12:48:53 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:48:53 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:49:13 AttractService: theme changed live to 'Color Wash'.
+2026-03-20 12:49:13 CYCLE -> Color Wash (speed 7)
+2026-03-20 12:49:33 AttractService: theme changed live to 'Rainbow Pulse'.
+2026-03-20 12:49:33 CYCLE -> Rainbow Pulse (speed 3)
+2026-03-20 12:49:53 AttractService: theme changed live to 'Fire Burst'.
+2026-03-20 12:49:53 CYCLE -> Fire Burst (speed 9)
+2026-03-20 12:50:09 Speed for 'Fire Burst' set to 8.
+2026-03-20 12:50:11 Speed for 'Fire Burst' set to 9.
+2026-03-20 12:50:13 AttractService: theme changed live to 'Ice Burst'.
+2026-03-20 12:50:13 CYCLE -> Ice Burst (speed 9)
+2026-03-20 12:50:33 AttractService: theme changed live to 'Galaxy Wave'.
+2026-03-20 12:50:33 CYCLE -> Galaxy Wave (speed 4)
+2026-03-20 12:50:53 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:50:53 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:51:13 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:51:13 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:51:34 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:51:34 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:51:54 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:51:54 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:52:14 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:52:14 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:52:34 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:52:34 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:52:54 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:52:54 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:53:14 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:53:14 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:53:34 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:53:34 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:53:54 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:53:54 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:54:14 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:54:14 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:54:34 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:54:34 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:54:54 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:54:54 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:55:15 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:55:15 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:55:35 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:55:35 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:55:55 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:55:55 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:56:15 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:56:15 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:56:35 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:56:35 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:56:55 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:56:55 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:57:15 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:57:15 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:57:35 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:57:35 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:57:55 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:57:55 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:58:15 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:58:15 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:58:35 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:58:35 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:58:55 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:58:55 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:59:16 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:59:16 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 12:59:36 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 12:59:36 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 12:59:56 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 12:59:56 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 13:00:16 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 13:00:16 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 13:00:36 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 13:00:36 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 13:00:56 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 13:00:56 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 13:01:08 FalconService: all lanes cleared.
+2026-03-20 13:01:08 AttractService: stopped.
+2026-03-20 13:01:08 FalconService: all lanes cleared.
+2026-03-20 13:03:48 Controller rescan: detected 4 joystick(s).
+2026-03-20 13:03:48 HostState -> IDLE: System ready.
+2026-03-20 13:03:48 AttractService: theme 'Lane Chase LR' started.
+2026-03-20 13:03:48 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 13:04:03 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 13:04:03 Game selected: Dot Dash
+2026-03-20 13:04:03 FalconService: all lanes cleared.
+2026-03-20 13:04:03 AttractService: stopped.
+2026-03-20 13:04:09 Controller rescan: detected 4 joystick(s).
+2026-03-20 13:04:09 FalconService: all lanes cleared.
+2026-03-20 13:04:09 AttractService: stopped.
+2026-03-20 13:04:09 FalconService: all lanes cleared.
+2026-03-20 13:04:09 HostState -> CHECKIN_OPEN: Player check-in opened. Waiting for white-button enrollment.
+2026-03-20 13:04:14 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 13:04:14 Game selected: Dot Dash
+2026-03-20 13:04:14 FalconService: all lanes cleared.
+2026-03-20 13:04:14 AttractService: stopped.
+2026-03-20 13:04:15 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 13:04:15 Game selected: Splash
+2026-03-20 13:04:26 --- BUTTON MAPPING STARTED ---
+2026-03-20 13:04:26 PLAYER 1: Press the WHITE button.
+2026-03-20 13:04:33   -> Mapped WHITE to ID 4
+2026-03-20 13:04:33 PLAYER 1: Press the RED button.
+2026-03-20 13:04:37   -> Mapped RED to ID 0
+2026-03-20 13:04:37 PLAYER 1: Press the GREEN button.
+2026-03-20 13:04:39   -> Mapped GREEN to ID 1
+2026-03-20 13:04:39 PLAYER 1: Press the BLUE button.
+2026-03-20 13:04:40   -> Mapped BLUE to ID 2
+2026-03-20 13:04:40 PLAYER 1: Press the ORANGE button.
+2026-03-20 13:04:40   -> Mapped ORANGE to ID 3
+2026-03-20 13:04:40 PLAYER 1: Press the YELLOW button.
+2026-03-20 13:05:10   -> Mapped YELLOW to ID 3
+2026-03-20 13:05:10 Player 1 mapping finished.
+2026-03-20 13:05:10 PLAYER 2: Press the WHITE button.
+2026-03-20 13:05:19   -> Mapped WHITE to ID 4
+2026-03-20 13:05:19 PLAYER 2: Press the RED button.
+2026-03-20 13:05:21   -> Mapped RED to ID 0
+2026-03-20 13:05:21 PLAYER 2: Press the GREEN button.
+2026-03-20 13:05:22   -> Mapped GREEN to ID 1
+2026-03-20 13:05:22 PLAYER 2: Press the BLUE button.
+2026-03-20 13:05:22   -> Mapped BLUE to ID 2
+2026-03-20 13:05:22 PLAYER 2: Press the ORANGE button.
+2026-03-20 13:05:23   -> Mapped ORANGE to ID 3
+2026-03-20 13:05:23 PLAYER 2: Press the YELLOW button.
+2026-03-20 13:05:27   -> Mapped YELLOW to ID 3
+2026-03-20 13:05:27 Player 2 mapping finished.
+2026-03-20 13:05:27 PLAYER 3: Press the WHITE button.
+2026-03-20 13:05:32   -> Mapped WHITE to ID 4
+2026-03-20 13:05:32 PLAYER 3: Press the RED button.
+2026-03-20 13:05:33   -> Mapped RED to ID 0
+2026-03-20 13:05:33 PLAYER 3: Press the GREEN button.
+2026-03-20 13:05:34   -> Mapped GREEN to ID 1
+2026-03-20 13:05:34 PLAYER 3: Press the BLUE button.
+2026-03-20 13:05:35   -> Mapped BLUE to ID 2
+2026-03-20 13:05:35 PLAYER 3: Press the ORANGE button.
+2026-03-20 13:05:35   -> Mapped ORANGE to ID 3
+2026-03-20 13:05:35 PLAYER 3: Press the YELLOW button.
+2026-03-20 13:05:36   -> Mapped YELLOW to ID 3
+2026-03-20 13:05:36 Player 3 mapping finished.
+2026-03-20 13:05:36 PLAYER 4: Press the WHITE button.
+2026-03-20 13:05:40   -> Mapped WHITE to ID 4
+2026-03-20 13:05:40 PLAYER 4: Press the RED button.
+2026-03-20 13:05:42   -> Mapped RED to ID 0
+2026-03-20 13:05:42 PLAYER 4: Press the GREEN button.
+2026-03-20 13:05:44   -> Mapped GREEN to ID 1
+2026-03-20 13:05:44 PLAYER 4: Press the BLUE button.
+2026-03-20 13:05:45   -> Mapped BLUE to ID 2
+2026-03-20 13:05:45 PLAYER 4: Press the ORANGE button.
+2026-03-20 13:05:47   -> Mapped ORANGE to ID 3
+2026-03-20 13:05:47 PLAYER 4: Press the YELLOW button.
+2026-03-20 13:05:47   -> Mapped YELLOW to ID 3
+2026-03-20 13:05:47 Player 4 mapping finished.
+2026-03-20 13:05:47 Controller assignments saved.
+2026-03-20 13:05:47 --- MAPPING COMPLETE & SAVED ---
+2026-03-20 13:05:56 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 13:05:56 Game selected: Dot Dash
+2026-03-20 13:05:56 FalconService: all lanes cleared.
+2026-03-20 13:05:56 AttractService: stopped.
+2026-03-20 13:05:58 Controller rescan: detected 4 joystick(s).
+2026-03-20 13:05:58 HostState -> IDLE: Player check-in closed.
+2026-03-20 13:06:16 Controller rescan: detected 4 joystick(s).
+2026-03-20 13:06:16 FalconService: all lanes cleared.
+2026-03-20 13:06:16 AttractService: stopped.
+2026-03-20 13:06:16 FalconService: all lanes cleared.
+2026-03-20 13:06:16 HostState -> CHECKIN_OPEN: Player check-in opened. Waiting for white-button enrollment.
+2026-03-20 13:06:23 Player 1 CHECKED IN via White Button.
+2026-03-20 13:06:29 Controller rescan: detected 4 joystick(s).
+2026-03-20 13:06:29 HostState -> PLAYERS_CONFIRMED: Confirmed 1 player(s).
+2026-03-20 13:06:29 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 13:06:29 Dot Dash: setup entered [stub].
+2026-03-20 13:06:33 Controller rescan: detected 4 joystick(s).
+2026-03-20 13:06:33 FalconService: all lanes cleared.
+2026-03-20 13:06:33 AttractService: stopped.
+2026-03-20 13:06:33 HostState -> GAME_RUNNING: Dot Dash started.
+2026-03-20 13:06:33 FalconService: all lanes cleared.
+2026-03-20 13:07:01 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:07:02 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:07:02 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:07:02 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:07:06 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:07:06 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:07:06 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:07:43 HostState -> IDLE: Session redeemed and reset.
+2026-03-20 13:07:43 ViewerService: requested splash.
+2026-03-20 13:07:43 FalconService: all lanes cleared.
+2026-03-20 13:08:26 Controller rescan: detected 4 joystick(s).
+2026-03-20 13:08:26 HostState -> IDLE: System ready.
+2026-03-20 13:08:26 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 13:08:42 Layout saved.
+2026-03-20 13:11:22 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 13:11:22 Game selected: Dot Dash
+2026-03-20 13:11:22 FalconService: all lanes cleared.
+2026-03-20 13:11:22 AttractService: stopped.
+2026-03-20 13:11:28 Controller rescan: detected 4 joystick(s).
+2026-03-20 13:11:28 FalconService: all lanes cleared.
+2026-03-20 13:11:28 AttractService: stopped.
+2026-03-20 13:11:28 FalconService: all lanes cleared.
+2026-03-20 13:11:28 HostState -> CHECKIN_OPEN: Player check-in opened. Waiting for white-button enrollment.
+2026-03-20 13:11:47 Player 1 CHECKED IN via White Button.
+2026-03-20 13:12:01 Controller rescan: detected 4 joystick(s).
+2026-03-20 13:12:01 HostState -> PLAYERS_CONFIRMED: Confirmed 1 player(s).
+2026-03-20 13:12:01 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 13:12:01 Dot Dash: setup entered [stub].
+2026-03-20 13:12:22 Controller rescan: detected 4 joystick(s).
+2026-03-20 13:12:22 FalconService: all lanes cleared.
+2026-03-20 13:12:22 AttractService: stopped.
+2026-03-20 13:12:22 HostState -> GAME_RUNNING: Dot Dash started.
+2026-03-20 13:12:22 FalconService: all lanes cleared.
+2026-03-20 13:13:29 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:13:29 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:13:29 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:13:29 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:13:33 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:13:33 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:13:34 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:13:34 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:13:34 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:13:35 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:13:35 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:13:35 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:13:35 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:13:43 Dot Dash: stopped [stub].
+2026-03-20 13:13:43 FalconService: all lanes cleared.
+2026-03-20 13:13:43 AttractService: stopped.
+2026-03-20 13:13:43 FalconService: all lanes cleared.
+2026-03-20 13:13:43 HostState -> IDLE: STOP pressed; session reset to idle.
+2026-03-20 13:13:43 ViewerService: requested splash.
+2026-03-20 13:13:54 --- BUTTON MAPPING STARTED ---
+2026-03-20 13:13:54 PLAYER 1: Press the WHITE button.
+2026-03-20 13:13:58   -> Mapped WHITE to ID 4
+2026-03-20 13:13:58 PLAYER 1: Press the RED button.
+2026-03-20 13:14:01   -> Mapped RED to ID 0
+2026-03-20 13:14:01 PLAYER 1: Press the GREEN button.
+2026-03-20 13:14:02   -> Mapped GREEN to ID 1
+2026-03-20 13:14:02 PLAYER 1: Press the BLUE button.
+2026-03-20 13:14:03   -> Mapped BLUE to ID 2
+2026-03-20 13:14:03 PLAYER 1: Press the ORANGE button.
+2026-03-20 13:14:04   -> Mapped ORANGE to ID 3
+2026-03-20 13:14:04 PLAYER 1: Press the YELLOW button.
+2026-03-20 13:14:06   -> Mapped YELLOW to ID 3
+2026-03-20 13:14:06 Player 1 mapping finished.
+2026-03-20 13:14:06 PLAYER 2: Press the WHITE button.
+2026-03-20 13:14:10   -> Mapped WHITE to ID 4
+2026-03-20 13:14:10 PLAYER 2: Press the RED button.
+2026-03-20 13:14:11   -> Mapped RED to ID 2
+2026-03-20 13:14:11 PLAYER 2: Press the GREEN button.
+2026-03-20 13:14:11   -> Mapped GREEN to ID 0
+2026-03-20 13:14:11 PLAYER 2: Press the BLUE button.
+2026-03-20 13:14:12   -> Mapped BLUE to ID 1
+2026-03-20 13:14:12 PLAYER 2: Press the ORANGE button.
+2026-03-20 13:14:12   -> Mapped ORANGE to ID 2
+2026-03-20 13:14:12 PLAYER 2: Press the YELLOW button.
+2026-03-20 13:14:13   -> Mapped YELLOW to ID 3
+2026-03-20 13:14:13 Player 2 mapping finished.
+2026-03-20 13:14:13 PLAYER 3: Press the WHITE button.
+2026-03-20 13:14:17   -> Mapped WHITE to ID 4
+2026-03-20 13:14:17 PLAYER 3: Press the RED button.
+2026-03-20 13:14:19   -> Mapped RED to ID 0
+2026-03-20 13:14:19 PLAYER 3: Press the GREEN button.
+2026-03-20 13:14:20   -> Mapped GREEN to ID 1
+2026-03-20 13:14:20 PLAYER 3: Press the BLUE button.
+2026-03-20 13:14:20   -> Mapped BLUE to ID 2
+2026-03-20 13:14:20 PLAYER 3: Press the ORANGE button.
+2026-03-20 13:14:22   -> Mapped ORANGE to ID 3
+2026-03-20 13:14:22 PLAYER 3: Press the YELLOW button.
+2026-03-20 13:14:24   -> Mapped YELLOW to ID 3
+2026-03-20 13:14:24 Player 3 mapping finished.
+2026-03-20 13:14:24 PLAYER 4: Press the WHITE button.
+2026-03-20 13:14:26   -> Mapped WHITE to ID 4
+2026-03-20 13:14:26 PLAYER 4: Press the RED button.
+2026-03-20 13:14:27   -> Mapped RED to ID 0
+2026-03-20 13:14:27 PLAYER 4: Press the GREEN button.
+2026-03-20 13:14:27   -> Mapped GREEN to ID 1
+2026-03-20 13:14:27 PLAYER 4: Press the BLUE button.
+2026-03-20 13:14:30   -> Mapped BLUE to ID 2
+2026-03-20 13:14:30 PLAYER 4: Press the ORANGE button.
+2026-03-20 13:14:31   -> Mapped ORANGE to ID 3
+2026-03-20 13:14:31 PLAYER 4: Press the YELLOW button.
+2026-03-20 13:14:32   -> Mapped YELLOW to ID 3
+2026-03-20 13:14:32 Player 4 mapping finished.
+2026-03-20 13:14:32 Controller assignments saved.
+2026-03-20 13:14:32 --- MAPPING COMPLETE & SAVED ---
+2026-03-20 13:18:50 Controller rescan: detected 4 joystick(s).
+2026-03-20 13:18:50 HostState -> IDLE: System ready.
+2026-03-20 13:18:50 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 13:19:57 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 13:19:57 Game selected: Dot Dash
+2026-03-20 13:19:57 FalconService: all lanes cleared.
+2026-03-20 13:19:57 AttractService: stopped.
+2026-03-20 13:20:01 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_pop_splash.png
+2026-03-20 13:20:01 Game selected: Pixel Pop
+2026-03-20 13:20:01 FalconService: all lanes cleared.
+2026-03-20 13:20:01 AttractService: stopped.
+2026-03-20 13:20:04 ViewerService: show splash -> /home/ledgame/easter_game/assets/surround_splash.png
+2026-03-20 13:20:04 Game selected: Surround
+2026-03-20 13:20:04 FalconService: all lanes cleared.
+2026-03-20 13:20:04 AttractService: stopped.
+2026-03-20 13:20:07 ViewerService: show splash -> /home/ledgame/easter_game/assets/ascend_splash.png
+2026-03-20 13:20:07 Game selected: Ascend
+2026-03-20 13:20:07 FalconService: all lanes cleared.
+2026-03-20 13:20:07 AttractService: stopped.
+2026-03-20 13:20:10 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 13:20:10 Game selected: Dot Dash
+2026-03-20 13:20:10 FalconService: all lanes cleared.
+2026-03-20 13:20:10 AttractService: stopped.
+2026-03-20 13:20:27 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 13:20:27 Game selected: Dot Dash
+2026-03-20 13:20:27 FalconService: all lanes cleared.
+2026-03-20 13:20:27 AttractService: stopped.
+2026-03-20 13:20:34 --- BUTTON MAPPING STARTED ---
+2026-03-20 13:20:34 PLAYER 1: Press the WHITE button.
+2026-03-20 13:20:37   -> Mapped WHITE to ID 4
+2026-03-20 13:20:37 PLAYER 1: Press the RED button.
+2026-03-20 13:20:39   -> Mapped RED to ID 0
+2026-03-20 13:20:39 PLAYER 1: Press the GREEN button.
+2026-03-20 13:20:40   -> Mapped GREEN to ID 1
+2026-03-20 13:20:40 PLAYER 1: Press the BLUE button.
+2026-03-20 13:20:40   -> Mapped BLUE to ID 2
+2026-03-20 13:20:40 PLAYER 1: Press the ORANGE button.
+2026-03-20 13:20:41   -> Mapped ORANGE to ID 3
+2026-03-20 13:20:41 PLAYER 1: Press the YELLOW button.
+2026-03-20 13:20:42   -> Mapped YELLOW to ID 3
+2026-03-20 13:20:42 Player 1 mapping finished.
+2026-03-20 13:20:42 PLAYER 2: Press the WHITE button.
+2026-03-20 13:20:43   -> Mapped WHITE to ID 4
+2026-03-20 13:20:43 PLAYER 2: Press the RED button.
+2026-03-20 13:20:44   -> Mapped RED to ID 0
+2026-03-20 13:20:44 PLAYER 2: Press the GREEN button.
+2026-03-20 13:20:45   -> Mapped GREEN to ID 1
+2026-03-20 13:20:45 PLAYER 2: Press the BLUE button.
+2026-03-20 13:20:46   -> Mapped BLUE to ID 2
+2026-03-20 13:20:46 PLAYER 2: Press the ORANGE button.
+2026-03-20 13:20:46   -> Mapped ORANGE to ID 3
+2026-03-20 13:20:46 PLAYER 2: Press the YELLOW button.
+2026-03-20 13:20:48   -> Mapped YELLOW to ID 3
+2026-03-20 13:20:48 Player 2 mapping finished.
+2026-03-20 13:20:48 PLAYER 3: Press the WHITE button.
+2026-03-20 13:20:50   -> Mapped WHITE to ID 4
+2026-03-20 13:20:50 PLAYER 3: Press the RED button.
+2026-03-20 13:20:52   -> Mapped RED to ID 0
+2026-03-20 13:20:52 PLAYER 3: Press the GREEN button.
+2026-03-20 13:20:52   -> Mapped GREEN to ID 1
+2026-03-20 13:20:52 PLAYER 3: Press the BLUE button.
+2026-03-20 13:20:53   -> Mapped BLUE to ID 2
+2026-03-20 13:20:53 PLAYER 3: Press the ORANGE button.
+2026-03-20 13:20:54   -> Mapped ORANGE to ID 3
+2026-03-20 13:20:54 PLAYER 3: Press the YELLOW button.
+2026-03-20 13:20:54   -> Mapped YELLOW to ID 3
+2026-03-20 13:20:54 Player 3 mapping finished.
+2026-03-20 13:20:54 PLAYER 4: Press the WHITE button.
+2026-03-20 13:20:55   -> Mapped WHITE to ID 4
+2026-03-20 13:20:55 PLAYER 4: Press the RED button.
+2026-03-20 13:20:56   -> Mapped RED to ID 0
+2026-03-20 13:20:56 PLAYER 4: Press the GREEN button.
+2026-03-20 13:20:57   -> Mapped GREEN to ID 1
+2026-03-20 13:20:57 PLAYER 4: Press the BLUE button.
+2026-03-20 13:20:57   -> Mapped BLUE to ID 2
+2026-03-20 13:20:57 PLAYER 4: Press the ORANGE button.
+2026-03-20 13:20:58   -> Mapped ORANGE to ID 3
+2026-03-20 13:20:58 PLAYER 4: Press the YELLOW button.
+2026-03-20 13:20:58   -> Mapped YELLOW to ID 3
+2026-03-20 13:20:58 Player 4 mapping finished.
+2026-03-20 13:20:58 Controller assignments saved.
+2026-03-20 13:20:58 --- MAPPING COMPLETE & SAVED ---
+2026-03-20 13:21:04 Controller rescan: detected 4 joystick(s).
+2026-03-20 13:21:04 FalconService: all lanes cleared.
+2026-03-20 13:21:04 AttractService: stopped.
+2026-03-20 13:21:04 FalconService: all lanes cleared.
+2026-03-20 13:21:04 HostState -> CHECKIN_OPEN: Player check-in opened. Waiting for white-button enrollment.
+2026-03-20 13:21:07 Player 1 CHECKED IN via White Button.
+2026-03-20 13:21:13 Controller rescan: detected 4 joystick(s).
+2026-03-20 13:21:13 HostState -> PLAYERS_CONFIRMED: Confirmed 1 player(s).
+2026-03-20 13:21:13 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 13:21:13 Dot Dash: setup entered [stub].
+2026-03-20 13:21:29 Controller rescan: detected 4 joystick(s).
+2026-03-20 13:21:29 FalconService: all lanes cleared.
+2026-03-20 13:21:29 AttractService: stopped.
+2026-03-20 13:21:29 HostState -> GAME_RUNNING: Dot Dash started.
+2026-03-20 13:21:29 FalconService: all lanes cleared.
+2026-03-20 13:21:44 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:21:44 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:21:44 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:25:25 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 13:25:25 Game selected: Splash
+2026-03-20 13:47:37 FalconService: all lanes cleared.
+2026-03-20 13:47:37 AttractService: stopped.
+2026-03-20 13:47:37 FalconService: all lanes cleared.
+2026-03-20 13:48:03 Controller rescan: detected 4 joystick(s).
+2026-03-20 13:48:04 HostState -> IDLE: System ready.
+2026-03-20 13:48:04 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 13:48:21 --- BUTTON MAPPING STARTED ---
+2026-03-20 13:48:21 PLAYER 1: Press the WHITE button.
+2026-03-20 13:48:34   -> Mapped WHITE to ID 4
+2026-03-20 13:48:34 PLAYER 1: Press the RED button.
+2026-03-20 13:48:37   -> Mapped RED to ID 0
+2026-03-20 13:48:37 PLAYER 1: Press the GREEN button.
+2026-03-20 13:48:37   -> Mapped GREEN to ID 1
+2026-03-20 13:48:37 PLAYER 1: Press the BLUE button.
+2026-03-20 13:48:38   -> Mapped BLUE to ID 2
+2026-03-20 13:48:38 PLAYER 1: Press the ORANGE button.
+2026-03-20 13:48:38   -> Mapped ORANGE to ID 3
+2026-03-20 13:48:38 PLAYER 1: Press the YELLOW button.
+2026-03-20 13:48:39   -> Mapped YELLOW to ID 3
+2026-03-20 13:48:39 Player 1 mapping finished.
+2026-03-20 13:48:39 PLAYER 2: Press the WHITE button.
+2026-03-20 13:48:41   -> Mapped WHITE to ID 4
+2026-03-20 13:48:41 PLAYER 2: Press the RED button.
+2026-03-20 13:48:42   -> Mapped RED to ID 0
+2026-03-20 13:48:42 PLAYER 2: Press the GREEN button.
+2026-03-20 13:48:42   -> Mapped GREEN to ID 1
+2026-03-20 13:48:42 PLAYER 2: Press the BLUE button.
+2026-03-20 13:48:43   -> Mapped BLUE to ID 2
+2026-03-20 13:48:43 PLAYER 2: Press the ORANGE button.
+2026-03-20 13:48:43   -> Mapped ORANGE to ID 3
+2026-03-20 13:48:43 PLAYER 2: Press the YELLOW button.
+2026-03-20 13:48:44   -> Mapped YELLOW to ID 3
+2026-03-20 13:48:44 Player 2 mapping finished.
+2026-03-20 13:48:44 PLAYER 3: Press the WHITE button.
+2026-03-20 13:48:47   -> Mapped WHITE to ID 4
+2026-03-20 13:48:47 PLAYER 3: Press the RED button.
+2026-03-20 13:48:48   -> Mapped RED to ID 0
+2026-03-20 13:48:48 PLAYER 3: Press the GREEN button.
+2026-03-20 13:48:49   -> Mapped GREEN to ID 1
+2026-03-20 13:48:49 PLAYER 3: Press the BLUE button.
+2026-03-20 13:48:49   -> Mapped BLUE to ID 2
+2026-03-20 13:48:49 PLAYER 3: Press the ORANGE button.
+2026-03-20 13:48:52   -> Mapped ORANGE to ID 3
+2026-03-20 13:48:52 PLAYER 3: Press the YELLOW button.
+2026-03-20 13:48:52   -> Mapped YELLOW to ID 3
+2026-03-20 13:48:52 Player 3 mapping finished.
+2026-03-20 13:48:52 PLAYER 4: Press the WHITE button.
+2026-03-20 13:48:54   -> Mapped WHITE to ID 4
+2026-03-20 13:48:54 PLAYER 4: Press the RED button.
+2026-03-20 13:48:55   -> Mapped RED to ID 0
+2026-03-20 13:48:55 PLAYER 4: Press the GREEN button.
+2026-03-20 13:48:56   -> Mapped GREEN to ID 1
+2026-03-20 13:48:56 PLAYER 4: Press the BLUE button.
+2026-03-20 13:48:56   -> Mapped BLUE to ID 2
+2026-03-20 13:48:56 PLAYER 4: Press the ORANGE button.
+2026-03-20 13:48:58   -> Mapped ORANGE to ID 3
+2026-03-20 13:48:58 PLAYER 4: Press the YELLOW button.
+2026-03-20 13:49:02   -> Mapped YELLOW to ID 3
+2026-03-20 13:49:02 Player 4 mapping finished.
+2026-03-20 13:49:02 Controller assignments saved.
+2026-03-20 13:49:02 --- MAPPING COMPLETE & SAVED ---
+2026-03-20 13:49:09 Controller rescan: detected 4 joystick(s).
+2026-03-20 13:49:09 FalconService: all lanes cleared.
+2026-03-20 13:49:09 AttractService: stopped.
+2026-03-20 13:49:09 FalconService: all lanes cleared.
+2026-03-20 13:49:09 HostState -> CHECKIN_OPEN: Player check-in opened. Waiting for white-button enrollment.
+2026-03-20 13:49:14 Player 1 CHECKED IN via White Button.
+2026-03-20 13:49:20 Controller rescan: detected 4 joystick(s).
+2026-03-20 13:49:20 HostState -> PLAYERS_CONFIRMED: Confirmed 1 player(s).
+2026-03-20 13:49:20 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 13:49:20 Splash: setup entered [stub].
+2026-03-20 13:49:25 Controller rescan: detected 4 joystick(s).
+2026-03-20 13:49:29 Start blocked: Splash is view-only.
+2026-03-20 13:49:31 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 13:49:31 Game selected: Dot Dash
+2026-03-20 13:49:31 HostState -> GAME_SELECTED: Dot Dash selected.
+2026-03-20 13:49:31 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 13:49:31 Dot Dash: setup entered [stub].
+2026-03-20 13:49:31 FalconService: all lanes cleared.
+2026-03-20 13:49:31 AttractService: stopped.
+2026-03-20 13:49:39 Controller rescan: detected 4 joystick(s).
+2026-03-20 13:49:40 FalconService: all lanes cleared.
+2026-03-20 13:49:40 AttractService: stopped.
+2026-03-20 13:49:40 HostState -> GAME_RUNNING: Dot Dash started.
+2026-03-20 13:49:40 FalconService: all lanes cleared.
+2026-03-20 13:54:21 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 13:54:21 Game selected: Splash
+2026-03-20 13:54:25 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 13:54:25 Game selected: Dot Dash
+2026-03-20 13:54:25 FalconService: all lanes cleared.
+2026-03-20 13:54:25 AttractService: stopped.
+2026-03-20 13:54:35 Controller rescan: detected 4 joystick(s).
+2026-03-20 13:54:35 FalconService: all lanes cleared.
+2026-03-20 13:54:35 AttractService: stopped.
+2026-03-20 13:54:35 HostState -> GAME_RUNNING: Dot Dash started.
+2026-03-20 13:54:35 FalconService: all lanes cleared.
+2026-03-20 13:54:46 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:54:46 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:54:46 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:54:46 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:54:47 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+2026-03-20 13:54:47 Joystick poll error: PixelChallengeConsole.push_viewer_state() takes 2 positional arguments but 3 were given
+============================= BEGIN V18.1.0 =======================
+
+
+
+
+=========== begin: start, map buttons, enroll players start game ============================
+2026-03-20 14:02:10 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:02:10 HostState -> IDLE: System ready.
+2026-03-20 14:02:10 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 14:02:33 --- BUTTON MAPPING STARTED ---
+2026-03-20 14:02:33 PLAYER 1: Press the WHITE button.
+2026-03-20 14:02:36   -> Mapped WHITE to ID 4
+2026-03-20 14:02:36 PLAYER 1: Press the RED button.
+2026-03-20 14:02:37   -> Mapped RED to ID 0
+2026-03-20 14:02:37 PLAYER 1: Press the GREEN button.
+2026-03-20 14:02:38   -> Mapped GREEN to ID 1
+2026-03-20 14:02:38 PLAYER 1: Press the BLUE button.
+2026-03-20 14:02:38   -> Mapped BLUE to ID 2
+2026-03-20 14:02:38 PLAYER 1: Press the ORANGE button.
+2026-03-20 14:02:39   -> Mapped ORANGE to ID 3
+2026-03-20 14:02:39 PLAYER 1: Press the YELLOW button.
+2026-03-20 14:02:40   -> Mapped YELLOW to ID 3
+2026-03-20 14:02:40 Player 1 mapping finished.
+2026-03-20 14:02:40 PLAYER 2: Press the WHITE button.
+2026-03-20 14:02:41   -> Mapped WHITE to ID 4
+2026-03-20 14:02:41 PLAYER 2: Press the RED button.
+2026-03-20 14:02:42   -> Mapped RED to ID 0
+2026-03-20 14:02:42 PLAYER 2: Press the GREEN button.
+2026-03-20 14:02:43   -> Mapped GREEN to ID 1
+2026-03-20 14:02:43 PLAYER 2: Press the BLUE button.
+2026-03-20 14:02:43   -> Mapped BLUE to ID 2
+2026-03-20 14:02:43 PLAYER 2: Press the ORANGE button.
+2026-03-20 14:02:44   -> Mapped ORANGE to ID 3
+2026-03-20 14:02:44 PLAYER 2: Press the YELLOW button.
+2026-03-20 14:02:44   -> Mapped YELLOW to ID 3
+2026-03-20 14:02:44 Player 2 mapping finished.
+2026-03-20 14:02:44 PLAYER 3: Press the WHITE button.
+2026-03-20 14:02:45   -> Mapped WHITE to ID 4
+2026-03-20 14:02:45 PLAYER 3: Press the RED button.
+2026-03-20 14:02:47   -> Mapped RED to ID 0
+2026-03-20 14:02:47 PLAYER 3: Press the GREEN button.
+2026-03-20 14:02:47   -> Mapped GREEN to ID 1
+2026-03-20 14:02:47 PLAYER 3: Press the BLUE button.
+2026-03-20 14:02:48   -> Mapped BLUE to ID 2
+2026-03-20 14:02:48 PLAYER 3: Press the ORANGE button.
+2026-03-20 14:02:49   -> Mapped ORANGE to ID 3
+2026-03-20 14:02:49 PLAYER 3: Press the YELLOW button.
+2026-03-20 14:02:50   -> Mapped YELLOW to ID 3
+2026-03-20 14:02:50 Player 3 mapping finished.
+2026-03-20 14:02:50 PLAYER 4: Press the WHITE button.
+2026-03-20 14:02:51   -> Mapped WHITE to ID 4
+2026-03-20 14:02:51 PLAYER 4: Press the RED button.
+2026-03-20 14:02:52   -> Mapped RED to ID 0
+2026-03-20 14:02:52 PLAYER 4: Press the GREEN button.
+2026-03-20 14:02:53   -> Mapped GREEN to ID 1
+2026-03-20 14:02:53 PLAYER 4: Press the BLUE button.
+2026-03-20 14:02:53   -> Mapped BLUE to ID 2
+2026-03-20 14:02:53 PLAYER 4: Press the ORANGE button.
+2026-03-20 14:02:54   -> Mapped ORANGE to ID 3
+2026-03-20 14:02:54 PLAYER 4: Press the YELLOW button.
+2026-03-20 14:02:54   -> Mapped YELLOW to ID 3
+2026-03-20 14:02:54 Player 4 mapping finished.
+2026-03-20 14:02:54 Controller assignments saved.
+2026-03-20 14:02:54 --- MAPPING COMPLETE & SAVED ---
+2026-03-20 14:03:02 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 14:03:02 Game selected: Dot Dash
+2026-03-20 14:03:02 FalconService: all lanes cleared.
+2026-03-20 14:03:02 AttractService: stopped.
+2026-03-20 14:03:11 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:03:11 FalconService: all lanes cleared.
+2026-03-20 14:03:11 AttractService: stopped.
+2026-03-20 14:03:11 FalconService: all lanes cleared.
+2026-03-20 14:03:11 HostState -> CHECKIN_OPEN: Player check-in opened. Waiting for white-button enrollment.
+2026-03-20 14:03:13 Player 1 CHECKED IN via White Button.
+2026-03-20 14:03:15 Player 2 CHECKED IN via White Button.
+2026-03-20 14:03:20 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:03:20 HostState -> PLAYERS_CONFIRMED: Confirmed 2 player(s).
+2026-03-20 14:03:20 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 14:03:20 Dot Dash: setup entered [stub].
+2026-03-20 14:03:28 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:03:28 FalconService: all lanes cleared.
+2026-03-20 14:03:28 AttractService: stopped.
+2026-03-20 14:03:28 HostState -> GAME_RUNNING: Dot Dash started.
+2026-03-20 14:03:28 FalconService: all lanes cleared.
+======================================
+
+BEGIN OF V18.1.1 WITH DOT DASH V5 ================
+
+=================================================
+
+
+2026-03-20 14:29:33 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:29:33 HostState -> IDLE: System ready.
+2026-03-20 14:29:33 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 14:29:45 --- BUTTON MAPPING STARTED ---
+2026-03-20 14:29:45 PLAYER 1: Press the WHITE button.
+2026-03-20 14:29:48   -> Mapped WHITE to ID 4
+2026-03-20 14:29:48 PLAYER 1: Press the RED button.
+2026-03-20 14:29:49   -> Mapped RED to ID 0
+2026-03-20 14:29:49 PLAYER 1: Press the GREEN button.
+2026-03-20 14:29:49   -> Mapped GREEN to ID 1
+2026-03-20 14:29:49 PLAYER 1: Press the BLUE button.
+2026-03-20 14:29:50   -> Mapped BLUE to ID 2
+2026-03-20 14:29:50 PLAYER 1: Press the ORANGE button.
+2026-03-20 14:29:50   -> Mapped ORANGE to ID 3
+2026-03-20 14:29:50 PLAYER 1: Press the YELLOW button.
+2026-03-20 14:29:51   -> Mapped YELLOW to ID 3
+2026-03-20 14:29:51 Player 1 mapping finished.
+2026-03-20 14:29:51 PLAYER 2: Press the WHITE button.
+2026-03-20 14:29:52   -> Mapped WHITE to ID 4
+2026-03-20 14:29:52 PLAYER 2: Press the RED button.
+2026-03-20 14:29:53   -> Mapped RED to ID 0
+2026-03-20 14:29:53 PLAYER 2: Press the GREEN button.
+2026-03-20 14:29:53   -> Mapped GREEN to ID 1
+2026-03-20 14:29:53 PLAYER 2: Press the BLUE button.
+2026-03-20 14:29:53   -> Mapped BLUE to ID 2
+2026-03-20 14:29:53 PLAYER 2: Press the ORANGE button.
+2026-03-20 14:29:54   -> Mapped ORANGE to ID 3
+2026-03-20 14:29:54 PLAYER 2: Press the YELLOW button.
+2026-03-20 14:29:54   -> Mapped YELLOW to ID 3
+2026-03-20 14:29:54 Player 2 mapping finished.
+2026-03-20 14:29:54 PLAYER 3: Press the WHITE button.
+2026-03-20 14:29:56   -> Mapped WHITE to ID 4
+2026-03-20 14:29:56 PLAYER 3: Press the RED button.
+2026-03-20 14:29:56   -> Mapped RED to ID 0
+2026-03-20 14:29:56 PLAYER 3: Press the GREEN button.
+2026-03-20 14:29:57   -> Mapped GREEN to ID 1
+2026-03-20 14:29:57 PLAYER 3: Press the BLUE button.
+2026-03-20 14:29:57   -> Mapped BLUE to ID 2
+2026-03-20 14:29:57 PLAYER 3: Press the ORANGE button.
+2026-03-20 14:29:57   -> Mapped ORANGE to ID 3
+2026-03-20 14:29:57 PLAYER 3: Press the YELLOW button.
+2026-03-20 14:29:58   -> Mapped YELLOW to ID 3
+2026-03-20 14:29:58 Player 3 mapping finished.
+2026-03-20 14:29:58 PLAYER 4: Press the WHITE button.
+2026-03-20 14:30:00   -> Mapped WHITE to ID 4
+2026-03-20 14:30:00 PLAYER 4: Press the RED button.
+2026-03-20 14:30:01   -> Mapped RED to ID 0
+2026-03-20 14:30:01 PLAYER 4: Press the GREEN button.
+2026-03-20 14:30:01   -> Mapped GREEN to ID 1
+2026-03-20 14:30:01 PLAYER 4: Press the BLUE button.
+2026-03-20 14:30:02   -> Mapped BLUE to ID 2
+2026-03-20 14:30:02 PLAYER 4: Press the ORANGE button.
+2026-03-20 14:30:02   -> Mapped ORANGE to ID 3
+2026-03-20 14:30:02 PLAYER 4: Press the YELLOW button.
+2026-03-20 14:30:03   -> Mapped YELLOW to ID 3
+2026-03-20 14:30:03 Player 4 mapping finished.
+2026-03-20 14:30:03 Controller assignments saved.
+2026-03-20 14:30:03 --- MAPPING COMPLETE & SAVED ---
+2026-03-20 14:30:11 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 14:30:11 Game selected: Dot Dash
+2026-03-20 14:30:11 FalconService: all lanes cleared.
+2026-03-20 14:30:11 AttractService: stopped.
+2026-03-20 14:30:19 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:30:23 Start blocked: No players have joined.
+2026-03-20 14:30:25 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:30:26 FalconService: all lanes cleared.
+2026-03-20 14:30:26 AttractService: stopped.
+2026-03-20 14:30:26 FalconService: all lanes cleared.
+2026-03-20 14:30:26 HostState -> CHECKIN_OPEN: Player check-in opened. Waiting for white-button enrollment.
+2026-03-20 14:30:27 Player 1 CHECKED IN via White Button.
+2026-03-20 14:30:28 Player 2 CHECKED IN via White Button.
+2026-03-20 14:30:32 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:30:32 HostState -> PLAYERS_CONFIRMED: Confirmed 2 player(s).
+2026-03-20 14:30:32 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 14:30:32 Dot Dash: setup entered [stub].
+2026-03-20 14:30:37 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:30:37 FalconService: all lanes cleared.
+2026-03-20 14:30:37 AttractService: stopped.
+2026-03-20 14:30:37 HostState -> GAME_RUNNING: Dot Dash started.
+2026-03-20 14:30:37 FalconService: all lanes cleared.
+2026-03-20 14:30:37 Dot Dash session entered.
+2026-03-20 14:31:19 FalconService: all lanes cleared.
+2026-03-20 14:31:19 AttractService: stopped.
+2026-03-20 14:31:19 FalconService: all lanes cleared.
+==============================================
+
+		start
+
+		CONSOLE
+
+---	 pixel_challenge_console_v18.2.0
+
+---------------------------------------------
+
+		GAME:
+
+---	 dot_dash_version6.py
+
+
+==============================================
+
+2026-03-20 14:54:11 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:54:11 HostState -> IDLE: System ready.
+2026-03-20 14:54:11 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 14:54:23 AttractService: theme 'Lane Chase LR' started.
+2026-03-20 14:54:28 AttractService: theme changed live to 'Bounce Chase'.
+2026-03-20 14:54:28 CYCLE -> Bounce Chase (speed 8)
+2026-03-20 14:54:44 --- BUTTON MAPPING STARTED ---
+2026-03-20 14:54:44 PLAYER 1: Press the WHITE button.
+2026-03-20 14:54:47   -> Mapped WHITE to ID 4
+2026-03-20 14:54:47 PLAYER 1: Press the RED button.
+2026-03-20 14:54:48 AttractService: theme changed live to 'Lane Chase LR'.
+2026-03-20 14:54:48 CYCLE -> Lane Chase LR (speed 7)
+2026-03-20 14:54:54 FalconService: all lanes cleared.
+2026-03-20 14:54:54 AttractService: stopped.
+2026-03-20 14:55:01   -> Mapped RED to ID 0
+2026-03-20 14:55:01 PLAYER 1: Press the GREEN button.
+2026-03-20 14:55:02   -> Mapped GREEN to ID 1
+2026-03-20 14:55:02 PLAYER 1: Press the BLUE button.
+2026-03-20 14:55:03   -> Mapped BLUE to ID 2
+2026-03-20 14:55:03 PLAYER 1: Press the ORANGE button.
+2026-03-20 14:55:03   -> Mapped ORANGE to ID 3
+2026-03-20 14:55:03 PLAYER 1: Press the YELLOW button.
+2026-03-20 14:55:04   -> Mapped YELLOW to ID 3
+2026-03-20 14:55:04 Player 1 mapping finished.
+2026-03-20 14:55:04 PLAYER 2: Press the WHITE button.
+2026-03-20 14:55:06   -> Mapped WHITE to ID 4
+2026-03-20 14:55:06 PLAYER 2: Press the RED button.
+2026-03-20 14:55:07   -> Mapped RED to ID 0
+2026-03-20 14:55:07 PLAYER 2: Press the GREEN button.
+2026-03-20 14:55:08   -> Mapped GREEN to ID 1
+2026-03-20 14:55:08 PLAYER 2: Press the BLUE button.
+2026-03-20 14:55:08   -> Mapped BLUE to ID 2
+2026-03-20 14:55:08 PLAYER 2: Press the ORANGE button.
+2026-03-20 14:55:09   -> Mapped ORANGE to ID 3
+2026-03-20 14:55:09 PLAYER 2: Press the YELLOW button.
+2026-03-20 14:55:09   -> Mapped YELLOW to ID 3
+2026-03-20 14:55:09 Player 2 mapping finished.
+2026-03-20 14:55:09 PLAYER 3: Press the WHITE button.
+2026-03-20 14:55:11   -> Mapped WHITE to ID 4
+2026-03-20 14:55:11 PLAYER 3: Press the RED button.
+2026-03-20 14:55:13   -> Mapped RED to ID 0
+2026-03-20 14:55:13 PLAYER 3: Press the GREEN button.
+2026-03-20 14:55:14   -> Mapped GREEN to ID 1
+2026-03-20 14:55:14 PLAYER 3: Press the BLUE button.
+2026-03-20 14:55:14   -> Mapped BLUE to ID 2
+2026-03-20 14:55:14 PLAYER 3: Press the ORANGE button.
+2026-03-20 14:55:15   -> Mapped ORANGE to ID 3
+2026-03-20 14:55:15 PLAYER 3: Press the YELLOW button.
+2026-03-20 14:55:15   -> Mapped YELLOW to ID 3
+2026-03-20 14:55:15 Player 3 mapping finished.
+2026-03-20 14:55:15 PLAYER 4: Press the WHITE button.
+2026-03-20 14:55:17   -> Mapped WHITE to ID 4
+2026-03-20 14:55:17 PLAYER 4: Press the RED button.
+2026-03-20 14:55:18   -> Mapped RED to ID 0
+2026-03-20 14:55:18 PLAYER 4: Press the GREEN button.
+2026-03-20 14:55:19   -> Mapped GREEN to ID 1
+2026-03-20 14:55:19 PLAYER 4: Press the BLUE button.
+2026-03-20 14:55:22   -> Mapped BLUE to ID 2
+2026-03-20 14:55:22 PLAYER 4: Press the ORANGE button.
+2026-03-20 14:55:23   -> Mapped ORANGE to ID 3
+2026-03-20 14:55:23 PLAYER 4: Press the YELLOW button.
+2026-03-20 14:55:23   -> Mapped YELLOW to ID 3
+2026-03-20 14:55:23 Player 4 mapping finished.
+2026-03-20 14:55:23 Controller assignments saved.
+2026-03-20 14:55:23 --- MAPPING COMPLETE & SAVED ---
+2026-03-20 14:55:28 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:55:29 FalconService: all lanes cleared.
+2026-03-20 14:55:29 AttractService: stopped.
+2026-03-20 14:55:29 FalconService: all lanes cleared.
+2026-03-20 14:55:29 HostState -> CHECKIN_OPEN: Player check-in opened. Waiting for white-button enrollment.
+2026-03-20 14:55:32 Player 1 CHECKED IN via White Button.
+2026-03-20 14:55:32 Player 2 CHECKED IN via White Button.
+2026-03-20 14:55:34 Player 3 CHECKED IN via White Button.
+2026-03-20 14:55:35 Player 4 CHECKED IN via White Button.
+2026-03-20 14:55:43 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:55:43 HostState -> PLAYERS_CONFIRMED: Confirmed 4 player(s).
+2026-03-20 14:55:43 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 14:55:43 Splash: setup entered [stub].
+2026-03-20 14:55:50 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:55:53 Start blocked: Splash is view-only.
+2026-03-20 14:55:56 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_pop_splash.png
+2026-03-20 14:55:56 Game selected: Pixel Pop
+2026-03-20 14:55:56 HostState -> GAME_SELECTED: Pixel Pop selected.
+2026-03-20 14:55:56 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_pop_splash.png
+2026-03-20 14:55:56 Pixel Pop: setup entered [stub].
+2026-03-20 14:55:56 FalconService: all lanes cleared.
+2026-03-20 14:55:56 AttractService: stopped.
+2026-03-20 14:55:57 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 14:55:57 Game selected: Dot Dash
+2026-03-20 14:55:57 HostState -> GAME_SELECTED: Dot Dash selected.
+2026-03-20 14:55:57 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 14:55:57 Dot Dash: setup entered [stub].
+2026-03-20 14:55:57 FalconService: all lanes cleared.
+2026-03-20 14:55:57 AttractService: stopped.
+2026-03-20 14:56:02 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:56:02 FalconService: all lanes cleared.
+2026-03-20 14:56:03 AttractService: stopped.
+2026-03-20 14:56:03 HostState -> GAME_RUNNING: Dot Dash started.
+2026-03-20 14:56:03 FalconService: all lanes cleared.
+2026-03-20 14:56:03 Dot Dash session entered.
+2026-03-20 14:56:45 Dot Dash: stopped [stub].
+2026-03-20 14:56:45 FalconService: all lanes cleared.
+2026-03-20 14:56:45 AttractService: stopped.
+2026-03-20 14:56:45 FalconService: all lanes cleared.
+2026-03-20 14:56:45 HostState -> IDLE: STOP pressed; session reset to idle.
+2026-03-20 14:56:45 ViewerService: requested splash.
+2026-03-20 14:56:56 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:56:59 Start blocked: Players are not confirmed.
+2026-03-20 14:57:01 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:57:02 HostState -> PLAYERS_CONFIRMED: Confirmed 4 player(s).
+2026-03-20 14:57:02 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 14:57:02 Dot Dash: setup entered [stub].
+2026-03-20 14:57:20 Controller rescan: detected 4 joystick(s).
+2026-03-20 14:57:21 FalconService: all lanes cleared.
+2026-03-20 14:57:21 AttractService: stopped.
+2026-03-20 14:57:21 HostState -> GAME_RUNNING: Dot Dash started.
+2026-03-20 14:57:21 FalconService: all lanes cleared.
+2026-03-20 14:57:21 Dot Dash session entered.
+
+==============================================
+
+                start 
+
+                CONSOLE
+
+---      pixel_challenge_console_v18.2.1.py
+
+---------------------------------------------
+
+                GAME: 
+
+---      dot_dash.py (not found)
+
+==============================================
+2026-03-20 15:05:44 Controller rescan: detected 4 joystick(s).
+2026-03-20 15:05:45 HostState -> IDLE: System ready.
+2026-03-20 15:05:45 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 15:06:09 --- BUTTON MAPPING STARTED ---
+2026-03-20 15:06:09 PLAYER 1: Press the WHITE button.
+2026-03-20 15:06:12   -> Mapped WHITE to ID 4
+2026-03-20 15:06:12 PLAYER 1: Press the RED button.
+2026-03-20 15:06:13   -> Mapped RED to ID 0
+2026-03-20 15:06:13 PLAYER 1: Press the GREEN button.
+2026-03-20 15:06:14   -> Mapped GREEN to ID 1
+2026-03-20 15:06:14 PLAYER 1: Press the BLUE button.
+2026-03-20 15:06:14   -> Mapped BLUE to ID 2
+2026-03-20 15:06:14 PLAYER 1: Press the ORANGE button.
+2026-03-20 15:06:14   -> Mapped ORANGE to ID 3
+2026-03-20 15:06:14 PLAYER 1: Press the YELLOW button.
+2026-03-20 15:06:17   -> Mapped YELLOW to ID 3
+2026-03-20 15:06:17 Player 1 mapping finished.
+2026-03-20 15:06:17 PLAYER 2: Press the WHITE button.
+2026-03-20 15:06:18   -> Mapped WHITE to ID 4
+2026-03-20 15:06:18 PLAYER 2: Press the RED button.
+2026-03-20 15:06:19   -> Mapped RED to ID 0
+2026-03-20 15:06:19 PLAYER 2: Press the GREEN button.
+2026-03-20 15:06:20   -> Mapped GREEN to ID 1
+2026-03-20 15:06:20 PLAYER 2: Press the BLUE button.
+2026-03-20 15:06:20   -> Mapped BLUE to ID 2
+2026-03-20 15:06:20 PLAYER 2: Press the ORANGE button.
+2026-03-20 15:06:20   -> Mapped ORANGE to ID 3
+2026-03-20 15:06:20 PLAYER 2: Press the YELLOW button.
+2026-03-20 15:06:21   -> Mapped YELLOW to ID 3
+2026-03-20 15:06:21 Player 2 mapping finished.
+2026-03-20 15:06:21 PLAYER 3: Press the WHITE button.
+2026-03-20 15:06:22   -> Mapped WHITE to ID 4
+2026-03-20 15:06:22 PLAYER 3: Press the RED button.
+2026-03-20 15:06:23   -> Mapped RED to ID 0
+2026-03-20 15:06:23 PLAYER 3: Press the GREEN button.
+2026-03-20 15:06:23   -> Mapped GREEN to ID 1
+2026-03-20 15:06:23 PLAYER 3: Press the BLUE button.
+2026-03-20 15:06:24   -> Mapped BLUE to ID 2
+2026-03-20 15:06:24 PLAYER 3: Press the ORANGE button.
+2026-03-20 15:06:24   -> Mapped ORANGE to ID 3
+2026-03-20 15:06:24 PLAYER 3: Press the YELLOW button.
+2026-03-20 15:06:24   -> Mapped YELLOW to ID 3
+2026-03-20 15:06:24 Player 3 mapping finished.
+2026-03-20 15:06:24 PLAYER 4: Press the WHITE button.
+2026-03-20 15:06:26   -> Mapped WHITE to ID 4
+2026-03-20 15:06:26 PLAYER 4: Press the RED button.
+2026-03-20 15:06:27   -> Mapped RED to ID 0
+2026-03-20 15:06:27 PLAYER 4: Press the GREEN button.
+2026-03-20 15:06:27   -> Mapped GREEN to ID 1
+2026-03-20 15:06:27 PLAYER 4: Press the BLUE button.
+2026-03-20 15:06:28   -> Mapped BLUE to ID 2
+2026-03-20 15:06:28 PLAYER 4: Press the ORANGE button.
+2026-03-20 15:06:28   -> Mapped ORANGE to ID 3
+2026-03-20 15:06:28 PLAYER 4: Press the YELLOW button.
+2026-03-20 15:06:29   -> Mapped YELLOW to ID 3
+2026-03-20 15:06:29 Player 4 mapping finished.
+2026-03-20 15:06:29 Controller assignments saved.
+2026-03-20 15:06:29 --- MAPPING COMPLETE & SAVED ---
+2026-03-20 15:06:36 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 15:06:36 Game selected: Dot Dash
+2026-03-20 15:06:36 FalconService: all lanes cleared.
+2026-03-20 15:06:36 AttractService: stopped.
+2026-03-20 15:06:40 Controller rescan: detected 4 joystick(s).
+2026-03-20 15:06:40 FalconService: all lanes cleared.
+2026-03-20 15:06:40 AttractService: stopped.
+2026-03-20 15:06:40 FalconService: all lanes cleared.
+2026-03-20 15:06:40 HostState -> CHECKIN_OPEN: Player check-in opened. Waiting for white-button enrollment.
+2026-03-20 15:06:43 Player 1 CHECKED IN via White Button.
+2026-03-20 15:06:44 Player 2 CHECKED IN via White Button.
+2026-03-20 15:06:48 Controller rescan: detected 4 joystick(s).
+2026-03-20 15:06:49 HostState -> PLAYERS_CONFIRMED: Confirmed 2 player(s).
+2026-03-20 15:06:49 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 15:06:49 Dot Dash: setup entered [stub].
+2026-03-20 15:06:54 Controller rescan: detected 4 joystick(s).
+2026-03-20 15:06:54 FalconService: all lanes cleared.
+2026-03-20 15:06:54 AttractService: stopped.
+2026-03-20 15:06:54 HostState -> GAME_RUNNING: Dot Dash started.
+2026-03-20 15:06:54 FalconService: all lanes cleared.
+2026-03-20 15:06:54 Dot Dash session entered.
+2026-03-20 15:07:28 Controller rescan: detected 4 joystick(s).
+2026-03-20 15:07:29 FalconService: all lanes cleared.
+2026-03-20 15:07:29 AttractService: stopped.
+2026-03-20 15:07:29 HostState -> GAME_RUNNING: Dot Dash started.
+2026-03-20 15:07:29 FalconService: all lanes cleared.
+2026-03-20 15:07:29 Dot Dash session entered.
+
+==============================================
+
+                start 
+
+                CONSOLE
+
+---      pixel_challenge_console_v18.2.2.py
+
+---------------------------------------------
+
+                GAME: 
+
+---      dot_dash_v6.py
+
+==============================================
+2026-03-20 15:21:17 Controller rescan: detected 4 joystick(s).
+2026-03-20 15:21:17 HostState -> IDLE: System ready.
+2026-03-20 15:21:17 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 15:23:11 --- BUTTON MAPPING STARTED ---
+2026-03-20 15:23:11 PLAYER 1: Press the WHITE button.
+2026-03-20 15:23:17   -> Mapped WHITE to ID 4
+2026-03-20 15:23:17 PLAYER 1: Press the RED button.
+2026-03-20 15:23:19   -> Mapped RED to ID 0
+2026-03-20 15:23:19 PLAYER 1: Press the GREEN button.
+2026-03-20 15:23:19   -> Mapped GREEN to ID 1
+2026-03-20 15:23:19 PLAYER 1: Press the BLUE button.
+2026-03-20 15:23:20   -> Mapped BLUE to ID 2
+2026-03-20 15:23:20 PLAYER 1: Press the ORANGE button.
+2026-03-20 15:23:20   -> Mapped ORANGE to ID 3
+2026-03-20 15:23:20 PLAYER 1: Press the YELLOW button.
+2026-03-20 15:23:23   -> Mapped YELLOW to ID 3
+2026-03-20 15:23:23 Player 1 mapping finished.
+2026-03-20 15:23:23 PLAYER 2: Press the WHITE button.
+2026-03-20 15:23:25   -> Mapped WHITE to ID 4
+2026-03-20 15:23:25 PLAYER 2: Press the RED button.
+2026-03-20 15:23:25   -> Mapped RED to ID 0
+2026-03-20 15:23:25 PLAYER 2: Press the GREEN button.
+2026-03-20 15:23:26   -> Mapped GREEN to ID 1
+2026-03-20 15:23:26 PLAYER 2: Press the BLUE button.
+2026-03-20 15:23:26   -> Mapped BLUE to ID 2
+2026-03-20 15:23:26 PLAYER 2: Press the ORANGE button.
+2026-03-20 15:23:26   -> Mapped ORANGE to ID 3
+2026-03-20 15:23:26 PLAYER 2: Press the YELLOW button.
+2026-03-20 15:23:27   -> Mapped YELLOW to ID 3
+2026-03-20 15:23:27 Player 2 mapping finished.
+2026-03-20 15:23:27 PLAYER 3: Press the WHITE button.
+2026-03-20 15:23:29   -> Mapped WHITE to ID 4
+2026-03-20 15:23:29 PLAYER 3: Press the RED button.
+2026-03-20 15:23:29   -> Mapped RED to ID 0
+2026-03-20 15:23:29 PLAYER 3: Press the GREEN button.
+2026-03-20 15:23:30   -> Mapped GREEN to ID 1
+2026-03-20 15:23:30 PLAYER 3: Press the BLUE button.
+2026-03-20 15:23:30   -> Mapped BLUE to ID 2
+2026-03-20 15:23:30 PLAYER 3: Press the ORANGE button.
+2026-03-20 15:23:31   -> Mapped ORANGE to ID 3
+2026-03-20 15:23:31 PLAYER 3: Press the YELLOW button.
+2026-03-20 15:23:31   -> Mapped YELLOW to ID 3
+2026-03-20 15:23:31 Player 3 mapping finished.
+2026-03-20 15:23:31 PLAYER 4: Press the WHITE button.
+2026-03-20 15:23:32   -> Mapped WHITE to ID 4
+2026-03-20 15:23:32 PLAYER 4: Press the RED button.
+2026-03-20 15:23:34   -> Mapped RED to ID 0
+2026-03-20 15:23:34 PLAYER 4: Press the GREEN button.
+2026-03-20 15:23:36   -> Mapped GREEN to ID 1
+2026-03-20 15:23:36 PLAYER 4: Press the BLUE button.
+2026-03-20 15:23:36   -> Mapped BLUE to ID 2
+2026-03-20 15:23:36 PLAYER 4: Press the ORANGE button.
+2026-03-20 15:23:37   -> Mapped ORANGE to ID 3
+2026-03-20 15:23:37 PLAYER 4: Press the YELLOW button.
+2026-03-20 15:23:37   -> Mapped YELLOW to ID 3
+2026-03-20 15:23:37 Player 4 mapping finished.
+2026-03-20 15:23:37 Controller assignments saved.
+2026-03-20 15:23:37 --- MAPPING COMPLETE & SAVED ---
+2026-03-20 15:23:54 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 15:23:54 Game selected: Dot Dash
+2026-03-20 15:23:54 FalconService: all lanes cleared.
+2026-03-20 15:23:54 AttractService: stopped.
+2026-03-20 15:23:57 Controller rescan: detected 4 joystick(s).
+2026-03-20 15:23:58 FalconService: all lanes cleared.
+2026-03-20 15:23:58 AttractService: stopped.
+2026-03-20 15:23:58 FalconService: all lanes cleared.
+2026-03-20 15:23:58 HostState -> CHECKIN_OPEN: Player check-in opened. Waiting for white-button enrollment.
+2026-03-20 15:24:00 Player 1 CHECKED IN via White Button.
+2026-03-20 15:24:00 Player 2 CHECKED IN via White Button.
+2026-03-20 15:24:05 Controller rescan: detected 4 joystick(s).
+2026-03-20 15:24:06 HostState -> PLAYERS_CONFIRMED: Confirmed 2 player(s).
+2026-03-20 15:24:06 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 15:24:06 Dot Dash: setup entered [stub].
+2026-03-20 15:24:24 Controller rescan: detected 4 joystick(s).
+2026-03-20 15:24:24 FalconService: all lanes cleared.
+2026-03-20 15:24:24 AttractService: stopped.
+2026-03-20 15:24:24 HostState -> GAME_RUNNING: Dot Dash started.
+2026-03-20 15:24:24 FalconService: all lanes cleared.
+2026-03-20 15:24:24 Dot Dash session entered.
+2026-03-20 15:26:34 Controller rescan: detected 4 joystick(s).
+2026-03-20 15:26:34 FalconService: all lanes cleared.
+2026-03-20 15:26:34 AttractService: stopped.
+2026-03-20 15:26:34 HostState -> GAME_RUNNING: Dot Dash started.
+2026-03-20 15:26:34 FalconService: all lanes cleared.
+2026-03-20 15:26:34 Dot Dash session entered.
+2026-03-20 15:26:55 Dot Dash: stopped [stub].
+2026-03-20 15:26:55 FalconService: all lanes cleared.
+2026-03-20 15:26:55 AttractService: stopped.
+2026-03-20 15:26:55 FalconService: all lanes cleared.
+2026-03-20 15:26:55 HostState -> IDLE: STOP pressed; session reset to idle.
+2026-03-20 15:26:55 ViewerService: requested splash.
+2026-03-20 15:27:02 Controller rescan: detected 4 joystick(s).
+2026-03-20 15:27:06 Start blocked: Players are not confirmed.
+2026-03-20 15:27:08 Controller rescan: detected 4 joystick(s).
+2026-03-20 15:27:08 HostState -> PLAYERS_CONFIRMED: Confirmed 2 player(s).
+2026-03-20 15:27:08 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 15:27:08 Dot Dash: setup entered [stub].
+2026-03-20 15:27:12 Controller rescan: detected 4 joystick(s).
+2026-03-20 15:27:12 FalconService: all lanes cleared.
+2026-03-20 15:27:12 AttractService: stopped.
+2026-03-20 15:27:12 HostState -> GAME_RUNNING: Dot Dash started.
+2026-03-20 15:27:12 FalconService: all lanes cleared.
+2026-03-20 15:27:12 Dot Dash session entered.
+2026-03-20 15:31:20 HostState -> IDLE: Session redeemed and reset.
+2026-03-20 15:31:20 ViewerService: requested splash.
+2026-03-20 15:31:20 FalconService: all lanes cleared.
+2026-03-20 15:34:44 Controller rescan: detected 4 joystick(s).
+2026-03-20 15:34:44 FalconService: all lanes cleared.
+2026-03-20 15:34:44 AttractService: stopped.
+2026-03-20 15:34:44 FalconService: all lanes cleared.
+2026-03-20 15:34:44 HostState -> CHECKIN_OPEN: Player check-in opened. Waiting for white-button enrollment.
+2026-03-20 15:34:47 Player 1 CHECKED IN via White Button.
+2026-03-20 15:34:47 Player 2 CHECKED IN via White Button.
+2026-03-20 15:34:51 Controller rescan: detected 4 joystick(s).
+2026-03-20 15:34:51 HostState -> PLAYERS_CONFIRMED: Confirmed 2 player(s).
+2026-03-20 15:34:51 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 15:34:51 Dot Dash: setup entered [stub].
+2026-03-20 15:34:55 Controller rescan: detected 4 joystick(s).
+2026-03-20 15:34:55 FalconService: all lanes cleared.
+2026-03-20 15:34:55 AttractService: stopped.
+2026-03-20 15:34:55 HostState -> GAME_RUNNING: Dot Dash started.
+2026-03-20 15:34:55 FalconService: all lanes cleared.
+2026-03-20 15:34:55 Dot Dash session entered.
+
+==============================================
+
+                start 
+
+                CONSOLE
+
+---      pixel_challenge_console_v18.2.2.py
+
+---------------------------------------------
+
+                GAME: 
+
+---      dot_dash_v8.py
+
+==============================================
+2026-03-20 15:47:29 Controller rescan: detected 4 joystick(s).
+2026-03-20 15:47:29 HostState -> IDLE: System ready.
+2026-03-20 15:47:29 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 15:48:09 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 15:48:09 Game selected: Dot Dash
+2026-03-20 15:48:09 FalconService: all lanes cleared.
+2026-03-20 15:48:09 AttractService: stopped.
+2026-03-20 15:48:12 Controller rescan: detected 4 joystick(s).
+2026-03-20 15:48:12 FalconService: all lanes cleared.
+2026-03-20 15:48:12 AttractService: stopped.
+2026-03-20 15:48:12 FalconService: all lanes cleared.
+2026-03-20 15:48:12 HostState -> CHECKIN_OPEN: Player check-in opened. Waiting for white-button enrollment.
+2026-03-20 15:48:14 Player 1 CHECKED IN via White Button.
+2026-03-20 15:48:15 Player 2 CHECKED IN via White Button.
+2026-03-20 15:48:19 Controller rescan: detected 4 joystick(s).
+2026-03-20 15:48:19 HostState -> PLAYERS_CONFIRMED: Confirmed 2 player(s).
+2026-03-20 15:48:19 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 15:48:19 Dot Dash: setup entered [stub].
+2026-03-20 15:48:23 Controller rescan: detected 4 joystick(s).
+2026-03-20 15:48:23 FalconService: all lanes cleared.
+2026-03-20 15:48:23 AttractService: stopped.
+2026-03-20 15:48:23 HostState -> GAME_RUNNING: Dot Dash started.
+2026-03-20 15:48:23 FalconService: all lanes cleared.
+2026-03-20 15:48:23 Dot Dash session entered.
+
+==============================================
+
+                start 
+
+                CONSOLE
+
+---      pixel_challenge_console_v18.2.2.py
+
+---------------------------------------------
+
+                GAME: 
+
+---      dot_dash_HARDWARE_TEST.py
+
+==============================================
+2026-03-20 16:18:12 Controller rescan: detected 4 joystick(s).
+2026-03-20 16:18:12 HostState -> IDLE: System ready.
+2026-03-20 16:18:12 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 16:18:26 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 16:18:26 Game selected: Dot Dash
+2026-03-20 16:18:26 FalconService: all lanes cleared.
+2026-03-20 16:18:26 AttractService: stopped.
+2026-03-20 16:18:33 Controller rescan: detected 4 joystick(s).
+2026-03-20 16:18:33 FalconService: all lanes cleared.
+2026-03-20 16:18:33 AttractService: stopped.
+2026-03-20 16:18:33 FalconService: all lanes cleared.
+2026-03-20 16:18:33 HostState -> CHECKIN_OPEN: Player check-in opened. Waiting for white-button enrollment.
+2026-03-20 16:18:35 Player 1 CHECKED IN via White Button.
+2026-03-20 16:18:36 Player 2 CHECKED IN via White Button.
+2026-03-20 16:18:37 Player 3 CHECKED IN via White Button.
+2026-03-20 16:18:38 Player 4 CHECKED IN via White Button.
+2026-03-20 16:18:43 Controller rescan: detected 4 joystick(s).
+2026-03-20 16:18:43 HostState -> PLAYERS_CONFIRMED: Confirmed 4 player(s).
+2026-03-20 16:18:43 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 16:18:43 Dot Dash: setup entered [stub].
+2026-03-20 16:18:57 Controller rescan: detected 4 joystick(s).
+2026-03-20 16:18:57 FalconService: all lanes cleared.
+2026-03-20 16:18:57 AttractService: stopped.
+2026-03-20 16:18:57 HostState -> GAME_RUNNING: Dot Dash started.
+2026-03-20 16:18:57 FalconService: all lanes cleared.
+2026-03-20 16:18:57 Dot Dash session entered.
+
+=== START v18.4.0_ToggleDebug ===
+16:53:03 Rescan: 4 devices found.
+16:53:04 System Ready. Debug Mode is OFF.
+16:53:12 Check-in OPEN. Press WHITE button to join.
+16:53:23 DEBUG MODE ON
+16:53:26 Check-in CLOSED.
+16:53:27 Check-in OPEN. Press WHITE button to join.
+16:53:33 Player 1 CHECKED IN.
+16:53:57 [DEBUG] FalconService: all lanes cleared.
+16:53:57 Game Stopped.
+16:54:09 Rescan: 4 devices found.
+16:54:09 [DEBUG]   Found: DragonRise Inc. Generic USB Joystick (ID 0)
+16:54:09 [DEBUG]   Found: DragonRise Inc. Generic USB Joystick (ID 1)
+16:54:09 [DEBUG]   Found: DragonRise Inc. Generic USB Joystick (ID 2)
+16:54:09 [DEBUG]   Found: DragonRise Inc. Generic USB Joystick (ID 3)
+16:54:13 --- MAPPING STARTED ---
+16:54:13 Player 1: Press WHITE
+
+=== START v18.4.0_ToggleDebug ===
+16:54:46 Rescan: 4 devices found.
+16:54:46 System Ready. Debug Mode is OFF.
+16:54:51 --- MAPPING STARTED ---
+16:54:51 Player 1: Press WHITE
+16:54:54 Mapped P1 WHITE -> Btn 4
+16:59:30 Assignments saved to disk.
+16:59:30 Mapping stopped.
+16:59:32 --- MAPPING STARTED ---
+16:59:32 Player 1: Press WHITE
+
+==============================================
+
+                start 
+
+                CONSOLE
+
+---      pixel_challenge_console_v19.0.0.py
+
+---------------------------------------------
+
+                GAME: 
+
+---      dot_dash_v20
+
+==============================================
+2026-03-20 18:03:19 Controller rescan: detected 4 joystick(s).
+2026-03-20 18:03:19   JS0: DragonRise Inc. Generic USB Joystick (12 buttons)
+2026-03-20 18:03:19   JS1: DragonRise Inc. Generic USB Joystick (12 buttons)
+2026-03-20 18:03:19   JS2: DragonRise Inc. Generic USB Joystick (12 buttons)
+2026-03-20 18:03:19   JS3: DragonRise Inc. Generic USB Joystick (12 buttons)
+2026-03-20 18:03:19 HostState -> IDLE: System ready.
+2026-03-20 18:03:19 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png
+2026-03-20 18:03:42 ViewerService: show splash -> /home/ledgame/easter_game/assets/dot_dash_splash.png
+2026-03-20 18:03:42 Game selected: Dot Dash
+2026-03-20 18:06:59 --- BUTTON MAPPING STARTED ---
+2026-03-20 18:06:59 PLAYER 1: Press the WHITE button.
+2026-03-20 18:06:59 ViewerService: show intro slide -> /home/ledgame/easter_game/assets/dot_dash_slide_1.png
+2026-03-20 18:07:00 Joystick poll error: Joystick not initialized
+
+==============================================
+
+                start 
+
+                CONSOLE
+
+---      pixel_challenge_console_v19.0.0.py
+
+---------------------------------------------
+
+                GAME: 
+
+---      dot_dash_v20
+
+==============================================
+2026-03-20 18:07:22 Controller rescan: detected 4 joystick(s).
+2026-03-20 18:07:22   JS0: DragonRise Inc. Generic USB Joystick (12 buttons)
+2026-03-20 18:07:22   JS1: DragonRise Inc. Generic USB Joystick (12 buttons)
+2026-03-20 18:07:22   JS2: DragonRise Inc. Generic USB Joystick (12 buttons)
+2026-03-20 18:07:22   JS3: DragonRise Inc. Generic USB Joystick (12 buttons)
+2026-03-20 18:07:23 HostState -> IDLE: System ready.
+2026-03-20 18:07:23 ViewerService: show splash -> /home/ledgame/easter_game/assets/pixel_challenge_splash_final.png

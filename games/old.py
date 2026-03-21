@@ -1,8 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Base classes and types for game modules.
-All game modules should inherit from these base classes.
-"""
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -12,7 +7,6 @@ from typing import Any, Protocol
 
 
 class GamePhase(str, Enum):
-    """Phases that a game session can be in."""
     SETUP = "setup"
     READY = "ready"
     COUNTDOWN = "countdown"
@@ -24,18 +18,16 @@ class GamePhase(str, Enum):
 
 @dataclass
 class PlayerConfig:
-    """Configuration for a player in a game session."""
     player_id: int
-    name: str = ""
-    lane_left_universe: int = 0
-    lane_right_universe: int = 0
-    button_a: str = ""
-    button_b: str = ""
+    name: str
+    lane_left_universe: int
+    lane_right_universe: int
+    button_a: str
+    button_b: str
 
 
 @dataclass
 class GameMeta:
-    """Metadata about a game module."""
     key: str
     title: str
     min_players: int
@@ -47,7 +39,6 @@ class GameMeta:
 
 @dataclass
 class GameResult:
-    """Result of a completed game session."""
     game_key: str
     completed: bool
     winner_player_id: int | None
@@ -56,7 +47,6 @@ class GameResult:
 
 
 class HostAPI(Protocol):
-    """Protocol defining the interface games use to interact with the host."""
     def now(self) -> float: ...
     def clear_all_pixels(self) -> None: ...
     def clear_player_lanes(self, player_id: int) -> None: ...
@@ -68,8 +58,6 @@ class HostAPI(Protocol):
 
 
 class GameSession(ABC):
-    """Abstract base class for game sessions."""
-
     def __init__(self, host: HostAPI, players: list[PlayerConfig], settings: dict[str, Any] | None = None):
         self.host = host
         self.players = players
@@ -85,8 +73,8 @@ class GameSession(ABC):
     @abstractmethod
     def tick(self, now_monotonic: float) -> None: ...
 
-    def get_viewer_state(self) -> dict[str, Any]:
-        return {}
+    @abstractmethod
+    def get_viewer_state(self) -> dict[str, Any]: ...
 
     @abstractmethod
     def is_complete(self) -> bool: ...
@@ -99,7 +87,6 @@ class GameSession(ABC):
 
 
 class GameModule(ABC):
-    """Abstract base class for game modules."""
     META: GameMeta
 
     @abstractmethod

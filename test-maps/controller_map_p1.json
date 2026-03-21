@@ -1,0 +1,19 @@
+{
+  "device": "js0",
+  "name": "DragonRise Inc. Generic USB Joystick",
+  "buttons": {
+    "RED": 0,
+    "GREEN": 1,
+    "BLUE": 2,
+    "ORANGE": 3,
+    "WHITE": 4
+  },
+  "joystick": {
+    "type": "axes",
+    "x_axis": 0,
+    "y_axis": 1,
+    "deadzone": 0.25,
+    "left_is_negative": true,
+    "up_is_negative": true
+  }
+}
