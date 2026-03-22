@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Dot Dash Game Module v21
+Dot Dash Game Module v21.6
 Players select 2 colors using their controller buttons, then alternate 
 pressing those two colors to:
 1. Move a dot outbound on the left lane (one pixel per correct press)
@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Tuple
 
 from games.base import GameMeta, GameModule, GamePhase, GameResult, GameSession, PlayerConfig
 
-VERSION_LABEL = "dot_dash_v21"
+VERSION_LABEL = "dot_dash_v21.6"
 
 # Type alias for RGB colors
 Color = Tuple[int, int, int]
@@ -46,13 +46,11 @@ DEFAULT_CONFIG = {
     "lane_pixel_count": 100,
     "dash_length": 3,
     "round_timeout_sec": 30,
-    "finish_blink_duration_sec": 4.0,
-    "countdown_blink_half_period_sec": 0.5,
-    "finish_blink_half_period_sec": 0.25,
-    "auto_start_when_colors_ready": True,
+    "finish_blink_duration_sec": 5.0,       # Winner blinks green for 5 seconds
+    "finish_blink_half_period_sec": 0.25,   # 500ms cycle (250ms on/off)
+    "auto_start_when_colors_ready": False,  # Console controls countdown now
     "brightness": {
         "setup": 0.5,
-        "countdown": 0.8,
         "gameplay": 1.0,
         "finish": 1.0,
     },
@@ -138,10 +136,12 @@ class DotDashSession(GameSession):
         self.dash_length = int(config["dash_length"])
         self.round_timeout_sec = float(config["round_timeout_sec"])
         self.finish_blink_duration_sec = float(config["finish_blink_duration_sec"])
-        self.countdown_blink_half_period_sec = float(config["countdown_blink_half_period_sec"])
         self.finish_blink_half_period_sec = float(config["finish_blink_half_period_sec"])
         self.auto_start_when_colors_ready = bool(config["auto_start_when_colors_ready"])
         self.brightness = config["brightness"]
+        
+        # Track if console signaled to start
+        self.console_signaled_start = False
 
         # Player state - keyed by player_id
         self.state: Dict[int, DotDashPlayerState] = {
@@ -150,13 +150,12 @@ class DotDashSession(GameSession):
 
         # Session timing
         self.ready_started_at: float | None = None
-        self.countdown_started_at: float | None = None
         self.completed_at: float | None = None
         self.round_deadline: float | None = None
         self.first_finisher_id: int | None = None
-
-        # Track last countdown number announced (to avoid repeat sounds)
-        self.last_countdown_announced: int = -1
+        
+        # Track when all players finished - for solid red display then winner blink
+        self.all_finished_at: float | None = None
 
     def on_enter(self) -> None:
         """Initialize the game session - called when game starts."""
@@ -168,7 +167,7 @@ class DotDashSession(GameSession):
             ps.selected_colors = []
             ps.setup_complete = False
         
-        self.host.log("=== DOT DASH v21 ===")
+        self.host.log("=== DOT DASH v21.6 ===")
         self.host.log(f"Players: {[p.player_id for p in self.players]}")
         self.host.log("Waiting for players to select 2 colors each...")
         self.host.log("Press any colored button to select that color.")
@@ -202,9 +201,12 @@ class DotDashSession(GameSession):
         # Route input based on current game phase
         if self.phase == GamePhase.SETUP:
             self._handle_setup_input(ps, color_name)
+        elif self.phase == GamePhase.READY:
+            # Ignore inputs during READY - waiting for console countdown
+            pass
         elif self.phase == GamePhase.RUNNING:
             self._handle_gameplay_input(ps, color_name)
-        # Ignore input during READY, COUNTDOWN, ROUND_COMPLETE, COMPLETE phases
+        # Ignore input during ROUND_COMPLETE, COMPLETE phases
 
     def _parse_color_from_action(self, action: str) -> str | None:
         """
@@ -234,10 +236,8 @@ class DotDashSession(GameSession):
             self.host.log(f"[SETUP] P{ps.player_id} unknown color: {color_name}")
             return
 
-        # Don't allow selecting WHITE during setup (reserved for check-in)
-        if color_name == "WHITE":
-            self.host.log(f"[SETUP] P{ps.player_id} WHITE not allowed for color selection")
-            return
+        # WHITE is now allowed as a valid color choice during setup
+        # (check-in is handled by console before game starts)
 
         # Only add if not already selected by this player
         if color_name not in ps.selected_colors:
@@ -332,21 +332,25 @@ class DotDashSession(GameSession):
         """Check if all players have completed color selection."""
         all_ready = all(ps.setup_complete for ps in self.state.values())
         
-        if all_ready and self.auto_start_when_colors_ready:
+        if all_ready and self.phase == GamePhase.SETUP:
             self.phase = GamePhase.READY
             self.ready_started_at = self.host.now()
             
             for ps in self.state.values():
                 ps.phase = "ready"
             
-            self.host.log("[GAME] All players ready! Starting countdown sequence...")
+            self.host.log("[GAME] All players ready! Notifying console...")
             self.host.play_sound("all_ready")
+            
+            # Notify console that setup is complete - console owns the 4-second hold and countdown
+            if hasattr(self.host, 'on_game_setup_complete'):
+                self.host.on_game_setup_complete()
 
     def _finish_player(self, ps: DotDashPlayerState, now: float) -> None:
-        """Mark a player as finished."""
+        """Mark a player as finished - lanes go solid red immediately."""
         ps.phase = "finished"
         ps.finished_at = now
-        ps.finish_blink_until = now + self.finish_blink_duration_sec
+        # Don't set blink timer yet - solid red first until all complete
 
         completion_time = now - ps.armed_at if ps.armed_at else 0
 
@@ -367,44 +371,12 @@ class DotDashSession(GameSession):
             self._render_lights()
             return
 
-        # READY -> COUNTDOWN transition (brief pause before countdown)
+        # READY phase - waiting for console to signal start after 4-second hold + countdown
         if self.phase == GamePhase.READY:
-            if self.ready_started_at and (now_monotonic - self.ready_started_at) > 1.5:
-                self.phase = GamePhase.COUNTDOWN
-                self.countdown_started_at = now_monotonic
-                self.last_countdown_announced = -1
-                
-                for ps in self.state.values():
-                    ps.phase = "countdown"
-                
-                self.host.log("[COUNTDOWN] 3...")
-                self.host.play_sound("countdown_3")
-                
+            # Console will call signal_start() when countdown completes
+            # Keep rendering the selected colors during this time
             self._render_lights()
             self._update_viewer()
-            return
-
-        # COUNTDOWN phase
-        if self.phase == GamePhase.COUNTDOWN:
-            elapsed = now_monotonic - self.countdown_started_at
-            remaining = self.countdown_seconds - int(elapsed)
-
-            # Announce countdown numbers (only once each)
-            if remaining == 2 and self.last_countdown_announced != 2:
-                self.last_countdown_announced = 2
-                self.host.log("[COUNTDOWN] 2...")
-                self.host.play_sound("countdown_2")
-            elif remaining == 1 and self.last_countdown_announced != 1:
-                self.last_countdown_announced = 1
-                self.host.log("[COUNTDOWN] 1...")
-                self.host.play_sound("countdown_1")
-
-            # Check if countdown complete
-            if elapsed >= self.countdown_seconds:
-                self._start_round(now_monotonic)
-            else:
-                self._render_lights()
-                self._update_viewer()
             return
 
         # RUNNING phase
@@ -412,30 +384,52 @@ class DotDashSession(GameSession):
             self._check_timeout(now_monotonic)
             self._render_lights()
 
-            # Check if all players finished and blink animations complete
-            if self._all_finished() and self._all_blinks_done(now_monotonic):
-                self.phase = GamePhase.ROUND_COMPLETE
-                self.completed_at = now_monotonic
-                self.host.play_sound("round_complete")
-                self.host.log("[GAME] Round complete!")
+            # Check if all players finished
+            if self._all_finished():
+                # First time all finished - record time and start winner blink
+                if self.all_finished_at is None:
+                    self.all_finished_at = now_monotonic
+                    self.host.log("[GAME] All players finished - winner blink starting")
+                    # Set up blink timer for winner only
+                    for ps in self.state.values():
+                        if ps.first_finisher:
+                            ps.finish_blink_until = now_monotonic + self.finish_blink_duration_sec
+                            self.host.log(f"[GAME] P{ps.player_id} winner blink for {self.finish_blink_duration_sec}s")
+                
+                # Check if winner blink complete
+                if self._winner_blink_done(now_monotonic):
+                    self.phase = GamePhase.ROUND_COMPLETE
+                    self.completed_at = now_monotonic
+                    self.host.play_sound("round_complete")
+                    self.host.log("[GAME] Round complete!")
                 
             self._update_viewer()
             return
 
         # ROUND_COMPLETE -> COMPLETE transition
         if self.phase == GamePhase.ROUND_COMPLETE:
-            if self.completed_at and (now_monotonic - self.completed_at) > 3.0:
+            if self.completed_at and (now_monotonic - self.completed_at) > 0.5:
                 self.phase = GamePhase.COMPLETE
                 self.host.log("[GAME] Session complete.")
             return
 
+    def signal_start(self) -> None:
+        """Called by console when countdown completes - start actual gameplay."""
+        if self.phase != GamePhase.READY:
+            self.host.log(f"[GAME] signal_start called but phase is {self.phase}, ignoring")
+            return
+        
+        self.console_signaled_start = True
+        self._start_round(self.host.now())
+
     def _start_round(self, now: float) -> None:
-        """Start the active gameplay round."""
+        """Start the active gameplay round - called by console after countdown."""
         self.phase = GamePhase.RUNNING
         self.round_deadline = now + self.round_timeout_sec
+        self.all_finished_at = None  # Reset
 
         self.host.log("[GAME] GO! GO! GO!")
-        self.host.play_sound("go")
+        # Console handles GO sound/display
 
         for ps in self.state.values():
             ps.phase = "armed"
@@ -448,6 +442,7 @@ class DotDashSession(GameSession):
             ps.valid_presses = 0
             ps.total_presses = 0
             ps.reaction_intervals = []
+            ps.finish_blink_until = None  # Reset blink timer
 
         self._render_lights()
         self._update_viewer()
@@ -460,7 +455,6 @@ class DotDashSession(GameSession):
                     ps.phase = "finished"
                     ps.timed_out = True
                     ps.finished_at = self.round_deadline
-                    ps.finish_blink_until = now + self.finish_blink_duration_sec
                     self.host.log(f"[GAME] P{ps.player_id} TIMED OUT!")
             self.host.play_sound("timeout")
 
@@ -468,11 +462,12 @@ class DotDashSession(GameSession):
         """Check if all players have finished."""
         return all(ps.is_finished() for ps in self.state.values())
 
-    def _all_blinks_done(self, now: float) -> bool:
-        """Check if all finish blink animations are complete."""
+    def _winner_blink_done(self, now: float) -> bool:
+        """Check if winner's blink animation is complete."""
         for ps in self.state.values():
-            if ps.finish_blink_until and now < ps.finish_blink_until:
-                return False
+            if ps.first_finisher and ps.finish_blink_until:
+                if now < ps.finish_blink_until:
+                    return False
         return True
 
     # -----------------------------------------------------------------------
@@ -482,11 +477,20 @@ class DotDashSession(GameSession):
         """Render LED lights for all players based on current state."""
         now = self.host.now()
         
+        # Get list of active player IDs (only players in this game session)
+        active_player_ids = set(self.state.keys())
+        
+        # Clear non-playing player lanes (players 1-4 not in this session)
+        for pid in range(1, 5):
+            if pid not in active_player_ids:
+                self.host.set_player_lane_pixels(pid, "left", [BLACK] * self.lane_pixel_count)
+                self.host.set_player_lane_pixels(pid, "right", [BLACK] * self.lane_pixel_count)
+        
         for pid, ps in self.state.items():
             left = [BLACK] * self.lane_pixel_count
             right = [BLACK] * self.lane_pixel_count
             
-            # SETUP: Show selected colors on left/right lanes
+            # SETUP/READY: Show selected colors on left/right lanes
             if self.phase == GamePhase.SETUP or self.phase == GamePhase.READY:
                 c1 = ps.get_color_rgb(0)
                 c2 = ps.get_color_rgb(1)
@@ -494,17 +498,7 @@ class DotDashSession(GameSession):
                 left = [self._scale(c1, self.brightness["setup"])] * self.lane_pixel_count
                 right = [self._scale(c2, self.brightness["setup"])] * self.lane_pixel_count
 
-            # COUNTDOWN: Red blink
-            elif self.phase == GamePhase.COUNTDOWN:
-                elapsed = now - self.countdown_started_at if self.countdown_started_at else 0
-                is_beat = int(elapsed / self.countdown_blink_half_period_sec) % 2 == 0
-                
-                c = FULL_RED if is_beat else BLACK
-                c = self._scale(c, self.brightness["countdown"])
-                left = [c] * self.lane_pixel_count
-                right = [c] * self.lane_pixel_count
-
-            # GAMEPLAY
+            # GAMEPLAY (console handles countdown lights now)
             elif self.phase == GamePhase.RUNNING:
                 c1 = ps.get_color_rgb(0)
                 c2 = ps.get_color_rgb(1)
@@ -516,18 +510,21 @@ class DotDashSession(GameSession):
                     active_color = c1  # We just pressed color 1, now expecting color 2
                 
                 if ps.phase == "armed":
-                    # Green light for GO
+                    # Green light for GO - waiting for first button press
                     g = self._scale(FULL_GREEN, self.brightness["gameplay"])
                     left = [g] * self.lane_pixel_count
                     right = [g] * self.lane_pixel_count
                 
                 elif ps.phase == "outbound":
-                    # Single dot moving outward
+                    # Single dot moving outward on BLACK background
+                    # left and right start as BLACK (initialized above)
                     idx = min(ps.outbound_index, self.lane_pixel_count - 1)
                     left[idx] = self._scale(active_color, self.brightness["gameplay"])
+                    # right lane stays BLACK
                     
                 elif ps.phase == "return":
-                    # Dash moving back
+                    # Dash moving back on BLACK background
+                    # left stays BLACK, right has the dash
                     head = max(-5, min(ps.return_head_index, self.lane_pixel_count - 1))
                     dash_c = self._scale(active_color, self.brightness["gameplay"])
                     for i in range(self.dash_length):
@@ -536,13 +533,15 @@ class DotDashSession(GameSession):
                             right[px] = dash_c
                 
                 elif ps.phase == "finished":
-                    # Blink effect for finished players
-                    is_beat = int(now / self.finish_blink_half_period_sec) % 2 == 0
-                    if ps.timed_out:
-                        c = FULL_RED if is_beat else BLACK
-                    else:
+                    # Finished players: solid red OR winner blinks green
+                    if ps.first_finisher and ps.finish_blink_until and now < ps.finish_blink_until:
+                        # Winner gets blinking green (500ms cycle = 250ms half period)
+                        is_beat = int(now / self.finish_blink_half_period_sec) % 2 == 0
                         c = FULL_GREEN if is_beat else BLACK
-                    c = self._scale(c, self.brightness["finish"])
+                        c = self._scale(c, self.brightness["finish"])
+                    else:
+                        # Non-winners and timed-out players show solid red
+                        c = self._scale(FULL_RED, self.brightness["finish"])
                     left = [c] * self.lane_pixel_count
                     right = [c] * self.lane_pixel_count
 
@@ -563,10 +562,6 @@ class DotDashSession(GameSession):
             payload["instruction"] = "SELECT 2 COLORS"
         elif self.phase == GamePhase.READY:
             payload["instruction"] = "GET READY!"
-        elif self.phase == GamePhase.COUNTDOWN:
-            elapsed = self.host.now() - self.countdown_started_at if self.countdown_started_at else 0
-            remaining = max(1, self.countdown_seconds - int(elapsed))
-            payload["instruction"] = str(remaining)
         elif self.phase == GamePhase.RUNNING:
             payload["instruction"] = "GO!"
         elif self.phase == GamePhase.ROUND_COMPLETE:

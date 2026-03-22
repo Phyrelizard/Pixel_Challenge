@@ -71,6 +71,22 @@ class GameManager:
             except Exception as e:
                 self.host.log(f"GameManager: Input error: {e}")
 
+    def signal_start(self):
+        """Signal the game to transition from READY to RUNNING (called after console countdown)."""
+        if self.current_session and hasattr(self.current_session, 'signal_start'):
+            try:
+                self.current_session.signal_start()
+            except Exception as e:
+                self.host.log(f"GameManager: signal_start error: {e}")
+
+    def signal_start(self):
+        """Signal the game to transition from READY to RUNNING (called after console countdown)."""
+        if self.current_session and hasattr(self.current_session, 'signal_start'):
+            try:
+                self.current_session.signal_start()
+            except Exception as e:
+                self.host.log(f"GameManager: signal_start error: {e}")
+
     def tick(self):
         """Called periodically to update the game state."""
         if self.current_session:
