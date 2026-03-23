@@ -1,82 +1,79 @@
 {
-    "game_duration_sec": 60,
-    "lives_enabled": false,
-    "lives_count": 3,
-    
-    "lanes": {
-        "left": {
-            "snake_speed_ms": 800,
-            "band_count_min": 4,
-            "band_count_max": 6,
-            "band_size_mode": "varied"
-        },
-        "right": {
-            "snake_speed_ms": 600,
-            "band_count_min": 2,
-            "band_count_max": 3,
-            "band_size_mode": "fixed",
-            "band_size_fixed_px": 5
-        }
+  "game_duration_sec": 60,
+  "lives_enabled": false,
+  "lives_count": 3,
+  "lanes": {
+    "left": {
+      "snake_speed_ms": 1800,
+      "band_count_min": 4,
+      "band_count_max": 6,
+      "band_size_mode": "varied"
     },
-    
-    "snake": {
-        "start_length": 20,
-        "growth_on_wrong_hit": 2,
-        "speed_ramp_enabled": true,
-        "speed_ramp_per_band_cleared_ms": -15,
-        "min_speed_ms": 200,
-        "respawn_delay_ms": 1000
-    },
-    
-    "bands": {
-        "color_sizes": {
-            "white": 3,
-            "orange": 4,
-            "red": 5,
-            "green": 6,
-            "blue": 7
-        },
-        "colors_enabled": ["white", "orange", "red", "green", "blue"]
-    },
-    
-    "projectile": {
-        "speed_base_ms_per_pixel": 8,
-        "sla_speed_adjustment_enabled": true,
-        "sla_speed_factor": 0.5
-    },
-    
-    "visuals": {
-        "head_brightness_boost": 1.5,
-        "selected_lane_glow_pixels": 5,
-        "selected_lane_glow_color": "white",
-        "projectile_color": "white",
-        "projectile_length_pixels": 2
-    },
-    
-    "scoring": {
-        "correct_hit": 10,
-        "wrong_hit_penalty": -5,
-        "snake_reached_end_penalty": -50,
-        "lane_clear_bonus": 25,
-        "bonus_round_points_per_hit": 20,
-        "bonus_round_duration_sec": 5
-    },
-    
-    "sla_scaling": {
-        "enabled": true,
-        "snake_speed_per_sla_point_ms": 20,
-        "band_distribution_bias": true
-    },
-    
-    "audio": {
-        "music_enabled": true,
-        "music_volume": 0.5,
-        "sfx_volume": 0.8
-    },
-    
-    "color_jam": {
-        "enabled": false,
-        "flash_interval_ms": 200,
-        "flash_count": 4
+    "right": {
+      "snake_speed_ms": 600,
+      "band_count_min": 2,
+      "band_count_max": 3,
+      "band_size_mode": "fixed",
+      "band_size_fixed_px": 5
     }
+  },
+  "snake": {
+    "start_length": 20,
+    "growth_on_wrong_hit": 2,
+    "speed_ramp_enabled": true,
+    "speed_ramp_per_band_cleared_ms": -15,
+    "min_speed_ms": 200,
+    "respawn_delay_ms": 1000
+  },
+  "bands": {
+    "color_sizes": {
+      "white": 3,
+      "orange": 4,
+      "red": 5,
+      "green": 6,
+      "blue": 7
+    },
+    "colors_enabled": [
+      "white",
+      "orange",
+      "red",
+      "green",
+      "blue"
+    ]
+  },
+  "projectile": {
+    "speed_base_ms_per_pixel": 8,
+    "sla_speed_adjustment_enabled": true,
+    "sla_speed_factor": 0.5
+  },
+  "visuals": {
+    "head_brightness_boost": 1.5,
+    "selected_lane_glow_pixels": 5,
+    "selected_lane_glow_color": "white",
+    "projectile_color": "white",
+    "projectile_length_pixels": 2
+  },
+  "scoring": {
+    "correct_hit": 10,
+    "wrong_hit_penalty": -5,
+    "snake_reached_end_penalty": -50,
+    "lane_clear_bonus": 25,
+    "bonus_round_points_per_hit": 20,
+    "bonus_round_duration_sec": 5
+  },
+  "sla_scaling": {
+    "enabled": true,
+    "snake_speed_per_sla_point_ms": 20,
+    "band_distribution_bias": true
+  },
+  "audio": {
+    "music_enabled": true,
+    "music_volume": 0.5,
+    "sfx_volume": 0.8
+  },
+  "color_jam": {
+    "enabled": false,
+    "flash_interval_ms": 200,
+    "flash_count": 4
+  }
 }

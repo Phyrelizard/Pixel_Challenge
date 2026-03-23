@@ -1,6 +1,6 @@
 {
   "auto_enabled": true,
-  "animate_enabled": false,
+  "animate_enabled": true,
   "cycle_seconds": 20,
   "per_theme_speed": {
     "Fire Burst": 9,
@@ -15,14 +15,14 @@
     "Lane Chase RL": 8
   },
   "selected_themes": [
-    "Team Colors",
-    "Bounce Chase"
+    "Bounce Chase",
+    "Team Colors"
   ],
-  "sash_left_attract_bottom": 840,
+  "sash_left_attract_bottom": 860,
   "sash_center_ctrl": 677,
   "sash_main_info": 540,
   "sash_bottom_log": 51,
-  "falcon_brightness": 10,
+  "falcon_brightness": 20,
   "gameplay_brightness": 19,
   "falcon_ip": "192.168.2.113",
   "wifi_ssid": "",
