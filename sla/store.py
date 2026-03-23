@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from .calculator import calculate_dot_dash_sla, calculate_average_sla, DEFAULT_SLA
+from .calculator import calculate_dot_dash_sla, calculate_pixel_pop_sla, calculate_average_sla, DEFAULT_SLA
 from .calibration import SLACalibration
 
 
@@ -41,12 +41,18 @@ class PlayerSessionSLA:
         Returns: New SLA value
         """
         # Calculate SLA for this game
+        # Calculate SLA for this game
         if game_key == "dot_dash":
             game_sla = calculate_dot_dash_sla(
                 metrics,
                 calibration=calibration,
                 accuracy_weight=config.get("accuracy_weight", 0.60),
                 reaction_weight=config.get("reaction_weight", 0.40),
+            )
+        elif game_key == "pixel_pop":
+            game_sla = calculate_pixel_pop_sla(
+                metrics,
+                calibration=calibration,
             )
         else:
             # Future games can add their own calculators

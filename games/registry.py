@@ -1,22 +1,44 @@
 # -*- coding: utf-8 -*-
 """
-Game Registry - Builds and returns the dictionary of available game modules.
+Game Registry - Central registration of all game modules.
 """
-from games.dot_dash.dot_dash import DotDashModule
+from __future__ import annotations
 
 
-def build_game_registry():
+def build_game_registry() -> dict:
     """
-    Build and return a registry of all available game modules.
+    Build and return the registry of all available game modules.
     
     Returns:
-        dict mapping game_key -> GameModule instance
+        Dictionary mapping game_key -> GameModule instance
     """
-    modules = [
-        DotDashModule(),
-        # Add more game modules here as they're developed:
-        # PixelPopModule(),
-        # SurroundModule(),
-        # AscendModule(),
-    ]
-    return {module.META.key: module for module in modules}
+    registry = {}
+    
+    # Import and register Dot Dash
+    try:
+        from games.dot_dash import DotDashModule
+        registry["dot_dash"] = DotDashModule()
+    except ImportError as e:
+        print(f"[REGISTRY] Failed to load dot_dash: {e}")
+    
+    # Import and register Pixel Pop
+    try:
+        from games.pixel_pop import PixelPopModule
+        registry["pixel_pop"] = PixelPopModule()
+    except ImportError as e:
+        print(f"[REGISTRY] Failed to load pixel_pop: {e}")
+    
+    # Future games:
+    # try:
+    #     from games.surround import SurroundModule
+    #     registry["surround"] = SurroundModule()
+    # except ImportError as e:
+    #     print(f"[REGISTRY] Failed to load surround: {e}")
+    
+    # try:
+    #     from games.ascend import AscendModule
+    #     registry["ascend"] = AscendModule()
+    # except ImportError as e:
+    #     print(f"[REGISTRY] Failed to load ascend: {e}")
+    
+    return registry
