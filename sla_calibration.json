@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "dot_dash": {
+    "sample_count": 6,
+    "last_calibrated": 0,
+    "reaction_times_ms": [
+      556.0,
+      494.0,
+      523.0,
+      426.0,
+      494.0,
+      319.0
+    ],
+    "accuracies": [
+      0.93,
+      0.88,
+      0.99,
+      1.0,
+      0.95,
+      1.0
+    ],
+    "thresholds": {
+      "reaction_expert_ms": 150,
+      "reaction_beginner_ms": 600,
+      "accuracy_expert": 1.0,
+      "accuracy_beginner": 0.3
+    },
+    "defaults": {
+      "reaction_expert_ms": 150,
+      "reaction_beginner_ms": 600,
+      "accuracy_expert": 1.0,
+      "accuracy_beginner": 0.3
+    }
+  }
+}

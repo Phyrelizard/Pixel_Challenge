@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "sessions": [
+    {
+      "session_id": "2026-03-23_00-23-53",
+      "timestamp": 1774251086.9215605,
+      "players": {
+        "1": {
+          "games_played": 1,
+          "final_sla": 8,
+          "samples": [
+            {
+              "game_key": "dot_dash",
+              "timestamp": 1774251150.212412,
+              "metrics": {
+                "accuracy": 1.0,
+                "reaction_time_sec": 0.426,
+                "completion_time_sec": 26.388,
+                "score": 10350
+              },
+              "calculated_sla": 8
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

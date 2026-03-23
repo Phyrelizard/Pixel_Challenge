@@ -643,6 +643,10 @@ class DotDashSession(GameSession):
                 "first_finisher": ps.first_finisher,
             }
             
+            # === SLA: Save result for skill assessment (v21.8.0) ===
+            # This feeds the calibration system and updates player SLA
+            self.host.save_sla_result(pid, "dot_dash", player_results[pid])
+            
         return GameResult(
             game_key="dot_dash",
             completed=True,
@@ -650,7 +654,7 @@ class DotDashSession(GameSession):
             player_results=player_results,
             viewer_payload={"screen": "results"}
         )
-
+    
     def on_exit(self) -> None:
         """Clean up when game session ends."""
         self.host.clear_all_pixels()
@@ -665,7 +669,7 @@ class DotDashModule(GameModule):
         min_players=1,
         max_players=4,
         requires_color_selection=True,
-        supports_sla=False,
+        supports_sla=True,  # SLA enabled in v21.8.0
         description="Select 2 colors, then alternate buttons to race your dot!"
     )
 
