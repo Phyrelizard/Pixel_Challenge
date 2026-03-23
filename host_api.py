@@ -103,24 +103,3 @@ class ConsoleHostAPI:
             def get(self):
                 return False
         return MockVar()
-
-    def on_game_setup_complete(self) -> None:
-        """Called by game when setup phase is complete (e.g., all players selected colors)."""
-        try:
-            if hasattr(self.console, 'on_game_setup_complete'):
-                self.console.on_game_setup_complete()
-            else:
-                self.log("Warning: Console missing on_game_setup_complete callback")
-        except Exception as e:
-            self.log(f"on_game_setup_complete error: {e}")
-
-    @property
-    def debug_logging(self):
-        """Expose console's debug_logging setting to games."""
-        if hasattr(self.console, 'debug_logging'):
-            return self.console.debug_logging
-        # Return a mock object that always returns False
-        class MockVar:
-            def get(self):
-                return False
-        return MockVar()

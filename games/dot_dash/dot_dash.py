@@ -50,7 +50,7 @@ DEFAULT_CONFIG = {
     "finish_blink_half_period_sec": 0.25,   # 500ms cycle (250ms on/off)
     "auto_start_when_colors_ready": False,  # Console controls countdown now
     "brightness": {
-        "setup": 0.5,
+        "setup": 1.0,      # Full brightness - console controls actual brightness via gameplay_brightness_percent
         "gameplay": 1.0,
         "finish": 1.0,
     },

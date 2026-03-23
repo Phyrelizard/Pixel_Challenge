@@ -15,15 +15,15 @@
     "Lane Chase RL": 8
   },
   "selected_themes": [
-    "Bounce Chase",
-    "Team Colors"
+    "Team Colors",
+    "Bounce Chase"
   ],
-  "sash_left_attract_bottom": 876,
+  "sash_left_attract_bottom": 726,
   "sash_center_ctrl": 677,
   "sash_main_info": 540,
   "sash_bottom_log": 51,
-  "falcon_brightness": 9,
-  "gameplay_brightness": 27,
+  "falcon_brightness": 17,
+  "gameplay_brightness": 19,
   "falcon_ip": "192.168.2.113",
   "wifi_ssid": "",
   "wifi_psk": "",
@@ -37,6 +37,6 @@
   "auto_start": true,
   "backup_restore": true,
   "apply_reboot": true,
-  "debug_logging": true,
+  "debug_logging": false,
   "setup_geometry": "900x714+2432+74"
 }

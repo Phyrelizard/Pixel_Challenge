@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v21.6.0
+Pixel Challenge Host Console v21.7.0
 
 """
 import os
@@ -23,7 +23,7 @@ from host_api import ConsoleHostAPI
 from game_manager import GameManager
 from games.base import PlayerConfig
 
-VERSION_LABEL = "v21.6.0"
+VERSION_LABEL = "v21.7.0"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 DEFAULT_FALCON_IP = "192.168.2.113"
@@ -536,7 +536,7 @@ class PixelChallengeConsole:
         self.config_text = None
         self.falcon_console_proc = None
 
-        self.log_file = f"/home/ledgame/easter_game/log_{time.strftime('%Y%m%d')}.txt"
+        self.log_file = f"/home/ledgame/easter_game/log_{time.strftime('%Y%m%d')}.log"
         self.viewer_state_file = "/home/ledgame/easter_game/viewer_state.json"
 
         self.state_var = tk.StringVar(value=f"STATE: {self.host_state.name}")
@@ -746,7 +746,8 @@ class PixelChallengeConsole:
         self.falcon.send_lane_pixels(player_id, lane, pixels)
 
     def apply_brightness_for_state(self):
-        if self.host_state == HostState.GAME_RUNNING:
+        # Use gameplay brightness for all game-related states (setup, countdown, running)
+        if self.host_state in (HostState.GAME_SETUP, HostState.COUNTDOWN, HostState.GAME_RUNNING):
             self.falcon.set_brightness(int(self.gameplay_brightness_percent.get()))
         else:
             self.falcon.set_brightness(int(self.theme_brightness_percent.get()))
@@ -1270,7 +1271,7 @@ class PixelChallengeConsole:
         self.run_countdown_step()
 
     def run_countdown_step(self):
-        """Execute one step of the countdown with red-red-yellow-green sequence"""
+        """Execute one step of the countdown with red-red-yellow sequence, then game handles green"""
         if self.countdown_value > 0:
             # Show number on viewer
             self.viewer.show_countdown(self.countdown_value)
@@ -1284,13 +1285,16 @@ class PixelChallengeConsole:
             self.countdown_value -= 1
             self.countdown_after_id = self.root.after(1000, self.run_countdown_step)
         elif self.countdown_value == 0:
-            # Show GO! - green light
+            # Show GO! on screen but DON'T flash green on lanes
+            # The game module will show green when it enters "armed" state
             self.viewer.show_countdown(0)  # 0 means "GO"
             self.log("COUNTDOWN: GO!")
-            self.falcon.flash_all_lanes("green")
+            # Clear lanes - game will immediately set them to green via armed state
+            self.falcon.clear_all_lanes(None)
             
             self.countdown_value = -1
-            self.countdown_after_id = self.root.after(500, self.run_countdown_step)
+            # Short delay then start game (game will render green immediately)
+            self.countdown_after_id = self.root.after(50, self.run_countdown_step)
         else:
             # Countdown complete - start the actual game
             self.countdown_after_id = None
