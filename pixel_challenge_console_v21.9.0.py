@@ -1512,8 +1512,25 @@ class PixelChallengeConsole:
         self.pending_players = players
         
         # Enter GAME_SETUP state - show color selection screen
-        self.set_state(HostState.GAME_SETUP, "Waiting for player color selection")
-        self.viewer.show_select_colors()
+        # Check if game requires color selection
+        game_meta = self.game_manager.registry.get(game_key)
+        requires_color_selection = True  # Default to true for safety
+        if game_meta and hasattr(game_meta, 'META'):
+            requires_color_selection = game_meta.META.requires_color_selection
+        
+        if requires_color_selection:
+            # Enter GAME_SETUP state - show color selection screen
+            self.set_state(HostState.GAME_SETUP, "Waiting for player color selection")
+            self.viewer.show_select_colors()
+        else:
+            # Skip color selection - show "get ready" or game-specific screen
+            self.set_state(HostState.GAME_SETUP, "Get ready!")
+            # Try to show game-specific ready screen, fallback to game splash
+            ready_image = f"{ASSETS_DIR}/{game_key}_ready.png"
+            if os.path.exists(ready_image):
+                self.viewer.show_image(ready_image)
+            else:
+                self.show_selected_game_splash()
         
         # Start game in SETUP phase (game handles color selection)
         success = self.game_manager.start_game(game_key, players)

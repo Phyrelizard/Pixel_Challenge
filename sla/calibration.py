@@ -1,196 +1,296 @@
 # -*- coding: utf-8 -*-
 """
-SLA Calculator - Converts game metrics to skill level scores.
-Uses calibrated thresholds when available for accurate assessment.
+SLA Calibration - Self-learning threshold adjustment.
+Observes actual player performance and adjusts expert/beginner 
+boundaries to create meaningful SLA distribution.
 """
 from __future__ import annotations
 
-from typing import Any, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from .calibration import SLACalibration
-
-
-DEFAULT_SLA = 5  # Middle of 1-10 scale
+import json
+import os
+import time
+from typing import Any
 
 
-def calculate_dot_dash_sla(
-    metrics: dict[str, Any],
-    calibration: "SLACalibration | None" = None,
-    accuracy_weight: float = 0.60,
-    reaction_weight: float = 0.40,
-) -> int:
-    """
-    Calculate SLA (1-10) from Dot Dash game metrics.
+class SLACalibration:
+    """Self-learning calibration for SLA thresholds."""
     
-    Uses calibrated thresholds if available, otherwise falls back to defaults.
+    CALIBRATION_FILE = "sla_calibration.json"
     
-    Args:
-        metrics: Game result metrics containing 'accuracy' and 'reaction_time_sec'
-        calibration: Optional SLACalibration instance for dynamic thresholds
-        accuracy_weight: Weight for accuracy in final score (default 0.60)
-        reaction_weight: Weight for reaction time in final score (default 0.40)
+    def __init__(self, calibration_file: str | None = None):
+        if calibration_file:
+            self.calibration_file = calibration_file
+        else:
+            self.calibration_file = self.CALIBRATION_FILE
+        
+        self.config = {
+            "enabled": True,
+            "min_samples_for_calibration": 20,
+            "percentile_expert": 10,
+            "percentile_beginner": 90,
+            "recalibrate_interval": 10,
+            "max_samples_stored": 500,
+        }
+        
+        self.data = self._load()
     
-    Returns:
-        Integer SLA score from 1 (beginner) to 10 (expert)
-    """
-    # Get thresholds (calibrated or default)
-    if calibration:
-        thresholds = calibration.get_thresholds("dot_dash")
-    else:
-        thresholds = {
-            "reaction_expert_ms": 150,
-            "reaction_beginner_ms": 600,
-            "accuracy_expert": 1.0,
-            "accuracy_beginner": 0.3,
+    def _load(self) -> dict:
+        """Load calibration data from file."""
+        if os.path.exists(self.calibration_file):
+            try:
+                with open(self.calibration_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    # Ensure all game keys exist
+                    if "dot_dash" not in data:
+                        data["dot_dash"] = self._default_game_data("dot_dash")
+                    if "pixel_pop" not in data:
+                        data["pixel_pop"] = self._default_game_data("pixel_pop")
+                    return data
+            except Exception as e:
+                print(f"[CALIBRATION] Load error: {e}")
+        return self._default_data()
+    
+    def _default_data(self) -> dict:
+        """Create default calibration data structure."""
+        return {
+            "version": 1,
+            "dot_dash": self._default_game_data("dot_dash"),
+            "pixel_pop": self._default_game_data("pixel_pop"),
         }
     
-    # Extract metrics with safe defaults
-    accuracy = float(metrics.get("accuracy", 0.5))
-    reaction_sec = float(metrics.get("reaction_time_sec", 0.4))
-    reaction_ms = reaction_sec * 1000
-    
-    # Handle timed out players - give them minimum SLA
-    if metrics.get("timed_out", False):
-        return 1
-    
-    # === ACCURACY SCORE ===
-    acc_expert = thresholds.get("accuracy_expert", 1.0)
-    acc_beginner = thresholds.get("accuracy_beginner", 0.3)
-    acc_range = acc_expert - acc_beginner
-    
-    if acc_range > 0.01:  # Avoid division by near-zero
-        accuracy_score = (accuracy - acc_beginner) / acc_range
-    else:
-        accuracy_score = 0.5
-    
-    accuracy_score = max(0.0, min(1.0, accuracy_score))
-    
-    # === REACTION TIME SCORE ===
-    rt_expert = thresholds.get("reaction_expert_ms", 150)
-    rt_beginner = thresholds.get("reaction_beginner_ms", 600)
-    rt_range = rt_beginner - rt_expert
-    
-    if rt_range > 10:  # Avoid division by near-zero
-        reaction_score = (rt_beginner - reaction_ms) / rt_range
-    else:
-        reaction_score = 0.5
-    
-    reaction_score = max(0.0, min(1.0, reaction_score))
-    
-    # === WEIGHTED COMBINATION ===
-    raw_score = (accuracy_score * accuracy_weight) + (reaction_score * reaction_weight)
-    
-    # === CONVERT TO 1-10 SCALE ===
-    # raw_score 0.0-1.0 → sla 1-10
-    sla = int(round(raw_score * 9)) + 1
-    return max(1, min(10, sla))
-
-
-def calculate_pixel_pop_sla(
-    metrics: dict[str, Any],
-    calibration: "SLACalibration | None" = None,
-    accuracy_weight: float = 0.55,
-    reaction_weight: float = 0.25,
-    efficiency_weight: float = 0.20,
-) -> int:
-    """
-    Calculate SLA (1-10) from Pixel Pop game metrics.
-    
-    Uses calibrated thresholds if available, otherwise falls back to defaults.
-    
-    Factors:
-    - Accuracy: correct_hits / total_shots (55% weight)
-    - Reaction: average time between shots (25% weight)  
-    - Efficiency: lanes_cleared vs snakes_reached_end (20% weight)
-    
-    Args:
-        metrics: Game result metrics
-        calibration: Optional SLACalibration instance for dynamic thresholds
-        accuracy_weight: Weight for accuracy in final score
-        reaction_weight: Weight for reaction/speed in final score
-        efficiency_weight: Weight for efficiency in final score
-    
-    Returns:
-        Integer SLA score from 1 (beginner) to 10 (expert)
-    """
-    # Get thresholds (calibrated or default)
-    if calibration:
-        thresholds = calibration.get_thresholds("pixel_pop")
-    else:
-        thresholds = {
-            "accuracy_expert": 0.85,
-            "accuracy_beginner": 0.30,
-            "reaction_expert_ms": 300,
-            "reaction_beginner_ms": 1000,
+    def _default_game_data(self, game_key: str) -> dict:
+        """Create default data for a specific game."""
+        if game_key == "dot_dash":
+            return {
+                "sample_count": 0,
+                "last_calibrated": 0,
+                "reaction_times_ms": [],
+                "accuracies": [],
+                "thresholds": {
+                    "reaction_expert_ms": 150,
+                    "reaction_beginner_ms": 600,
+                    "accuracy_expert": 1.0,
+                    "accuracy_beginner": 0.3,
+                },
+                "defaults": {
+                    "reaction_expert_ms": 150,
+                    "reaction_beginner_ms": 600,
+                    "accuracy_expert": 1.0,
+                    "accuracy_beginner": 0.3,
+                }
+            }
+        elif game_key == "pixel_pop":
+            return {
+                "sample_count": 0,
+                "last_calibrated": 0,
+                "reaction_times_ms": [],
+                "accuracies": [],
+                "thresholds": {
+                    "reaction_expert_ms": 300,
+                    "reaction_beginner_ms": 1000,
+                    "accuracy_expert": 0.85,
+                    "accuracy_beginner": 0.30,
+                },
+                "defaults": {
+                    "reaction_expert_ms": 300,
+                    "reaction_beginner_ms": 1000,
+                    "accuracy_expert": 0.85,
+                    "accuracy_beginner": 0.30,
+                }
+            }
+        # Future games can add their own defaults
+        return {
+            "sample_count": 0,
+            "last_calibrated": 0,
+            "thresholds": {},
+            "defaults": {},
         }
     
-    # === ACCURACY SCORE (55%) ===
-    accuracy = float(metrics.get("accuracy", 0.5))
-    acc_expert = thresholds.get("accuracy_expert", 0.85)
-    acc_beginner = thresholds.get("accuracy_beginner", 0.30)
-    acc_range = acc_expert - acc_beginner
+    def _save(self) -> None:
+        """Save calibration data to file."""
+        try:
+            with open(self.calibration_file, "w", encoding="utf-8") as f:
+                json.dump(self.data, f, indent=2)
+        except Exception as e:
+            print(f"[CALIBRATION] Save error: {e}")
     
-    if acc_range > 0.01:
-        accuracy_score = (accuracy - acc_beginner) / acc_range
-    else:
-        accuracy_score = 0.5
+    def update_config(self, config: dict) -> None:
+        """Update calibration configuration."""
+        self.config.update(config)
     
-    accuracy_score = max(0.0, min(1.0, accuracy_score))
+    def add_sample(self, game_key: str, metrics: dict) -> None:
+        """
+        Add a new game result to calibration data.
+        Triggers recalibration if interval reached.
+        """
+        if not self.config.get("enabled", True):
+            return
+        
+        if game_key not in self.data:
+            self.data[game_key] = self._default_game_data(game_key)
+        
+        game_data = self.data[game_key]
+        
+        # Extract and store metrics based on game type
+        if game_key == "dot_dash":
+            if "reaction_time_sec" in metrics:
+                reaction_ms = metrics["reaction_time_sec"] * 1000
+                # Only store valid reaction times (not timed out, etc.)
+                if 0 < reaction_ms < 5000:
+                    game_data.setdefault("reaction_times_ms", []).append(reaction_ms)
+            
+            if "accuracy" in metrics:
+                accuracy = metrics["accuracy"]
+                if 0 <= accuracy <= 1:
+                    game_data.setdefault("accuracies", []).append(accuracy)
+        
+        elif game_key == "pixel_pop":
+            if "reaction_time_sec" in metrics:
+                reaction_ms = metrics["reaction_time_sec"] * 1000
+                if 0 < reaction_ms < 5000:
+                    game_data.setdefault("reaction_times_ms", []).append(reaction_ms)
+            
+            if "accuracy" in metrics:
+                accuracy = metrics["accuracy"]
+                if 0 <= accuracy <= 1:
+                    game_data.setdefault("accuracies", []).append(accuracy)
+        
+        game_data["sample_count"] = game_data.get("sample_count", 0) + 1
+        
+        # Trim to max samples (rolling window)
+        max_samples = self.config.get("max_samples_stored", 500)
+        if len(game_data.get("reaction_times_ms", [])) > max_samples:
+            game_data["reaction_times_ms"] = game_data["reaction_times_ms"][-max_samples:]
+        if len(game_data.get("accuracies", [])) > max_samples:
+            game_data["accuracies"] = game_data["accuracies"][-max_samples:]
+        
+        # Check if recalibration needed
+        interval = self.config.get("recalibrate_interval", 10)
+        if game_data["sample_count"] % interval == 0:
+            self._recalibrate(game_key)
+        
+        self._save()
     
-    # === REACTION SCORE (25%) ===
-    # Based on how quickly player fires
-    reaction_sec = float(metrics.get("reaction_time_sec", 0.5))
-    reaction_ms = reaction_sec * 1000
+    def _recalibrate(self, game_key: str) -> None:
+        """Recalculate thresholds based on collected data."""
+        if game_key not in self.data:
+            return
+        
+        game_data = self.data[game_key]
+        min_samples = self.config.get("min_samples_for_calibration", 20)
+        
+        if game_data.get("sample_count", 0) < min_samples:
+            # Not enough data yet, keep using defaults
+            return
+        
+        p_expert = self.config.get("percentile_expert", 10)
+        p_beginner = self.config.get("percentile_beginner", 90)
+        
+        # Reaction time: LOWER is better, so expert = low percentile value
+        reaction_times = game_data.get("reaction_times_ms", [])
+        if len(reaction_times) >= 5:
+            sorted_rt = sorted(reaction_times)
+            game_data["thresholds"]["reaction_expert_ms"] = self._percentile(sorted_rt, p_expert)
+            game_data["thresholds"]["reaction_beginner_ms"] = self._percentile(sorted_rt, p_beginner)
+        
+        # Accuracy: HIGHER is better, so expert = high percentile value
+        accuracies = game_data.get("accuracies", [])
+        if len(accuracies) >= 5:
+            sorted_acc = sorted(accuracies)
+            # Flip percentiles for accuracy (higher = better)
+            game_data["thresholds"]["accuracy_expert"] = self._percentile(sorted_acc, 100 - p_expert)
+            game_data["thresholds"]["accuracy_beginner"] = self._percentile(sorted_acc, 100 - p_beginner)
+        
+        game_data["last_calibrated"] = time.time()
+        
+        print(f"[CALIBRATION] {game_key} recalibrated after {game_data['sample_count']} samples:")
+        print(f"  Reaction: {game_data['thresholds'].get('reaction_expert_ms', 0):.0f}ms (expert) - {game_data['thresholds'].get('reaction_beginner_ms', 0):.0f}ms (beginner)")
+        print(f"  Accuracy: {game_data['thresholds'].get('accuracy_beginner', 0):.0%} (beginner) - {game_data['thresholds'].get('accuracy_expert', 0):.0%} (expert)")
     
-    rt_expert = thresholds.get("reaction_expert_ms", 300)
-    rt_beginner = thresholds.get("reaction_beginner_ms", 1000)
-    rt_range = rt_beginner - rt_expert
+    def _percentile(self, sorted_data: list, percentile: float) -> float:
+        """Calculate percentile value from sorted list."""
+        if not sorted_data:
+            return 0.0
+        
+        n = len(sorted_data)
+        k = (n - 1) * (percentile / 100)
+        f = int(k)
+        c = min(f + 1, n - 1)
+        
+        if f == c:
+            return sorted_data[f]
+        
+        # Linear interpolation
+        return sorted_data[f] + (k - f) * (sorted_data[c] - sorted_data[f])
     
-    if rt_range > 10:
-        reaction_score = (rt_beginner - reaction_ms) / rt_range
-    else:
-        reaction_score = 0.5
+    def get_thresholds(self, game_key: str) -> dict:
+        """
+        Get current calibrated thresholds for a game.
+        Returns defaults if not enough samples yet.
+        """
+        if game_key not in self.data:
+            return self._default_game_data(game_key).get("defaults", {})
+        
+        game_data = self.data[game_key]
+        min_samples = self.config.get("min_samples_for_calibration", 20)
+        
+        # Use defaults if not enough samples yet
+        if game_data.get("sample_count", 0) < min_samples:
+            return game_data.get("defaults", {}).copy()
+        
+        return game_data.get("thresholds", {}).copy()
     
-    reaction_score = max(0.0, min(1.0, reaction_score))
+    def is_calibrated(self, game_key: str) -> bool:
+        """Check if game has enough samples for calibration."""
+        if game_key not in self.data:
+            return False
+        
+        min_samples = self.config.get("min_samples_for_calibration", 20)
+        return self.data[game_key].get("sample_count", 0) >= min_samples
     
-    # === EFFICIENCY SCORE (20%) ===
-    # Based on lanes cleared vs snakes reaching end
-    lanes_cleared = int(metrics.get("lanes_cleared", 0))
-    snakes_reached = int(metrics.get("snakes_reached_end", 0))
+    def get_sample_count(self, game_key: str) -> int:
+        """Get number of samples collected for a game."""
+        if game_key not in self.data:
+            return 0
+        return self.data[game_key].get("sample_count", 0)
     
-    # More clears = better, more reaches = worse
-    if lanes_cleared + snakes_reached > 0:
-        efficiency_score = lanes_cleared / (lanes_cleared + snakes_reached + 1)
-    else:
-        efficiency_score = 0.5
+    def get_status(self, game_key: str) -> dict:
+        """Get detailed calibration status for a game."""
+        if game_key not in self.data:
+            return {
+                "game_key": game_key,
+                "error": "Unknown game",
+                "sample_count": 0,
+                "is_calibrated": False,
+            }
+        
+        game_data = self.data[game_key]
+        min_samples = self.config.get("min_samples_for_calibration", 20)
+        
+        return {
+            "game_key": game_key,
+            "sample_count": game_data.get("sample_count", 0),
+            "min_samples_required": min_samples,
+            "is_calibrated": game_data.get("sample_count", 0) >= min_samples,
+            "samples_until_calibrated": max(0, min_samples - game_data.get("sample_count", 0)),
+            "current_thresholds": self.get_thresholds(game_key),
+            "last_calibrated": game_data.get("last_calibrated", 0),
+        }
     
-    efficiency_score = max(0.0, min(1.0, efficiency_score))
+    def force_recalibrate(self, game_key: str) -> None:
+        """Force immediate recalibration for a game."""
+        self._recalibrate(game_key)
+        self._save()
     
-    # === WEIGHTED COMBINATION ===
-    raw_score = (
-        accuracy_score * accuracy_weight +
-        reaction_score * reaction_weight +
-        efficiency_score * efficiency_weight
-    )
+    def reset_game(self, game_key: str) -> None:
+        """Reset calibration data for a specific game."""
+        if game_key in self.data:
+            self.data[game_key] = self._default_game_data(game_key)
+            self._save()
+            print(f"[CALIBRATION] {game_key} calibration reset")
     
-    # === CONVERT TO 1-10 ===
-    sla = int(round(raw_score * 9)) + 1
-    return max(1, min(10, sla))
-
-
-def calculate_average_sla(sla_samples: list[int]) -> int:
-    """
-    Calculate average SLA from multiple game samples.
-    
-    Args:
-        sla_samples: List of individual SLA scores (1-10)
-    
-    Returns:
-        Rounded average SLA (1-10), or default 5 if no samples
-    """
-    if not sla_samples:
-        return DEFAULT_SLA
-    
-    avg = sum(sla_samples) / len(sla_samples)
-    return max(1, min(10, int(round(avg))))
+    def reset_all(self) -> None:
+        """Reset all calibration data."""
+        self.data = self._default_data()
+        self._save()
+        print("[CALIBRATION] All calibration data reset")
