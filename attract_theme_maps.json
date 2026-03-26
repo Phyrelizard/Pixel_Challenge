@@ -15,12 +15,12 @@
     "Lane Chase RL": 6
   },
   "selected_themes": [
-    "Lane Chase LR",
-    "Rainbow Pulse",
-    "Galaxy Wave",
-    "Lane Chase RL",
     "Team Colors",
-    "Bounce Chase"
+    "Lane Chase RL",
+    "Galaxy Wave",
+    "Bounce Chase",
+    "Lane Chase LR",
+    "Rainbow Pulse"
   ],
   "sash_left_attract_bottom": 726,
   "sash_center_ctrl": 677,

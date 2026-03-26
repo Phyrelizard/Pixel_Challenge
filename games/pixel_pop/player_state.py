@@ -130,7 +130,7 @@ class PlayerState:
         left_snake = self.snakes.get("left")
         right_snake = self.snakes.get("right")
         
-        left_clear = left_snake is None or left_snake.is_destroyed()
-        right_clear = right_snake is None or right_snake.is_destroyed()
+        left_clear = left_snake is None or left_snake.is_active == False
+        right_clear = right_snake is None or right_snake.is_active == False
         
         return left_clear and right_clear

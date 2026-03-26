@@ -45,8 +45,8 @@
     }
   },
   "pixel_pop": {
-    "sample_count": 18,
-    "last_calibrated": 0,
+    "sample_count": 21,
+    "last_calibrated": 1774523692.5032945,
     "reaction_times_ms": [],
     "accuracies": [
       0.211,
@@ -66,13 +66,16 @@
       0.64,
       0.615,
       0.714,
-      0.0
+      0.0,
+      0.0,
+      0.0,
+      0.741
     ],
     "thresholds": {
       "reaction_expert_ms": 300,
       "reaction_beginner_ms": 1000,
-      "accuracy_expert": 0.85,
-      "accuracy_beginner": 0.3
+      "accuracy_expert": 0.7355000000000002,
+      "accuracy_beginner": 0.0
     },
     "defaults": {
       "reaction_expert_ms": 300,

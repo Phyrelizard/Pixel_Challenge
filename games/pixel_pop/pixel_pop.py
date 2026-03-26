@@ -583,14 +583,13 @@ class PixelPopSession(GameSession):
             total_points = points_per_band * bands_count
             state.score += total_points
             state.correct_hits += bands_count
-            snake.bands.clear()
-            snake.is_active = False
+            snake.destroy_all_bands()
             self.host.play_sound("pp_shot_hit_correct")
             self.host.log(f"[PIXEL POP] P{player_id} DESTROYED snake on {lane}! +{total_points} ({bands_count} bands)")
             self._handle_lane_cleared(player_id, lane, current_time)
         else:
             # Default: head_only - pop just the head band
-            removed_band = snake.pop_head()
+            removed_band = snake.destroy_head_band()
             
             # Add points
             points = self.config.get("scoring", {}).get("correct_hit", 10)
@@ -603,12 +602,13 @@ class PixelPopSession(GameSession):
             if snake_config.get("speed_ramp_enabled", True):
                 ramp = snake_config.get("speed_ramp_per_band_cleared_ms", -15)
                 min_speed = snake_config.get("min_speed_ms", 200)
-                snake.apply_speed_ramp(ramp, min_speed)
+                # speed_up takes positive value to speed up (reduce ms)
+                snake.speed_up(-ramp)
             
             self.host.log(f"[PIXEL POP] P{player_id} HIT {lane}! +{points} (bands left: {len(snake.bands)})")
             
-            # Check if snake destroyed
-            if snake.is_destroyed():
+            # Check if snake destroyed (no more bands)
+            if not snake.is_active or len(snake.bands) == 0:
                 self._handle_lane_cleared(player_id, lane, current_time)
     
     def _handle_wrong_hit(self, player_id: int, lane: str, snake: Snake, shot_color: str, current_time: float) -> None:
@@ -815,7 +815,7 @@ class PixelPopSession(GameSession):
                     # Render snake
                     snake = state.snakes.get(lane)
                     if snake and snake.is_active:
-                        for pos, color in snake.render(head_boost):
+                        for pos, color in snake.render():
                             if 0 <= pos < self.lane_length:
                                 pixels[pos] = color
                 
