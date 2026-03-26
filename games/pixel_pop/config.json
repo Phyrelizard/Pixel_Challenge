@@ -4,17 +4,19 @@
   "lives_count": 3,
   "lanes": {
     "left": {
-      "snake_speed_ms": 1800,
+      "snake_speed_ms": 400,
       "band_count_min": 4,
       "band_count_max": 6,
-      "band_size_mode": "varied"
+      "band_size_mode": "varied",
+      "reverse_direction": true
     },
     "right": {
-      "snake_speed_ms": 600,
+      "snake_speed_ms": 300,
       "band_count_min": 2,
       "band_count_max": 3,
       "band_size_mode": "fixed",
-      "band_size_fixed_px": 5
+      "band_size_fixed_px": 5,
+      "reverse_direction": true
     }
   },
   "snake": {
@@ -22,8 +24,9 @@
     "growth_on_wrong_hit": 2,
     "speed_ramp_enabled": true,
     "speed_ramp_per_band_cleared_ms": -15,
-    "min_speed_ms": 200,
-    "respawn_delay_ms": 1000
+    "min_speed_ms": 100,
+    "respawn_delay_ms": 1000,
+    "hit_destroys": "head_only"
   },
   "bands": {
     "color_sizes": {

@@ -6,7 +6,14 @@
   "players": [
     {
       "player_id": 1,
-      "score": -65,
+      "score": 35,
+      "selected_lane": "right",
+      "is_active": true,
+      "lives": null
+    },
+    {
+      "player_id": 2,
+      "score": 230,
       "selected_lane": "left",
       "is_active": true,
       "lives": null

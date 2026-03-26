@@ -2,6 +2,8 @@
 """
 Pixel Pop - Projectile Class
 Manages shot projectiles that travel up the lane.
+
+Version: 21.11.0 - Added reverse_direction support
 """
 from __future__ import annotations
 
@@ -14,17 +16,22 @@ Color = Tuple[int, int, int]
 @dataclass
 class Projectile:
     """
-    A projectile fired by the player traveling up a lane.
+    A projectile fired by the player traveling along a lane.
     
-    Position 0 is TOP of lane, lane_length-1 is BOTTOM (where player shoots from).
-    Projectile travels from bottom toward top (decreasing position).
+    Normal mode (reverse_direction=False):
+        Position 0 is TOP of lane, lane_length-1 is BOTTOM (where player shoots from).
+        Projectile travels from bottom toward top (decreasing position).
+    
+    Reversed mode (reverse_direction=True):
+        Player shoots from position 0 (TOP).
+        Projectile travels from top toward bottom (increasing position).
     """
     
     lane: str  # "left" or "right"
     color_name: str  # The color the player shot
     color_rgb: Color  # RGB value
     
-    # Position (starts at bottom, travels to top)
+    # Position
     position: float  # Current position (float for smooth movement)
     lane_length: int = 100
     
@@ -37,6 +44,9 @@ class Projectile:
     
     # Visual
     length_pixels: int = 2  # How many pixels the projectile occupies
+    
+    # Direction
+    reverse_direction: bool = False  # If True, player fires from position 0
     
     @classmethod
     def create(
@@ -63,6 +73,10 @@ class Projectile:
         """
         proj_config = config.get("projectile", {})
         visuals_config = config.get("visuals", {})
+        lane_config = config.get("lanes", {}).get(lane, {})
+        
+        # Check if lane direction is reversed
+        reverse_direction = lane_config.get("reverse_direction", False)
         
         # Base speed
         base_speed = proj_config.get("speed_base_ms_per_pixel", 8)
@@ -80,16 +94,23 @@ class Projectile:
         # Projectile length
         length = visuals_config.get("projectile_length_pixels", 2)
         
+        # Start position depends on direction
+        if reverse_direction:
+            start_position = 0.0  # Player fires from position 0 (top)
+        else:
+            start_position = float(lane_length - 1)  # Player fires from bottom
+        
         return cls(
             lane=lane,
             color_name=color_name,
             color_rgb=color_rgb,
-            position=float(lane_length - 1),  # Start at bottom
+            position=start_position,
             lane_length=lane_length,
             speed_ms_per_pixel=speed,
             is_active=True,
             fired_at=fired_at,
             length_pixels=length,
+            reverse_direction=reverse_direction,
         )
     
     def tick(self, delta_ms: float) -> bool:
@@ -101,14 +122,22 @@ class Projectile:
         if not self.is_active:
             return False
         
-        # Move toward top (decreasing position)
         pixels_to_move = delta_ms / self.speed_ms_per_pixel
-        self.position -= pixels_to_move
         
-        # Check if projectile has left the lane (past top)
-        if self.position < -self.length_pixels:
-            self.is_active = False
-            return False
+        if self.reverse_direction:
+            # Player at position 0, projectile moves toward bottom (increasing position)
+            self.position += pixels_to_move
+            # Check if projectile has left the lane (past bottom)
+            if self.position > self.lane_length + self.length_pixels:
+                self.is_active = False
+                return False
+        else:
+            # Player at bottom, projectile moves toward top (decreasing position)
+            self.position -= pixels_to_move
+            # Check if projectile has left the lane (past top)
+            if self.position < -self.length_pixels:
+                self.is_active = False
+                return False
         
         return True
     
@@ -130,7 +159,12 @@ class Projectile:
         lead_pos = self.get_pixel_position()
         
         for i in range(self.length_pixels):
-            pixel_pos = lead_pos + i  # Trail behind the leading edge
+            if self.reverse_direction:
+                # Trail behind (lower positions) when moving forward
+                pixel_pos = lead_pos - i
+            else:
+                # Trail behind (higher positions) when moving backward
+                pixel_pos = lead_pos + i
             
             if 0 <= pixel_pos < self.lane_length:
                 # Fade the trail slightly
@@ -155,7 +189,11 @@ class Projectile:
         Returns:
             Time in milliseconds, or -1 if target is behind projectile
         """
-        distance = self.position - target_position
+        if self.reverse_direction:
+            distance = target_position - self.position
+        else:
+            distance = self.position - target_position
+        
         if distance < 0:
             return -1
         

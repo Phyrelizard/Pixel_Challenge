@@ -290,20 +290,31 @@ class PixelPopSession(GameSession):
     def _render_ready_prompt(self, player_id: int) -> None:
         """Render a 'ready' visual on player's lanes."""
         glow_color = GLOW_COLORS.get("white", (255, 255, 255))
-        glow_pixels = [(0, 0, 0)] * self.lane_length
         
-        # Glow at bottom
-        for i in range(5):
-            pos = self.lane_length - 1 - i
-            brightness = 1.0 - (i * 0.15)
-            glow_pixels[pos] = (
-                int(glow_color[0] * brightness),
-                int(glow_color[1] * brightness),
-                int(glow_color[2] * brightness),
-            )
-        
-        self.host.set_player_lane_pixels(player_id, "left", glow_pixels)
-        self.host.set_player_lane_pixels(player_id, "right", glow_pixels)
+        for lane in ("left", "right"):
+            glow_pixels = [(0, 0, 0)] * self.lane_length
+            
+            # Check if this lane is reversed
+            lane_config = self.config.get("lanes", {}).get(lane, {})
+            is_reversed = lane_config.get("reverse_direction", False)
+            
+            # Glow at player's end
+            for i in range(5):
+                if is_reversed:
+                    # Player is at position 0
+                    pos = i
+                else:
+                    # Player is at bottom
+                    pos = self.lane_length - 1 - i
+                
+                brightness = 1.0 - (i * 0.15)
+                glow_pixels[pos] = (
+                    int(glow_color[0] * brightness),
+                    int(glow_color[1] * brightness),
+                    int(glow_color[2] * brightness),
+                )
+            
+            self.host.set_player_lane_pixels(player_id, lane, glow_pixels)
     
     def on_input(self, player_id: int, action: str, value: Any = None) -> None:
         """
@@ -561,28 +572,44 @@ class PixelPopSession(GameSession):
         if not state:
             return
         
-        # Pop the head band
-        removed_band = snake.pop_head()
-        
-        # Add points
-        points = self.config.get("scoring", {}).get("correct_hit", 10)
-        state.add_correct_hit(points)
-        
-        # Play sound
-        self.host.play_sound("pp_shot_hit_correct")
-        
-        # Apply speed ramp if enabled
+        # Check hit_destroys mode
         snake_config = self.config.get("snake", {})
-        if snake_config.get("speed_ramp_enabled", True):
-            ramp = snake_config.get("speed_ramp_per_band_cleared_ms", -15)
-            min_speed = snake_config.get("min_speed_ms", 200)
-            snake.apply_speed_ramp(ramp, min_speed)
+        hit_mode = snake_config.get("hit_destroys", "head_only")
         
-        self.host.log(f"[PIXEL POP] P{player_id} HIT {lane}! +{points} (bands left: {len(snake.bands)})")
-        
-        # Check if snake destroyed
-        if snake.is_destroyed():
+        if hit_mode == "whole_snake":
+            # Destroy entire snake
+            bands_count = len(snake.bands)
+            points_per_band = self.config.get("scoring", {}).get("correct_hit", 10)
+            total_points = points_per_band * bands_count
+            state.score += total_points
+            state.correct_hits += bands_count
+            snake.bands.clear()
+            snake.is_active = False
+            self.host.play_sound("pp_shot_hit_correct")
+            self.host.log(f"[PIXEL POP] P{player_id} DESTROYED snake on {lane}! +{total_points} ({bands_count} bands)")
             self._handle_lane_cleared(player_id, lane, current_time)
+        else:
+            # Default: head_only - pop just the head band
+            removed_band = snake.pop_head()
+            
+            # Add points
+            points = self.config.get("scoring", {}).get("correct_hit", 10)
+            state.add_correct_hit(points)
+            
+            # Play sound
+            self.host.play_sound("pp_shot_hit_correct")
+            
+            # Apply speed ramp if enabled
+            if snake_config.get("speed_ramp_enabled", True):
+                ramp = snake_config.get("speed_ramp_per_band_cleared_ms", -15)
+                min_speed = snake_config.get("min_speed_ms", 200)
+                snake.apply_speed_ramp(ramp, min_speed)
+            
+            self.host.log(f"[PIXEL POP] P{player_id} HIT {lane}! +{points} (bands left: {len(snake.bands)})")
+            
+            # Check if snake destroyed
+            if snake.is_destroyed():
+                self._handle_lane_cleared(player_id, lane, current_time)
     
     def _handle_wrong_hit(self, player_id: int, lane: str, snake: Snake, shot_color: str, current_time: float) -> None:
         """Handle wrong color hit on snake head."""
@@ -799,10 +826,20 @@ class PixelPopSession(GameSession):
                             if 0 <= pos < self.lane_length:
                                 pixels[pos] = color
                 
-                # Render selected lane glow (at bottom)
+                # Render selected lane glow at player's end
                 if state.selected_lane == lane and state.is_active:
+                    # Check if this lane is reversed
+                    lane_config = self.config.get("lanes", {}).get(lane, {})
+                    is_reversed = lane_config.get("reverse_direction", False)
+                    
                     for i in range(glow_pixels_count):
-                        pos = self.lane_length - 1 - i
+                        if is_reversed:
+                            # Player is at position 0
+                            pos = i
+                        else:
+                            # Player is at bottom (lane_length - 1)
+                            pos = self.lane_length - 1 - i
+                        
                         brightness = 1.0 - (i * 0.15)
                         # Blend with existing pixel
                         existing = pixels[pos]
