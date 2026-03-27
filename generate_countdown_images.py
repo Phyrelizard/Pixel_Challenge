@@ -55,10 +55,12 @@ def main():
     os.makedirs(ASSETS_DIR, exist_ok=True)
     
     # Create countdown images
-    create_countdown_image("3", (255, 80, 80), "countdown_3.png")      # Red
-    create_countdown_image("2", (255, 220, 80), "countdown_2.png")     # Yellow
-    create_countdown_image("1", (80, 255, 80), "countdown_1.png")      # Green
-    create_countdown_image("GO!", (80, 255, 80), "countdown_go.png")   # Green
+    create_countdown_image("5", (255, 80, 80), "countdown_5.png")      # Red
+    create_countdown_image("4", (255, 80, 80), "countdown_4.png")      # Red
+    # create_countdown_image("3", (255, 80, 80), "countdown_3.png")      # Red
+    # create_countdown_image("2", (255, 220, 80), "countdown_2.png")     # Yellow
+    # create_countdown_image("1", (80, 255, 80), "countdown_1.png")      # Green
+    # create_countdown_image("GO!", (80, 255, 80), "countdown_go.png")   # Green
     
     print("\nAll countdown images created!")
     print(f"Location: {ASSETS_DIR}")
