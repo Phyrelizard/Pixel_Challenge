@@ -1,5 +1,84 @@
 # Changelog
 
+## [22.0.0] - 2026-03-27
+
+### Added - Surround Game
+- **New Game: Surround** - Center-defense, two-lane, dual-direction pressure game
+- **Two Game Modes:**
+  - **Mode 1 (Timed):** Arcade score-attack with configurable round duration
+  - **Mode 2 (Objective):** Lives-based survival with Hunter Snake boss encounters
+- **Player Marker System:**
+  - 3-5 pixel contiguous marker with smooth joystick movement
+  - Configurable hold delay and repeat rate for fluid control
+  - Soft fade transitions between pixels (configurable enable/disable/rate)
+  - Lives displayed as marker pixels in Mode 2 (shrinks from edges inward)
+  - Invulnerability period with rapid blink effect after taking damage
+- **Dual-Direction Snake System:**
+  - Snakes spawn from both top and bottom of each lane simultaneously
+  - Snakes pass through each other when traveling opposite directions
+  - Per-lane and per-direction speed/spawn configuration
+  - Configurable color weighting and band sizes (white:3, orange:4, red:5, green:6, blue:7)
+  - Snake growth on wrong-color shots
+  - Soft fade transitions for snake movement
+- **Egg & Hatch Mechanics:**
+  - Golden eggs spawn when opposing snake tails overlap
+  - Visual pulse and color wash effects on eggs
+  - 10-second hatch timer (configurable)
+  - Player must physically touch egg to collect (risk/reward gameplay)
+  - Hatches into 4 baby snakes (2 up, 2 down) if not collected
+  - Shell fades over 3 seconds after hatch
+- **Baby Snakes:**
+  - 3-pixel fast snakes spawned from egg hatch
+  - Random colors, single hit to destroy
+  - Exit field permanently after spawning
+- **Hunter Snake (Mode 2):**
+  - Transforms when normal snake overlaps an egg
+  - Distinct white head (red if original snake was white)
+  - Fires orange projectiles at configurable interval
+  - U-turns at lane ends with compress/expand animation
+  - **Mid-field turn ability:** Random chance to turn when player is behind (configurable)
+  - **Directional damage system:** Separate front and rear hit counters (do not combine)
+  - Front attacks: size × 2 hits required
+  - Rear attacks: 3 hits per segment to remove
+  - Warning pulse effect when 4 or fewer front hits remain
+  - Other snakes retreat permanently when Hunter spawns
+  - Defeating all Hunter Snake(s) wins Mode 2
+- **Shooting Mechanics:**
+  - Projectile direction based on last vertical joystick movement
+  - Blocked shots when direction not established (after lane switch)
+  - Dual-fire: shoots both directions if opposing snakes share same lead color
+  - Configurable projectile color and speed
+- **Scoring System:**
+  - Points by snake color (white:30, orange:40, red:50, green:60, blue:70)
+  - Egg collection: 50 points
+  - Baby snake: 25 points
+  - Hunter Snake: 250 points
+  - Hunter rear segment removed: 10 points
+  - Penalties for wrong-color shots, wasted shots, getting hit, allowing hatch
+  - End-of-round accuracy and efficiency bonuses
+- **Audio Support:**
+  - Full sound effect set with sr_ prefix
+  - Separate background music for Mode 1 and Mode 2
+  - Placeholder for Hunter turn swish sound
+- **Configuration:**
+  - Separate config files for Mode 1 and Mode 2
+  - Extensive tuning parameters for all mechanics
+  - Per-lane and per-direction snake behavior settings
+
+### Added - Console Enhancements
+- **Mode Toggle Button:** New button between Config and Scoreboard
+  - Displays "MODE 1 / Timed" or "MODE 2 / Objective"
+  - Click to toggle between modes
+  - Grayed out for games without multiple modes (Dot Dash, Pixel Pop)
+  - Selected mode determines which config file is loaded
+
+### Technical
+- New game module structure: `games/surround/`
+- Modular class design: `player.py`, `snake.py`, `egg.py`, `surround.py`
+- State persistence for Hunter Snake transformation data
+- Hybrid architecture supporting both modes with shared foundation
+# Changelog
+
 All notable changes to Pixel Challenge will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).

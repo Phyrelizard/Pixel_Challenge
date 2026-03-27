@@ -1,0 +1,215 @@
+{
+  "game_info": {
+    "name": "Surround",
+    "version": "22.0.0",
+    "mode": 2,
+    "mode_name": "Objective",
+    "description": "Objective game - survive with limited lives and defeat all Hunter Snakes"
+  },
+
+  "round": {
+    "duration_sec": 0,
+    "show_timer": false,
+    "countdown_sec": 3,
+    "time_limit_enabled": false,
+    "time_limit_sec": 300
+  },
+
+  "objective": {
+    "type": "hunter_defeat",
+    "kill_quota": 0,
+    "egg_quota": 0,
+    "wave_quota": 0,
+    "final_surge_enabled": false
+  },
+
+  "player": {
+    "start_lane": "left",
+    "start_row": 49,
+    "marker_pixels": 3,
+    "marker_color": "white",
+    "extra_life_center_color": "green",
+    "lives_enabled": true,
+    "start_lives": 3,
+    "max_lives": 5,
+    "extra_life_every_kills": 25,
+    "invulnerability_ms": 1000,
+    "invulnerability_blink_rate_ms": 100,
+    "respawn_in_place": true,
+    "safe_respawn_same_lane_only": true
+  },
+
+  "movement": {
+    "hold_initial_delay_ms": 150,
+    "hold_repeat_ms": 50,
+    "lane_switch_cooldown_ms": 100,
+    "input_priority": "vertical_first",
+    "diagonal_input_allowed": false
+  },
+
+  "transitions": {
+    "player_fade_enabled": true,
+    "player_fade_rate_ms": 30,
+    "snake_fade_enabled": true,
+    "snake_fade_rate_ms": 20
+  },
+
+  "projectile": {
+    "speed_ms_per_pixel": 8,
+    "color": "red",
+    "length_pixels": 1,
+    "dual_fire_on_matching_heads": true
+  },
+
+  "lanes": {
+    "left": {
+      "enabled": true,
+      "top_to_bottom": {
+        "enabled": true,
+        "base_speed_ms": 450,
+        "min_speed_ms": 175,
+        "spawn_interval_ms": 2800,
+        "max_simultaneous_snakes": 3,
+        "speedup_every_sec": 20,
+        "speedup_step_ms": 20
+      },
+      "bottom_to_top": {
+        "enabled": true,
+        "base_speed_ms": 500,
+        "min_speed_ms": 175,
+        "spawn_interval_ms": 3000,
+        "max_simultaneous_snakes": 3,
+        "speedup_every_sec": 20,
+        "speedup_step_ms": 20
+      }
+    },
+    "right": {
+      "enabled": true,
+      "top_to_bottom": {
+        "enabled": true,
+        "base_speed_ms": 400,
+        "min_speed_ms": 150,
+        "spawn_interval_ms": 2500,
+        "max_simultaneous_snakes": 3,
+        "speedup_every_sec": 20,
+        "speedup_step_ms": 25
+      },
+      "bottom_to_top": {
+        "enabled": true,
+        "base_speed_ms": 430,
+        "min_speed_ms": 150,
+        "spawn_interval_ms": 2700,
+        "max_simultaneous_snakes": 3,
+        "speedup_every_sec": 20,
+        "speedup_step_ms": 25
+      }
+    }
+  },
+
+  "snakes": {
+    "colors_enabled": ["white", "orange", "red", "green", "blue"],
+    "band_sizes": {
+      "white": 3,
+      "orange": 4,
+      "red": 5,
+      "green": 6,
+      "blue": 7
+    },
+    "color_weighting": {
+      "white": 20,
+      "orange": 25,
+      "red": 25,
+      "green": 20,
+      "blue": 10
+    },
+    "miss_growth_enabled": true,
+    "miss_growth_pixels": 2
+  },
+
+  "eggs": {
+    "enabled": true,
+    "lanes_allowed": "both",
+    "max_per_lane": 1,
+    "hatch_time_sec": 10,
+    "pulse_enabled": true,
+    "pulse_rate_ms": 500,
+    "color_wash_enabled": true,
+    "color_wash_rate_ms": 200,
+    "shell_fade_duration_ms": 3000,
+    "transformation_window_ms": 500
+  },
+
+  "baby_snakes": {
+    "count_per_hatch": 4,
+    "length_pixels": 3,
+    "speed_ms_per_pixel": 150,
+    "color_mode": "random",
+    "up_count": 2,
+    "down_count": 2
+  },
+
+  "hunter": {
+    "enabled": true,
+    "max_per_lane": 1,
+    "lanes_allowed": "both",
+    "head_color": "white",
+    "head_color_if_white_snake": "red",
+    "speed_ms_per_pixel": 300,
+    "min_speed_ms": 200,
+    "fire_enabled": true,
+    "fire_interval_ms": 100,
+    "fire_color": "orange",
+    "fire_length_pixels": 1,
+    "fire_speed_ms_per_pixel": 12,
+    "front_damage_multiplier": 2,
+    "rear_damage_per_segment": 3,
+    "front_last4_warning_enabled": true,
+    "front_last4_pulse_rate_ms": 100,
+    "midfield_turn_enabled": true,
+    "midfield_turn_chance_percent": 30,
+    "midfield_turn_cooldown_ms": 3000,
+    "midfield_turn_requires_player_behind": true,
+    "midfield_turn_same_lane_only": true,
+    "midfield_turn_warning_ms": 0,
+    "midfield_turn_compress_rate_ms": 40,
+    "retreat_other_snakes": true,
+    "retreat_speed_ms": 100
+  },
+
+  "scoring": {
+    "snake_destroy": {
+      "white": 30,
+      "orange": 40,
+      "red": 50,
+      "green": 60,
+      "blue": 70
+    },
+    "egg_collect": 50,
+    "egg_hatch_penalty": -15,
+    "baby_snake_destroy": 25,
+    "super_snake_destroy": 150,
+    "hunter_rear_segment_removed": 10,
+    "hunter_destroy": 250,
+    "wrong_color_penalty": -5,
+    "wasted_shot_penalty": -1,
+    "blocked_shot_penalty": 0,
+    "player_hit_penalty": -20,
+    "accuracy_bonus_tiers": {
+      "tier_90": 150,
+      "tier_80": 100,
+      "tier_70": 50
+    },
+    "efficiency_bonus_enabled": true,
+    "objective_completion_bonus": 200,
+    "lives_remaining_bonus_per_life": 50
+  },
+
+  "audio": {
+    "music_enabled": true,
+    "music_volume": 0.5,
+    "sfx_enabled": true,
+    "player_sfx_volume": 0.8,
+    "enemy_sfx_volume": 0.7,
+    "alert_sfx_volume": 0.9
+  }
+}
