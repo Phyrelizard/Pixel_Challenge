@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Surround Game Module
 Version 22.0.0
@@ -10,7 +11,7 @@ Supports two modes:
 - Mode 2: Objective Game
 """
 
-from .surround import SurroundGame
+from .surround import SurroundSession, SurroundModule
 
-__all__ = ['SurroundGame']
+__all__ = ['SurroundSession', 'SurroundModule']
 __version__ = '22.0.0'

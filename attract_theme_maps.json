@@ -1,6 +1,6 @@
 {
   "auto_enabled": true,
-  "animate_enabled": true,
+  "animate_enabled": false,
   "cycle_seconds": 20,
   "per_theme_speed": {
     "Fire Burst": 6,
@@ -16,15 +16,15 @@
   },
   "selected_themes": [
     "Ice Burst",
-    "Galaxy Wave",
-    "Color Wash"
+    "Color Wash",
+    "Galaxy Wave"
   ],
-  "sash_left_attract_bottom": 842,
+  "sash_left_attract_bottom": 726,
   "sash_center_ctrl": 677,
   "sash_main_info": 540,
   "sash_bottom_log": 51,
-  "falcon_brightness": 43,
-  "gameplay_brightness": 99,
+  "falcon_brightness": 14,
+  "gameplay_brightness": 39,
   "falcon_ip": "192.168.2.113",
   "wifi_ssid": "",
   "wifi_psk": "",

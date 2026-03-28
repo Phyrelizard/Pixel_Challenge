@@ -63,15 +63,19 @@ class PlayerState:
     transition_from_row: Optional[int] = None
     transition_progress: float = 0.0  # 0.0 to 1.0
     
-    # Statistics
+     # Statistics
     kills: int = 0
     eggs_collected: int = 0
+    eggs_allowed_to_hatch: int = 0
     shots_fired: int = 0
     shots_hit: int = 0
     shots_blocked: int = 0
     wrong_color_shots: int = 0
     times_hit: int = 0
     extra_lives_earned: int = 0
+    baby_snakes_destroyed: int = 0
+    hunter_snakes_destroyed: int = 0
+    hunter_segments_removed: int = 0
     
     # Scoring
     score: int = 0
@@ -228,6 +232,9 @@ class PlayerState:
     
     def can_shoot(self) -> bool:
         """Check if player can currently fire a shot."""
+        # Cannot shoot during invulnerability (rejuvenation period)
+        if self.is_invulnerable:
+            return False
         return self.vertical_direction != VerticalDirection.NONE and self.is_alive
     
     def add_score(self, points: int) -> None:
@@ -249,9 +256,9 @@ class PlayerState:
         """Record a snake kill."""
         self.kills += 1
     
-    def record_egg_collect(self) -> None:
-        """Record an egg collection."""
-        self.eggs_collected += 1
+    def record_egg_hatch(self) -> None:
+        """Record an egg that was allowed to hatch."""
+        self.eggs_allowed_to_hatch += 1
     
     def get_accuracy(self) -> float:
         """Calculate shot accuracy percentage."""
@@ -286,10 +293,14 @@ class PlayerState:
         # Reset stats
         self.kills = 0
         self.eggs_collected = 0
+        self.eggs_allowed_to_hatch = 0
         self.shots_fired = 0
         self.shots_hit = 0
         self.shots_blocked = 0
         self.wrong_color_shots = 0
         self.times_hit = 0
         self.extra_lives_earned = 0
+        self.baby_snakes_destroyed = 0
+        self.hunter_snakes_destroyed = 0
+        self.hunter_segments_removed = 0
         self.score = 0
