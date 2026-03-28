@@ -226,6 +226,8 @@ class SurroundSession(GameSession):
         self.host.log("[SURROUND] Session entering - on_enter called")
         self.host.clear_all_pixels()
         current_time = self.host.now()
+        # CRITICAL: Initialize last_tick_time to prevent huge delta on first tick
+        self.last_tick_time = current_time
         # Start in WAITING phase - wait for player to press a button
         self.surround_phase = SurroundPhase.WAITING
         self.phase = BaseGamePhase.SETUP
@@ -264,6 +266,7 @@ class SurroundSession(GameSession):
             self._process_movement(player_id, normalized_action, current_time)
         
             # Handle color buttons
+        # Handle color buttons
         elif normalized_action in ("red", "green", "blue", "orange", "white"):
             pressed = value if isinstance(value, bool) else True
             self.host.log(f"[SURROUND] P{player_id} button {normalized_action} pressed={pressed}")
@@ -275,7 +278,6 @@ class SurroundSession(GameSession):
                 return
             
             self._handle_button(player_id, normalized_action, pressed, current_time)
-            self._handle_button(player_id, normalized_action, pressed, current_time)
     
     def tick(self, now_monotonic: float) -> None:
         """Main game update tick."""
@@ -284,13 +286,21 @@ class SurroundSession(GameSession):
         try:
             # Handle WAITING phase - just render player position, waiting for button press
             if self.surround_phase == SurroundPhase.WAITING:
+                # Keep last_tick_time fresh to prevent stale delta when game starts
+                self.last_tick_time = current_time
                 # Render the player marker so they can see where they are
                 self._render_all(current_time)
                 return
             
             # Handle countdown phase
             if self.surround_phase == SurroundPhase.COUNTDOWN:
+                # Keep last_tick_time fresh to prevent stale delta when game starts
+                self.last_tick_time = current_time
                 elapsed = current_time - self.phase_start_time
+                remaining = self.countdown_sec - elapsed
+                # Log countdown seconds
+                if remaining > 0:
+                    self.host.log(f"[SURROUND] Countdown: {int(remaining) + 1}")
                 # Render during countdown so player can see their position
                 self._render_all(current_time)
                 if elapsed >= self.countdown_sec:
@@ -304,7 +314,14 @@ class SurroundSession(GameSession):
             
             delta_ms = (current_time - self.last_tick_time) * 1000
             self.last_tick_time = current_time
-            delta_ms = min(delta_ms, 100)
+            
+            # Cap delta to prevent physics explosion from stale time
+            if delta_ms > 100:
+                self.host.log(f"[SURROUND] WARNING: Large delta_ms={delta_ms:.1f}, capping to 100")
+                delta_ms = 100
+            
+            if delta_ms <= 0:
+                return
             
             # Update each player's game state
             for player_cfg in self.players:
@@ -385,9 +402,11 @@ class SurroundSession(GameSession):
     
     def start_countdown(self, current_time: float) -> None:
         """Start the pre-game countdown."""
+        self.host.log(f"[SURROUND] Starting countdown ({self.countdown_sec} seconds)")
         self.surround_phase = SurroundPhase.COUNTDOWN
         self.phase = BaseGamePhase.COUNTDOWN
         self.phase_start_time = current_time
+        self.last_tick_time = current_time  # Reset to prevent stale delta
     
     def _start_round(self, current_time: float) -> None:
         """Start the actual gameplay."""
@@ -558,12 +577,12 @@ class SurroundSession(GameSession):
             return
         
         # Fire in the direction the player is facing/moving
-        # UP direction means player moved toward pixel 99, so fire toward pixel 99 (TOP_TO_BOTTOM)
-        # DOWN direction means player moved toward pixel 0, so fire toward pixel 0 (BOTTOM_TO_TOP)
+        # UP = player moved toward pixel 0, so fire toward pixel 0 (BOTTOM_TO_TOP)
+        # DOWN = player moved toward pixel 99, so fire toward pixel 99 (TOP_TO_BOTTOM)
         if ps.vertical_direction == VerticalDirection.UP:
-            fire_direction = TravelDirection.TOP_TO_BOTTOM
-        else:
             fire_direction = TravelDirection.BOTTOM_TO_TOP
+        else:
+            fire_direction = TravelDirection.TOP_TO_BOTTOM
         
         lanes_to_fire = [ps.current_lane]
         

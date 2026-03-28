@@ -1,5 +1,42 @@
 # Changelog
 
+
+Version 22.1.4 (In Progress - Has Syntax Error)
+Attempted to add WAITING phase before countdown (wait for button press to start)
+Contains IndentationError that prevents loading
+Version 22.1.3
+Fixed player movement direction (UP moves toward pixel 99, DOWN toward pixel 0)
+Added WAITING phase - game waits for player button press before starting countdown
+Added last_tick_time initialization in on_enter() to prevent large delta spikes
+Added delta_ms cap (100ms max) to prevent physics explosion
+Added traceback logging for errors in _update_player_game()
+Firing direction inverted (BUG - needs reverting)
+Version 22.1.2
+Added normalized action logging for debugging
+Lane switching now logs confirmation messages
+Button presses log with pressed=True/False
+Version 22.1.1
+Fixed input normalization (P1_RED → red)
+Added joystick deadzone handling
+Movement processing for UP/DOWN/LEFT/RIGHT buttons
+Version 22.1.0
+Initial Surround game integration
+Basic snake spawning, movement, projectile system
+Two-lane gameplay structure
+
+
+items that need to be addressed with 22.1.4- 
+
+Current Issues to Address Tomorrow
+Firing Direction Reversed: When moving forward (joystick up), projectiles fire backward instead of in the direction of movement. Need to swap the firing direction logic back.
+
+Countdown Not Showing on Viewer: The viewer stays stuck on "press any button to start" screen and never shows the countdown (3, 2, 1, GO).
+
+Game Freeze/Blink After ~2 Minutes: Snakes and player position freeze, then the display blinks at approximately 1-second intervals. Input is still being logged but nothing moves. This has been a persistent issue.
+
+Syntax Error in surround.py v22.1.4: IndentationError at line 280 - there's a malformed block around the button handling code in on_input().
+
+
 ## [22.0.0] - 2026-03-27
 
 ### Added - Surround Game
