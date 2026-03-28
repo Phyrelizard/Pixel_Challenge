@@ -3,10 +3,10 @@
   "animate_enabled": true,
   "cycle_seconds": 20,
   "per_theme_speed": {
-    "Fire Burst": 7,
+    "Fire Burst": 6,
     "Bounce Chase": 8,
     "Rainbow Pulse": 9,
-    "Calm Mode": 8,
+    "Calm Mode": 10,
     "Team Colors": 7,
     "Color Wash": 10,
     "Lane Chase LR": 6,
@@ -15,18 +15,16 @@
     "Lane Chase RL": 6
   },
   "selected_themes": [
-    "Lane Chase RL",
     "Ice Burst",
-    "Color Wash",
-    "Team Colors",
-    "Bounce Chase"
+    "Galaxy Wave",
+    "Color Wash"
   ],
-  "sash_left_attract_bottom": 726,
+  "sash_left_attract_bottom": 842,
   "sash_center_ctrl": 677,
   "sash_main_info": 540,
   "sash_bottom_log": 51,
-  "falcon_brightness": 22,
-  "gameplay_brightness": 36,
+  "falcon_brightness": 43,
+  "gameplay_brightness": 99,
   "falcon_ip": "192.168.2.113",
   "wifi_ssid": "",
   "wifi_psk": "",
@@ -41,5 +39,5 @@
   "backup_restore": true,
   "apply_reboot": true,
   "debug_logging": false,
-  "setup_geometry": "900x714+2432+74"
+  "setup_geometry": "1920x998+1920+82"
 }

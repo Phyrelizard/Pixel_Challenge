@@ -11,7 +11,7 @@
       "reverse_direction": true
     },
     "right": {
-      "snake_speed_ms": 350,
+      "snake_speed_ms": 300,
       "band_count_min": 2,
       "band_count_max": 3,
       "band_size_mode": "fixed",
