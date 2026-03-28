@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
-Surround Game Module
-Version 22.1.3
+surround.py Game Module v1.0.1
+first tested with pixel_challenge_console.py v22.1.3
+updated for pixel_challenge_console.py v22.1.5
 
 A center-defense, two-lane, dual-direction pressure game with eggs,
 hatch events, and special hunter threats.
@@ -11,6 +13,8 @@ Supports two modes:
 - Mode 2: Objective Game (lives, Hunter Snake boss)
 """
 from __future__ import annotations
+
+VERSION_LABEL = "v1.0.1"
 
 import json
 import os
@@ -1316,6 +1320,7 @@ class SurroundModule(GameModule):
         title="Surround",
         min_players=1,
         max_players=4,
+        version=VERSION_LABEL,
         requires_color_selection=False,
         supports_sla=False,
         description="Center-defense game with dual-direction snakes and Hunter bosses"

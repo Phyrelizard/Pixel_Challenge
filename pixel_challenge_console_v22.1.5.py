@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v22.1.4a
+Pixel Challenge Host Console v22.1.5
 
 """
 import os
@@ -25,7 +25,7 @@ from games.base import PlayerConfig
 # SLA System (v21.8.0)
 from sla import SLAStore, SLACalibration
 
-VERSION_LABEL = "v22.1.4a"
+VERSION_LABEL = "v22.1.5"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 DEFAULT_FALCON_IP = "192.168.2.113"
@@ -37,20 +37,7 @@ ASSETS_DIR = "/home/ledgame/easter_game/assets"
 SETTINGS_FILE = "/home/ledgame/easter_game/attract_theme_maps.json"
 GAMES_ROOT = "/home/ledgame/easter_game/games"
 
-DOT_DASH_PATH = os.path.join(GAMES_ROOT, "dot_dash", "dot_dash.py")
-DOT_DASH_VERSION_LABEL = "dot_dash.py (not found)"
-
-if os.path.exists(DOT_DASH_PATH):
-    try:
-        with open(DOT_DASH_PATH, "r", encoding="utf-8") as f:
-            for line in f:
-                if line.strip().startswith("VERSION_LABEL"):
-                    parts = line.split("=")
-                    if len(parts) > 1:
-                        DOT_DASH_VERSION_LABEL = parts[1].strip().strip('"').strip("'")
-                    break
-    except Exception:
-        DOT_DASH_VERSION_LABEL = "dot_dash.py (read error)"
+# Game module versions are now read from GameMeta.version in each game module
 
 DEFAULT_THEME_SPEED = 5
 MIN_LEFT = 340
@@ -611,9 +598,6 @@ class PixelChallengeConsole:
 ==============================================
           CONSOLE START - {VERSION_LABEL}
 ---   {CONSOLE_FILENAME}
-----------------------------------------------
-          GAME MODULE:
----   {DOT_DASH_VERSION_LABEL}
 ==============================================
 """
         try:
@@ -621,6 +605,36 @@ class PixelChallengeConsole:
                 f.write(header)
         except Exception:
             pass
+
+    def get_game_module_version(self, game_key: str) -> str:
+        """Get the version string from a game module's META."""
+        try:
+            game_meta = self.game_manager.registry.get(game_key)
+            if game_meta and hasattr(game_meta, 'META'):
+                meta = game_meta.META
+                version = getattr(meta, 'version', 'unknown')
+                title = getattr(meta, 'title', game_key)
+                return f"{title} {version}"
+        except Exception:
+            pass
+        return f"{game_key} (version unknown)"
+
+    def write_game_start_log(self, game_key: str):
+        """Write a log header when a game starts."""
+        game_version = self.get_game_module_version(game_key)
+        header = f"""
+----------------------------------------------
+          GAME START
+---   Console: {VERSION_LABEL}
+---   Game: {game_version}
+----------------------------------------------
+"""
+        try:
+            with open(self.log_file, "a", encoding="utf-8") as f:
+                f.write(header)
+        except Exception:
+            pass
+        self.log(f"Starting game: {game_version}")
 
     def load_assignments(self):
         if not os.path.exists(ASSIGNMENTS_FILE):
@@ -1555,6 +1569,8 @@ class PixelChallengeConsole:
         self.checkin_open = False
         self.falcon.set_brightness(int(self.gameplay_brightness_percent.get()))
 
+        # Write game start header to log file
+        self.write_game_start_log(game_key)
         self.log(f"Starting {game_name} with {len(players)} player(s)")
         self.refresh_player_status_panel()
         self.refresh_controller_panel()

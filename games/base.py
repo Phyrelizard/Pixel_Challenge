@@ -40,6 +40,7 @@ class GameMeta:
     title: str
     min_players: int
     max_players: int
+    version: str = "v1.0.0"
     requires_color_selection: bool = False
     supports_sla: bool = False
     description: str = ""

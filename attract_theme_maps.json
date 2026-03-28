@@ -1,7 +1,7 @@
 {
   "auto_enabled": true,
   "animate_enabled": false,
-  "cycle_seconds": 20,
+  "cycle_seconds": 40,
   "per_theme_speed": {
     "Fire Burst": 6,
     "Bounce Chase": 8,
@@ -9,15 +9,15 @@
     "Calm Mode": 10,
     "Team Colors": 7,
     "Color Wash": 10,
-    "Lane Chase LR": 6,
+    "Lane Chase LR": 5,
     "Ice Burst": 9,
     "Galaxy Wave": 10,
     "Lane Chase RL": 6
   },
   "selected_themes": [
     "Color Wash",
-    "Galaxy Wave",
-    "Ice Burst"
+    "Ice Burst",
+    "Galaxy Wave"
   ],
   "sash_left_attract_bottom": 726,
   "sash_center_ctrl": 677,
