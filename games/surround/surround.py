@@ -226,9 +226,11 @@ class SurroundSession(GameSession):
         self.host.log("[SURROUND] Session entering - on_enter called")
         self.host.clear_all_pixels()
         current_time = self.host.now()
-        self.host.log(f"[SURROUND] Starting countdown at time {current_time:.2f}")
-        self.start_countdown(current_time)
-        self.host.log(f"[SURROUND] Phase is now: {self.surround_phase.value}")
+        # Start in WAITING phase - wait for player to press a button
+        self.surround_phase = SurroundPhase.WAITING
+        self.phase = BaseGamePhase.SETUP
+        self.phase_start_time = current_time
+        self.host.log(f"[SURROUND] Phase is now: {self.surround_phase.value} - waiting for player input")
     
     def on_input(self, player_id: int, action: str, value: Any = None) -> None:
         """Handle player input."""
@@ -261,10 +263,18 @@ class SurroundSession(GameSession):
         elif normalized_action in ("up", "down", "left", "right"):
             self._process_movement(player_id, normalized_action, current_time)
         
-        # Handle color buttons
+            # Handle color buttons
         elif normalized_action in ("red", "green", "blue", "orange", "white"):
             pressed = value if isinstance(value, bool) else True
             self.host.log(f"[SURROUND] P{player_id} button {normalized_action} pressed={pressed}")
+            
+            # If in WAITING phase, any button press starts the countdown
+            if self.surround_phase == SurroundPhase.WAITING and pressed:
+                self.host.log(f"[SURROUND] P{player_id} pressed {normalized_action} - starting countdown!")
+                self.start_countdown(current_time)
+                return
+            
+            self._handle_button(player_id, normalized_action, pressed, current_time)
             self._handle_button(player_id, normalized_action, pressed, current_time)
     
     def tick(self, now_monotonic: float) -> None:
@@ -272,9 +282,17 @@ class SurroundSession(GameSession):
         current_time = now_monotonic
         
         try:
+            # Handle WAITING phase - just render player position, waiting for button press
+            if self.surround_phase == SurroundPhase.WAITING:
+                # Render the player marker so they can see where they are
+                self._render_all(current_time)
+                return
+            
             # Handle countdown phase
             if self.surround_phase == SurroundPhase.COUNTDOWN:
                 elapsed = current_time - self.phase_start_time
+                # Render during countdown so player can see their position
+                self._render_all(current_time)
                 if elapsed >= self.countdown_sec:
                     self.host.log("[SURROUND] Countdown complete - starting round")
                     self._start_round(current_time)
@@ -492,25 +510,25 @@ class SurroundSession(GameSession):
                     ps.vertical_direction = VerticalDirection.NONE  # Reset direction on lane switch
                     self.host.log(f"[SURROUND] P{player_id} switched to RIGHT lane")
         
-        # UP = move marker toward pixel 0
+            # UP = move marker toward pixel 99 (forward on joystick = toward end of lane)
         elif direction == "up":
-            old_row = ps.current_row
-            half = ps.marker_pixels // 2
-            min_row = half
-            ps.current_row = max(min_row, ps.current_row - self.player_speed)
-            ps.vertical_direction = VerticalDirection.UP
-            if ps.current_row != old_row:
-                self.host.log(f"[SURROUND] P{player_id} moved UP: {old_row} -> {ps.current_row}")
-        
-        # DOWN = move marker toward pixel 99
-        elif direction == "down":
             old_row = ps.current_row
             half = ps.marker_pixels // 2
             max_row = self.lane_length - 1 - half
             ps.current_row = min(max_row, ps.current_row + self.player_speed)
+            ps.vertical_direction = VerticalDirection.UP
+            if ps.current_row != old_row:
+                self.host.log(f"[SURROUND] P{player_id} moved UP (toward 99): {old_row} -> {ps.current_row}")
+        
+        # DOWN = move marker toward pixel 0 (back on joystick = toward start of lane)
+        elif direction == "down":
+            old_row = ps.current_row
+            half = ps.marker_pixels // 2
+            min_row = half
+            ps.current_row = max(min_row, ps.current_row - self.player_speed)
             ps.vertical_direction = VerticalDirection.DOWN
             if ps.current_row != old_row:
-                self.host.log(f"[SURROUND] P{player_id} moved DOWN: {old_row} -> {ps.current_row}")
+                self.host.log(f"[SURROUND] P{player_id} moved DOWN (toward 0): {old_row} -> {ps.current_row}")
     
     def _handle_button(self, player_id: int, button: str, pressed: bool, current_time: float) -> None:
         """Handle color button press."""
@@ -539,10 +557,13 @@ class SurroundSession(GameSession):
         if not ps:
             return
         
+        # Fire in the direction the player is facing/moving
+        # UP direction means player moved toward pixel 99, so fire toward pixel 99 (TOP_TO_BOTTOM)
+        # DOWN direction means player moved toward pixel 0, so fire toward pixel 0 (BOTTOM_TO_TOP)
         if ps.vertical_direction == VerticalDirection.UP:
-            fire_direction = TravelDirection.BOTTOM_TO_TOP
-        else:
             fire_direction = TravelDirection.TOP_TO_BOTTOM
+        else:
+            fire_direction = TravelDirection.BOTTOM_TO_TOP
         
         lanes_to_fire = [ps.current_lane]
         
@@ -640,7 +661,9 @@ class SurroundSession(GameSession):
             self._update_speeds(player_id, current_time)
         
         except Exception as e:
+            import traceback
             self.host.log(f"[SURROUND] ERROR in _update_player_game P{player_id}: {type(e).__name__}: {e}")
+            self.host.log(f"[SURROUND] Traceback: {traceback.format_exc()}")
     
     def _update_snakes(self, player_id: int, current_time: float, delta_ms: float) -> None:
         """Update all normal snakes for a player."""
