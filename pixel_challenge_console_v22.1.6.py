@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v21.12.1
+Pixel Challenge Host Console v22.1.6
 
 """
 import os
@@ -25,7 +25,7 @@ from games.base import PlayerConfig
 # SLA System (v21.8.0)
 from sla import SLAStore, SLACalibration
 
-VERSION_LABEL = "v21.12.1"
+VERSION_LABEL = "v22.1.6"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 DEFAULT_FALCON_IP = "192.168.2.113"
@@ -37,20 +37,7 @@ ASSETS_DIR = "/home/ledgame/easter_game/assets"
 SETTINGS_FILE = "/home/ledgame/easter_game/attract_theme_maps.json"
 GAMES_ROOT = "/home/ledgame/easter_game/games"
 
-DOT_DASH_PATH = os.path.join(GAMES_ROOT, "dot_dash", "dot_dash.py")
-DOT_DASH_VERSION_LABEL = "dot_dash.py (not found)"
-
-if os.path.exists(DOT_DASH_PATH):
-    try:
-        with open(DOT_DASH_PATH, "r", encoding="utf-8") as f:
-            for line in f:
-                if line.strip().startswith("VERSION_LABEL"):
-                    parts = line.split("=")
-                    if len(parts) > 1:
-                        DOT_DASH_VERSION_LABEL = parts[1].strip().strip('"').strip("'")
-                    break
-    except Exception:
-        DOT_DASH_VERSION_LABEL = "dot_dash.py (read error)"
+# Game module versions are now read from GameMeta.version in each game module
 
 DEFAULT_THEME_SPEED = 5
 MIN_LEFT = 340
@@ -611,9 +598,6 @@ class PixelChallengeConsole:
 ==============================================
           CONSOLE START - {VERSION_LABEL}
 ---   {CONSOLE_FILENAME}
-----------------------------------------------
-          GAME MODULE:
----   {DOT_DASH_VERSION_LABEL}
 ==============================================
 """
         try:
@@ -621,6 +605,36 @@ class PixelChallengeConsole:
                 f.write(header)
         except Exception:
             pass
+
+    def get_game_module_version(self, game_key: str) -> str:
+        """Get the version string from a game module's META."""
+        try:
+            game_meta = self.game_manager.registry.get(game_key)
+            if game_meta and hasattr(game_meta, 'META'):
+                meta = game_meta.META
+                version = getattr(meta, 'version', 'unknown')
+                title = getattr(meta, 'title', game_key)
+                return f"{title} {version}"
+        except Exception:
+            pass
+        return f"{game_key} (version unknown)"
+
+    def write_game_start_log(self, game_key: str):
+        """Write a log header when a game starts."""
+        game_version = self.get_game_module_version(game_key)
+        header = f"""
+----------------------------------------------
+          GAME START
+---   Console: {VERSION_LABEL}
+---   Game: {game_version}
+----------------------------------------------
+"""
+        try:
+            with open(self.log_file, "a", encoding="utf-8") as f:
+                f.write(header)
+        except Exception:
+            pass
+        self.log(f"Starting game: {game_version}")
 
     def load_assignments(self):
         if not os.path.exists(ASSIGNMENTS_FILE):
@@ -1247,28 +1261,49 @@ class PixelChallengeConsole:
                     self.button_last_state[js_index][btn_idx] = current_state
                 
                 # Poll joystick axes for lane switching
+                # Poll joystick axes for lane switching AND vertical movement
                 if not self.button_map_mode and js.get_numaxes() >= 1:
                     try:
                         x_axis = js.get_axis(0)  # X axis for left/right
-                        axis_key = f"axis_{js_index}"
-                        prev_axis = self.button_last_state[js_index].get(axis_key, 0.0)
+                        axis_x_key = f"axis_x_{js_index}"
+                        prev_x_axis = self.button_last_state[js_index].get(axis_x_key, 0.0)
                         
                         # Deadzone threshold
                         DEADZONE = 0.5
                         
                         # Detect transition from center to left/right
-                        if x_axis < -DEADZONE and prev_axis >= -DEADZONE:
+                        if x_axis < -DEADZONE and prev_x_axis >= -DEADZONE:
                             # Moved LEFT
                             self.handle_button_press(player_id, "LEFT")
                             if self.debug_logging.get():
                                 self.log(f"[JOYSTICK] P{player_id} axis LEFT")
-                        elif x_axis > DEADZONE and prev_axis <= DEADZONE:
+                        elif x_axis > DEADZONE and prev_x_axis <= DEADZONE:
                             # Moved RIGHT
                             self.handle_button_press(player_id, "RIGHT")
                             if self.debug_logging.get():
                                 self.log(f"[JOYSTICK] P{player_id} axis RIGHT")
                         
-                        self.button_last_state[js_index][axis_key] = x_axis
+                        self.button_last_state[js_index][axis_x_key] = x_axis
+                        
+                        # Y axis for up/down movement (if available)
+                        if js.get_numaxes() >= 2:
+                            y_axis = js.get_axis(1)  # Y axis for up/down
+                            axis_y_key = f"axis_y_{js_index}"
+                            prev_y_axis = self.button_last_state[js_index].get(axis_y_key, 0.0)
+                            
+                            # Detect transition from center to up/down
+                            if y_axis < -DEADZONE and prev_y_axis >= -DEADZONE:
+                                # Moved UP (joystick forward)
+                                self.handle_button_press(player_id, "UP")
+                                if self.debug_logging.get():
+                                    self.log(f"[JOYSTICK] P{player_id} axis UP")
+                            elif y_axis > DEADZONE and prev_y_axis <= DEADZONE:
+                                # Moved DOWN (joystick back)
+                                self.handle_button_press(player_id, "DOWN")
+                                if self.debug_logging.get():
+                                    self.log(f"[JOYSTICK] P{player_id} axis DOWN")
+                            
+                            self.button_last_state[js_index][axis_y_key] = y_axis
                     except Exception:
                         pass
                         
@@ -1394,6 +1429,15 @@ class PixelChallengeConsole:
         self.countdown_value = 5
         self.set_state(HostState.COUNTDOWN, "Countdown starting...")
         self.run_countdown_step()
+ 
+    def cancel_countdown(self):
+        """Cancel any pending countdown timer."""
+        if hasattr(self, 'countdown_after_id') and self.countdown_after_id:
+            try:
+                self.root.after_cancel(self.countdown_after_id)
+            except Exception:
+                pass
+            self.countdown_after_id = None
 
     def run_countdown_step(self):
         """Execute one step of the countdown with red-red-red-yellow-yellow sequence, then game handles green"""
@@ -1525,6 +1569,8 @@ class PixelChallengeConsole:
         self.checkin_open = False
         self.falcon.set_brightness(int(self.gameplay_brightness_percent.get()))
 
+        # Write game start header to log file
+        self.write_game_start_log(game_key)
         self.log(f"Starting {game_name} with {len(players)} player(s)")
         self.refresh_player_status_panel()
         self.refresh_controller_panel()
@@ -1588,12 +1634,25 @@ class PixelChallengeConsole:
         self.root.after(33, self.game_tick_setup)
 
     def on_game_setup_complete(self):
-        """Called by game module when all players have completed setup (color selection)"""
+        """Called by game module when all players have completed setup (color selection or ready)"""
         if self.host_state != HostState.GAME_SETUP:
             return
-        self.log("All players ready - holding colors for 4 seconds")
-        # Keep lanes lit with selected colors for 4 seconds, then turn off and countdown
-        self.root.after(4000, self._after_color_hold)
+        
+        # Check if game requires color selection (like Dot Dash)
+        game_key = self.current_game_key()
+        game_meta = self.game_manager.registry.get(game_key)
+        requires_color_selection = True
+        if game_meta and hasattr(game_meta, 'META'):
+            requires_color_selection = game_meta.META.requires_color_selection
+        
+        if requires_color_selection:
+            # Color selection games: hold colors for 4 seconds, then countdown
+            self.log("All players ready - holding colors for 4 seconds")
+            self.root.after(4000, self._after_color_hold)
+        else:
+            # Non-color-selection games: start countdown immediately
+            self.log("Player ready - starting countdown")
+            self.start_countdown(self.pending_players)
 
     def _after_color_hold(self):
         """Called 4 seconds after all players selected colors - turn off lanes and start countdown"""
@@ -1625,8 +1684,13 @@ class PixelChallengeConsole:
         self.root.after(33, self.game_tick)
 
     def on_stop_game(self):
-        self.cancel_viewer_return()
-        self.cancel_countdown()
+        # Cancel any pending countdown if it exists
+        if hasattr(self, 'countdown_after_id') and self.countdown_after_id:
+            try:
+                self.root.after_cancel(self.countdown_after_id)
+            except Exception:
+                pass
+            self.countdown_after_id = None
         
         if self.game_manager.is_running():
             self.game_manager.abort_game()

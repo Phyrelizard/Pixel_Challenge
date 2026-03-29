@@ -1,5 +1,54 @@
 # Changelog
 
+v22.1.6 (2026-03-29)
+Console (pixel_challenge_console_v22.1.6.py)
+Fixed:
+
+Fixed countdown display not showing on viewer for Surround game
+Fixed lane flashing not occurring during countdown for non-color-selection games
+Corrected responsibility separation: console now properly owns countdown display and lane flashing for all games
+Changed:
+
+on_game_setup_complete() now differentiates between color-selection games (Dot Dash) and ready-up games (Surround)
+Non-color-selection games now skip the 4-second color hold and proceed directly to countdown
+Surround (surround.py v1.0.2)
+Fixed:
+
+Removed internal countdown logic that was conflicting with console's countdown responsibilities
+Game now properly signals console when player is ready instead of running its own countdown
+Fixed countdown spam in logs (was logging every tick instead of once per second)
+Changed:
+
+Added signal_start() method for console to call after countdown completes
+Player button press in WAITING phase now triggers on_game_setup_complete() callback to console
+Simplified tick handler during countdown phase - just renders while waiting for console signal
+Base (games/base.py)
+Added:
+
+Added version field to GameMeta dataclass (default: "v1.0.0")
+Enables accurate game module version reporting in logs
+Logging Improvements
+Added:
+
+Game start log header now includes both console version and game module version
+Format: Console: v22.1.6 / Game: Surround v1.0.2
+New method get_game_module_version() retrieves version from game's META
+New method write_game_start_log() writes formatted header when game starts
+Architecture Clarification
+This release reinforces the separation of responsibilities:
+
+Component	Responsibility
+Console	Countdown display, lane flashing during countdown, game lifecycle management
+Game Module	Gameplay logic, signal readiness, report results
+Games should:
+
+Wait for player ready signal (button press)
+Call host.on_game_setup_complete() to tell console "start your countdown"
+Wait for signal_start() call from console
+Run gameplay
+Report results back to console
+
+====================================
 
 Version 22.1.4 (In Progress - Has Syntax Error)
 Attempted to add WAITING phase before countdown (wait for button press to start)

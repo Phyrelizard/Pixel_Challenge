@@ -14,7 +14,7 @@ Supports two modes:
 """
 from __future__ import annotations
 
-VERSION_LABEL = "v1.0.1"
+VERSION_LABEL = "v1.0.2"
 
 import json
 import os
@@ -183,8 +183,12 @@ class SurroundSession(GameSession):
             self.kills_since_last_extra_life[player_cfg.player_id] = 0
         
         # Results
+        # Results
         self.game_complete = False
         self.results: Dict[int, Dict[str, Any]] = {}
+        
+        # Track if we've signaled console that setup is complete
+        self._setup_complete_signaled = False
     
     def _load_config(self, mode: int) -> dict:
         """Load configuration for the specified mode."""
@@ -271,14 +275,21 @@ class SurroundSession(GameSession):
         
             # Handle color buttons
         # Handle color buttons
+        # Handle color buttons
         elif normalized_action in ("red", "green", "blue", "orange", "white"):
             pressed = value if isinstance(value, bool) else True
             self.host.log(f"[SURROUND] P{player_id} button {normalized_action} pressed={pressed}")
             
-            # If in WAITING phase, any button press starts the countdown
+            # If in WAITING phase, any button press signals console to start countdown
             if self.surround_phase == SurroundPhase.WAITING and pressed:
-                self.host.log(f"[SURROUND] P{player_id} pressed {normalized_action} - starting countdown!")
-                self.start_countdown(current_time)
+                if not self._setup_complete_signaled:
+                    self._setup_complete_signaled = True
+                    self.surround_phase = SurroundPhase.COUNTDOWN
+                    self.phase = BaseGamePhase.READY
+                    self.host.log(f"[SURROUND] P{player_id} ready - signaling console to start countdown")
+                    # Console will handle countdown display and lane flashing
+                    if hasattr(self.host, 'on_game_setup_complete'):
+                        self.host.on_game_setup_complete()
                 return
             
             self._handle_button(player_id, normalized_action, pressed, current_time)
@@ -289,27 +300,11 @@ class SurroundSession(GameSession):
         
         try:
             # Handle WAITING phase - just render player position, waiting for button press
-            if self.surround_phase == SurroundPhase.WAITING:
-                # Keep last_tick_time fresh to prevent stale delta when game starts
-                self.last_tick_time = current_time
-                # Render the player marker so they can see where they are
-                self._render_all(current_time)
-                return
-            
-            # Handle countdown phase
+            # Handle countdown phase - console owns the countdown display
+            # We just keep rendering and wait for console to call signal_start()
             if self.surround_phase == SurroundPhase.COUNTDOWN:
-                # Keep last_tick_time fresh to prevent stale delta when game starts
                 self.last_tick_time = current_time
-                elapsed = current_time - self.phase_start_time
-                remaining = self.countdown_sec - elapsed
-                # Log countdown seconds
-                if remaining > 0:
-                    self.host.log(f"[SURROUND] Countdown: {int(remaining) + 1}")
-                # Render during countdown so player can see their position
                 self._render_all(current_time)
-                if elapsed >= self.countdown_sec:
-                    self.host.log("[SURROUND] Countdown complete - starting round")
-                    self._start_round(current_time)
                 return
             
             # Only process game logic in PLAYING phase
@@ -404,13 +399,11 @@ class SurroundSession(GameSession):
     # GAME PHASE MANAGEMENT
     # =========================================================================
     
-    def start_countdown(self, current_time: float) -> None:
-        """Start the pre-game countdown."""
-        self.host.log(f"[SURROUND] Starting countdown ({self.countdown_sec} seconds)")
-        self.surround_phase = SurroundPhase.COUNTDOWN
-        self.phase = BaseGamePhase.COUNTDOWN
-        self.phase_start_time = current_time
-        self.last_tick_time = current_time  # Reset to prevent stale delta
+    def signal_start(self) -> None:
+        """Called by console after countdown completes - start the actual game."""
+        current_time = self.host.now()
+        self.host.log("[SURROUND] Console signaled GO - starting round")
+        self._start_round(current_time)
     
     def _start_round(self, current_time: float) -> None:
         """Start the actual gameplay."""
