@@ -6,7 +6,7 @@
     "Fire Burst": 6,
     "Bounce Chase": 8,
     "Rainbow Pulse": 9,
-    "Calm Mode": 10,
+    "Calm Mode": 1,
     "Team Colors": 7,
     "Color Wash": 10,
     "Lane Chase LR": 5,
@@ -15,14 +15,14 @@
     "Lane Chase RL": 6
   },
   "selected_themes": [
-    "Bounce Chase",
+    "Lane Chase LR",
     "Galaxy Wave",
-    "Lane Chase LR"
+    "Bounce Chase"
   ],
-  "sash_left_attract_bottom": 726,
+  "sash_left_attract_bottom": 818,
   "sash_center_ctrl": 677,
-  "sash_main_info": 540,
-  "sash_bottom_log": 51,
+  "sash_main_info": 510,
+  "sash_bottom_log": 687,
   "falcon_brightness": 14,
   "gameplay_brightness": 39,
   "falcon_ip": "192.168.2.113",
@@ -39,5 +39,6 @@
   "backup_restore": true,
   "apply_reboot": true,
   "debug_logging": false,
-  "setup_geometry": "1920x998+1920+82"
+  "setup_geometry": "1920x998+1920+82",
+  "game_mode": 1
 }

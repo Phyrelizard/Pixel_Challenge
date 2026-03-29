@@ -27,8 +27,8 @@
     },
     
     "movement": {
-        "hold_initial_delay_ms": 150,
-        "hold_repeat_ms": 50,
+        "hold_initial_delay_ms": 120,
+        "hold_repeat_ms": 35,
         "lane_switch_cooldown_ms": 100,
         "input_priority": "vertical_first"
     },

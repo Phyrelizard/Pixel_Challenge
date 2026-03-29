@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # -*- coding: utf-8 -*-
 """
-surround.py Game Module v1.0.1
+surround.py Game Module v1.0.3
 first tested with pixel_challenge_console.py v22.1.3
 updated for pixel_challenge_console.py v22.1.5
 
@@ -14,7 +14,7 @@ Supports two modes:
 """
 from __future__ import annotations
 
-VERSION_LABEL = "v1.0.2"
+VERSION_LABEL = "v1.0.3"
 
 import json
 import os
@@ -104,7 +104,8 @@ class SurroundSession(GameSession):
             self.joystick_state[player_cfg.player_id] = {
                 "held_direction": None,
                 "hold_start_time": 0.0,
-                "last_repeat_time": 0.0
+                "last_repeat_time": 0.0,
+                "axis_y_raw": 0.0,  # Raw joystick Y value for smooth continuous movement
             }
         
         # Projectile config
@@ -325,6 +326,8 @@ class SurroundSession(GameSession):
             # Update each player's game state
             for player_cfg in self.players:
                 pid = player_cfg.player_id
+                # Process continuous joystick movement
+                self._process_held_movement(pid, current_time)
                 self._update_player_game(pid, current_time, delta_ms)
             
             # Render pixels
@@ -419,11 +422,21 @@ class SurroundSession(GameSession):
         else:
             self.round_end_time = 0
         
-        # Reset spawn timers
+        # Reset spawn timers - set to past time so first spawn happens immediately
+        # Subtract spawn_interval to trigger immediate spawn
         for pid in self.last_spawn_time:
             for lane in self.lanes:
                 for direction in ["top_to_bottom", "bottom_to_top"]:
-                    self.last_spawn_time[pid][lane][direction] = current_time
+                    # Set to past so first spawn check passes immediately
+                    self.last_spawn_time[pid][lane][direction] = current_time - 10.0
+        
+        # Force immediate first spawn for all players
+        for player_cfg in self.players:
+            self._spawn_snakes(player_cfg.player_id, current_time)
+            # Now set proper spawn times for subsequent spawns
+            for lane in self.lanes:
+                for direction in ["top_to_bottom", "bottom_to_top"]:
+                    self.last_spawn_time[player_cfg.player_id][lane][direction] = current_time
     
     def _end_round(self, current_time: float) -> None:
         """End the round."""
@@ -485,11 +498,16 @@ class SurroundSession(GameSession):
         deadzone = 0.3
         
         # Y-axis controls vertical movement (up/down the lane)
+        js_state = self.joystick_state.get(player_id, {})
         if abs(y) > deadzone:
-            if y < -deadzone:  # Joystick up
+            if y < -deadzone:  # Joystick up (toward pixel 99)
                 self._process_movement(player_id, "up", current_time)
-            elif y > deadzone:  # Joystick down
+            elif y > deadzone:  # Joystick down (toward pixel 0)
                 self._process_movement(player_id, "down", current_time)
+        else:
+            # Joystick returned to center - clear held direction
+            if js_state.get("held_direction") in ("up", "down"):
+                js_state["held_direction"] = None
         
         # X-axis controls lane switching
         if abs(x) > 0.5:  # Lane switch deadzone
@@ -533,8 +551,12 @@ class SurroundSession(GameSession):
             max_row = self.lane_length - 1 - half
             ps.current_row = min(max_row, ps.current_row + self.player_speed)
             ps.vertical_direction = VerticalDirection.UP
-            if ps.current_row != old_row:
-                self.host.log(f"[SURROUND] P{player_id} moved UP (toward 99): {old_row} -> {ps.current_row}")
+            # Track held direction for continuous movement
+            js_state = self.joystick_state.get(player_id, {})
+            if js_state.get("held_direction") != "up":
+                js_state["held_direction"] = "up"
+                js_state["hold_start_time"] = current_time
+                js_state["last_repeat_time"] = current_time
         
         # DOWN = move marker toward pixel 0 (back on joystick = toward start of lane)
         elif direction == "down":
@@ -543,8 +565,54 @@ class SurroundSession(GameSession):
             min_row = half
             ps.current_row = max(min_row, ps.current_row - self.player_speed)
             ps.vertical_direction = VerticalDirection.DOWN
-            if ps.current_row != old_row:
-                self.host.log(f"[SURROUND] P{player_id} moved DOWN (toward 0): {old_row} -> {ps.current_row}")
+            # Track held direction for continuous movement
+            js_state = self.joystick_state.get(player_id, {})
+            if js_state.get("held_direction") != "down":
+                js_state["held_direction"] = "down"
+                js_state["hold_start_time"] = current_time
+                js_state["last_repeat_time"] = current_time
+
+    def _process_held_movement(self, player_id: int, current_time: float) -> None:
+        """Process continuous movement when joystick is held in a direction."""
+        ps = self.player_states.get(player_id)
+        if not ps or not ps.is_alive or not ps.is_active:
+            return
+        
+        js_state = self.joystick_state.get(player_id)
+        if not js_state:
+            return
+        
+        held_dir = js_state.get("held_direction")
+        if held_dir not in ("up", "down"):
+            return
+        
+        hold_start = js_state.get("hold_start_time", 0.0)
+        last_repeat = js_state.get("last_repeat_time", 0.0)
+        
+        # Check if we've passed the initial delay
+        elapsed_since_start_ms = (current_time - hold_start) * 1000
+        if elapsed_since_start_ms < self.hold_initial_delay_ms:
+            return
+        
+        # Check if it's time for a repeat
+        elapsed_since_repeat_ms = (current_time - last_repeat) * 1000
+        if elapsed_since_repeat_ms < self.hold_repeat_ms:
+            return
+        
+        # Perform the movement
+        half = ps.marker_pixels // 2
+        old_row = ps.current_row
+        
+        if held_dir == "up":
+            max_row = self.lane_length - 1 - half
+            ps.current_row = min(max_row, ps.current_row + self.player_speed)
+            ps.vertical_direction = VerticalDirection.UP
+        elif held_dir == "down":
+            min_row = half
+            ps.current_row = max(min_row, ps.current_row - self.player_speed)
+            ps.vertical_direction = VerticalDirection.DOWN
+        
+        js_state["last_repeat_time"] = current_time  
     
     def _handle_button(self, player_id: int, button: str, pressed: bool, current_time: float) -> None:
         """Handle color button press."""
@@ -574,12 +642,12 @@ class SurroundSession(GameSession):
             return
         
         # Fire in the direction the player is facing/moving
-        # UP = player moved toward pixel 0, so fire toward pixel 0 (BOTTOM_TO_TOP)
-        # DOWN = player moved toward pixel 99, so fire toward pixel 99 (TOP_TO_BOTTOM)
+        # UP = player moved toward pixel 99, so fire toward pixel 99 (TOP_TO_BOTTOM)
+        # DOWN = player moved toward pixel 0, so fire toward pixel 0 (BOTTOM_TO_TOP)
         if ps.vertical_direction == VerticalDirection.UP:
-            fire_direction = TravelDirection.BOTTOM_TO_TOP
-        else:
             fire_direction = TravelDirection.TOP_TO_BOTTOM
+        else:
+            fire_direction = TravelDirection.BOTTOM_TO_TOP
         
         lanes_to_fire = [ps.current_lane]
         

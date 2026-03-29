@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v22.1.6
+Pixel Challenge Host Console v22.2.0
 
 """
 import os
@@ -25,7 +25,7 @@ from games.base import PlayerConfig
 # SLA System (v21.8.0)
 from sla import SLAStore, SLACalibration
 
-VERSION_LABEL = "v22.1.6"
+VERSION_LABEL = "v22.2.0"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 DEFAULT_FALCON_IP = "192.168.2.113"
@@ -479,6 +479,9 @@ class PixelChallengeConsole:
         self.viewer_return_after_id = None
         self.current_intro_index = -1
         self.show_ranking = tk.BooleanVar(value=False)
+        
+        # Game mode selection (1 = TIMED, 2 = OBJECTIVE)
+        self.game_mode = tk.IntVar(value=1)
 
         self.player_status = {
             1: {"sla": 5, "state": "WAITING", "checked_in": False, "confirmed": False, "points": 0, "tickets": 0},
@@ -591,6 +594,7 @@ class PixelChallengeConsole:
         self.update_cycle_button()
         self.update_lanes_test_button()
         self.update_reassign_button()
+        self.update_mode_button()
         self.show_selected_game_splash()
 
     def write_startup_log(self):
@@ -708,6 +712,7 @@ class PixelChallengeConsole:
             self.apply_reboot.set(bool(data.get("apply_reboot", False)))
             self.debug_logging.set(bool(data.get("debug_logging", False)))
             self.setup_geometry = data.get("setup_geometry")
+            self.game_mode.set(int(data.get("game_mode", 1)))
         except Exception:
             pass
 
@@ -739,6 +744,7 @@ class PixelChallengeConsole:
             "apply_reboot": bool(self.apply_reboot.get()),
             "debug_logging": bool(self.debug_logging.get()),
             "setup_geometry": self.setup_geometry,
+            "game_mode": int(self.game_mode.get()),
         }
         try:
             with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
@@ -862,6 +868,15 @@ class PixelChallengeConsole:
         key = self.current_game_key()
         if key == "splash":
             return os.path.join(GAMES_ROOT, "global.config.json")
+        
+        # Use mode-specific config file
+        mode = self.game_mode.get()
+        config_filename = f"config_mode{mode}.json"
+        mode_config_path = os.path.join(GAMES_ROOT, key, config_filename)
+        
+        # Fall back to generic config.json if mode-specific doesn't exist
+        if os.path.exists(mode_config_path):
+            return mode_config_path
         return os.path.join(GAMES_ROOT, key, "config.json")
 
     def viewer_show_splash(self):
@@ -1079,6 +1094,34 @@ class PixelChallengeConsole:
             activebackground="#58be3d" if enabled else "#c93b1e",
         )
         self.save_settings()
+
+    def toggle_game_mode(self):
+        """Toggle between Mode 1 (TIMED) and Mode 2 (OBJECTIVE)."""
+        current = self.game_mode.get()
+        if current == 1:
+            self.game_mode.set(2)
+        else:
+            self.game_mode.set(1)
+        self.update_mode_button()
+        self.log(f"Game mode changed to Mode {self.game_mode.get()}")
+
+    def update_mode_button(self):
+        """Update the mode button display."""
+        if not hasattr(self, 'mode_btn'):
+            return
+        mode = self.game_mode.get()
+        if mode == 1:
+            self.mode_btn.configure(
+                text="MODE 1\nTIMED",
+                bg="#1b63ff",
+                activebackground="#1b63ff"
+            )
+        else:
+            self.mode_btn.configure(
+                text="MODE 2\nOBJECTIVE",
+                bg="#9440ff",
+                activebackground="#9440ff"
+            )
 
     def toggle_animate(self):
         self.animate_enabled.set(not self.animate_enabled.get())
@@ -1606,7 +1649,9 @@ class PixelChallengeConsole:
                     self.show_selected_game_splash()
         
         # Start game in SETUP phase (game handles color selection)
-        success = self.game_manager.start_game(game_key, players)
+        # Pass the selected mode to the game
+        game_settings = {"mode": self.game_mode.get()}
+        success = self.game_manager.start_game(game_key, players, settings=game_settings)
         if not success:
             self.log("Failed to start game!")
             self.set_state(HostState.IDLE, "Failed to start game")
@@ -2097,13 +2142,21 @@ class PixelChallengeConsole:
         self.game_box.bind("<<ComboboxSelected>>", self.on_game_selected)
         self.config_btn = self.neon_button(center, "CONFIG", self.open_config_window, bg="#9440ff", width=8)
         self.config_btn.grid(row=0, column=2, padx=10)
+        
+        # Mode toggle button
+        self.mode_btn = tk.Button(center, text="MODE 1\nTIMED", command=self.toggle_game_mode, 
+                                   bg="#1b63ff", fg="white", activebackground="#1b63ff", 
+                                   activeforeground="white", relief="raised", bd=3, 
+                                   font=("Arial", 12, "bold"), width=10, pady=2, cursor="hand2")
+        self.mode_btn.grid(row=0, column=3, padx=10)
+        
         btns = tk.Frame(top, bg="#0f0617")
         btns.grid(row=0, column=2, sticky="e", padx=12)
-        self.neon_button(btns, "SCOREBOARD", self.on_view_scoreboard, bg="#1b63ff").pack(side="left", padx=8)
-        tk.Checkbutton(btns, text="Ranking", variable=self.show_ranking, bg="#0f0617", fg="white", activebackground="#0f0617", activeforeground="white", selectcolor="#17071f", font=("Arial", 14, "bold")).pack(side="left", padx=(0, 8))
-        self.neon_button(btns, "INTRO", self.on_view_intro, bg="#1b63ff").pack(side="left", padx=8)
-        self.neon_button(btns, "START", self.on_start_game, bg="#2ea62e").pack(side="left", padx=8)
-        tk.Button(btns, text="STOP", command=self.on_stop_game, bg="#c93b1e", fg="white", activebackground="#c93b1e", activeforeground="white", relief="raised", bd=3, font=("Arial", 16, "bold"), width=7, padx=12, pady=8, cursor="hand2").pack(side="left", padx=8)
+        self.neon_button(btns, "SCORE", self.on_view_scoreboard, bg="#1b63ff", width=6).pack(side="left", padx=8)
+        tk.Checkbutton(btns, text="Rank", variable=self.show_ranking, bg="#0f0617", fg="white", activebackground="#0f0617", activeforeground="white", selectcolor="#17071f", font=("Arial", 12, "bold")).pack(side="left", padx=(0, 6))
+        self.neon_button(btns, "INTRO", self.on_view_intro, bg="#1b63ff", width=6).pack(side="left", padx=6)
+        self.neon_button(btns, "START", self.on_start_game, bg="#2ea62e", width=7).pack(side="left", padx=6)
+        tk.Button(btns, text="STOP", command=self.on_stop_game, bg="#c93b1e", fg="white", activebackground="#c93b1e", activeforeground="white", relief="raised", bd=3, font=("Arial", 14, "bold"), width=6, padx=8, pady=6, cursor="hand2").pack(side="left", padx=6)
 
     def build_attract_area(self, parent):
         parent.grid_rowconfigure(0, weight=1)
@@ -2421,9 +2474,14 @@ class PixelChallengeConsole:
         # Save geometry when window is moved/resized
         self.setup_window.bind("<Configure>", self.on_setup_window_configure)
 
-        # Header row with title and close button
+        # Header row with SAVE on left, title in center, CLOSE on right
         header_frame = tk.Frame(self.setup_window, bg="#1a1a2e")
         header_frame.pack(fill="x", padx=20, pady=(15, 10))
+        header_frame.grid_columnconfigure(1, weight=1)  # Center column expands
+        
+        tk.Button(header_frame, text="SAVE", command=self.save_setup,
+                  bg="#2ea62e", fg="white", font=("Arial", 12, "bold"), 
+                  width=8, cursor="hand2").pack(side="left")
         
         tk.Label(header_frame, text="SYSTEM SETUP", bg="#1a1a2e", fg="white", 
                  font=("Arial", 22, "bold")).pack(side="left", expand=True)
@@ -2555,21 +2613,8 @@ class PixelChallengeConsole:
         tk.Label(suggestions_frame, text=suggestions_text, bg="#1a1a2e", fg="#888888", 
                  font=("Arial", 9), justify="left").pack(anchor="w")
 
-        # === Button row at bottom ===
-        btn_frame = tk.Frame(self.setup_window, bg="#1a1a2e")
-        btn_frame.pack(fill="x", padx=20, pady=(10, 20))
-        
-        # Center the buttons
-        btn_inner = tk.Frame(btn_frame, bg="#1a1a2e")
-        btn_inner.pack()
-        
-        tk.Button(btn_inner, text="SAVE & APPLY", command=self.save_setup,
-                  bg="#2ea62e", fg="white", font=("Arial", 12, "bold"), 
-                  width=14, cursor="hand2").pack(side="left", padx=10)
-        
-        tk.Button(btn_inner, text="CANCEL", command=self.close_setup_window,
-                  bg="#ff6600", fg="white", font=("Arial", 12, "bold"), 
-                  width=10, cursor="hand2").pack(side="left", padx=10)
+        # Bottom spacer (buttons moved to header)
+        tk.Frame(self.setup_window, bg="#1a1a2e", height=20).pack(fill="x", pady=(10, 20))
 
     def on_setup_window_configure(self, event):
         """Save setup window geometry when moved/resized"""
