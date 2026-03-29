@@ -1504,6 +1504,34 @@ class PixelChallengeConsole:
             self.map_current_button_idx = 0
         self.prompt_next_map_step()
 
+    def on_game_setup_complete(self):
+        """
+        Called by game module when setup phase is complete.
+        For non-color-selection games (Surround, Pixel Pop), start countdown immediately.
+        For color-selection games (Dot Dash), this won't be called - they manage their own flow.
+        """
+        self.log("[SETUP] Game setup complete - starting countdown")
+        
+        # Get current players that are checked in
+        players = []
+        for pid in range(1, 5):
+            if self.player_status[pid]["checked_in"]:
+                from games.base import PlayerConfig
+                lane_map = self.falcon.lane_map.get(pid, {"left": 1, "right": 2})
+                players.append(PlayerConfig(
+                    player_id=pid,
+                    name=f"Player {pid}",
+                    lane_left_universe=lane_map["left"],
+                    lane_right_universe=lane_map["right"],
+                ))
+        
+        if not players:
+            self.log("[SETUP] No players checked in!")
+            return
+        
+        # Start the console-owned countdown
+        self.start_countdown(players)
+        
     # =========================================================================
     # COUNTDOWN SEQUENCE (3-2-1-GO)
     # =========================================================================

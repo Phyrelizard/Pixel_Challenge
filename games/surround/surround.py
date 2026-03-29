@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # -*- coding: utf-8 -*-
 """
-surround.py Game Module v1.0.3
+surround.py Game Module v1.0.4
 first tested with pixel_challenge_console.py v22.1.3
 updated for pixel_challenge_console.py v22.1.5
 
@@ -14,7 +14,7 @@ Supports two modes:
 """
 from __future__ import annotations
 
-VERSION_LABEL = "v1.0.3"
+VERSION_LABEL = "v1.0.4"
 
 import json
 import os

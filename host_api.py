@@ -155,18 +155,6 @@ class ConsoleHostAPI:
         except Exception as e:
             self.log(f"save_sla_result error: {e}")
 
-    def on_game_setup_complete(self) -> None:
-        """
-        Called by game modules when setup is complete and game is ready to start.
-        For games like Surround that don't need color selection, this triggers
-        the countdown directly.
-        """
-        try:
-            if hasattr(self.console, 'on_game_setup_complete'):
-                self.console.on_game_setup_complete()
-        except Exception as e:
-            self.log(f"on_game_setup_complete error: {e}")
-
 
     def on_game_setup_complete(self) -> None:
         """Called by game when setup phase is complete (e.g., all players selected colors)."""
