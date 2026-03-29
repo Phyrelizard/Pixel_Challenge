@@ -14,14 +14,15 @@
     "Lane Chase RL": 6
   },
   "selected_themes": [
+    "Rainbow Pulse",
     "Bounce Chase",
-    "Galaxy Wave",
+    "Fire Burst",
     "Lane Chase LR"
   ],
   "sash_left_attract_bottom": 726,
   "sash_center_ctrl": 677,
   "sash_main_info": 510,
-  "sash_bottom_log": 685,
+  "sash_bottom_log": 196,
   "falcon_brightness": 14,
   "gameplay_brightness": 10,
   "falcon_ip": "192.168.2.113",
@@ -37,7 +38,7 @@
   "auto_start": true,
   "backup_restore": true,
   "apply_reboot": true,
-  "debug_logging": false,
+  "debug_logging": true,
   "setup_geometry": "1920x998+1920+82",
   "game_mode": 1,
   "sfx_volume": 100,

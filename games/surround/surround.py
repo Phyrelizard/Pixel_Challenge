@@ -1381,7 +1381,7 @@ class SurroundModule(GameModule):
         title="Surround",
         min_players=1,
         max_players=4,
-        version=VERSION_LABEL,
+        version="v1.0.2",
         requires_color_selection=False,
         supports_sla=False,
         description="Center-defense game with dual-direction snakes and Hunter bosses"

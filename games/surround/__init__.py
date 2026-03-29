@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Surround Game Module
-Version 22.0.0
+Version 1.0.2
 
 A center-defense, two-lane, dual-direction pressure game with eggs,
 hatch events, and special hunter threats.
@@ -14,4 +14,4 @@ Supports two modes:
 from .surround import SurroundSession, SurroundModule
 
 __all__ = ['SurroundSession', 'SurroundModule']
-__version__ = '22.0.0'
+__version__ = '1.0.2'

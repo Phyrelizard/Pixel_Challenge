@@ -1,0 +1,19 @@
+[200~JOYSTICK] P4 axis DOWN
+Game selected: Pixel Pop
+Opening config: /home/ledgame/easter_game/games/pixel_pop/config.json
+ERROR opening config window: 'PixelChallengeConsole' object has no attribute 'save_config_file'
+Traceback (most recent call last):
+  File /home/ledgame/easter_game/pixel_challenge_console_v22.3.2.py, line 2846, in open_config_window
+    header, text=SAVE, command=self.save_config_file,
+                                 ^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'PixelChallengeConsole' object has no attribute 'save_config_file'
+
+AttractService: theme changed to 'Fire Burst'.
+AttractService: theme changed to 'Lane Chase LR'.
+AttractService: theme changed to 'Bounce Chase'.
+AttractService: stopped.
+AttractService: theme 'Rainbow Pulse' started.
+AttractService: stopped.
+Game mode changed to Mode 2
+
+~

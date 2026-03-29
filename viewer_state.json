@@ -6,14 +6,14 @@
   "players": [
     {
       "id": 2,
-      "score": 2030,
+      "score": 0,
       "colors": [
-        "GREEN",
+        "BLUE",
         "ORANGE"
       ],
       "finished": true,
-      "timed_out": false,
-      "first_finisher": true
+      "timed_out": true,
+      "first_finisher": false
     }
   ]
 }
