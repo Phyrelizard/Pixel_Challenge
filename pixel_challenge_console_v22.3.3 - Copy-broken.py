@@ -2798,68 +2798,97 @@ class PixelChallengeConsole:
     # CONFIG WINDOW
     # =========================================================================
     def open_config_window(self):
-        if self.config_window and tk.Toplevel.winfo_exists(self.config_window):
-            self.config_window.focus_set()
-            return
+        """Open the game configuration editor window."""
+        # Prevent multiple config windows - safer check
+        if self.config_window is not None:
+            try:
+                if self.config_window.winfo_exists():
+                    self.config_window.lift()
+                    self.config_window.focus_force()
+                    return
+            except Exception:
+                # Window reference is stale, clear it
+                self.config_window = None
+                self.config_text = None
+
         path = self.config_path_for_current_game()
+        self.log(f"Opening config: {path}")
+
+        # FIX #1: Create directory and default config if file doesn't exist
         os.makedirs(os.path.dirname(path), exist_ok=True)
         if not os.path.exists(path):
             with open(path, "w", encoding="utf-8") as f:
                 json.dump({"difficulty": "normal"}, f, indent=2)
-        
-        self.config_window = tk.Toplevel(self.root, bg="#0f0617")
+            self.log(f"Created default config: {path}")
+
+        # Create config window
+        self.config_window = tk.Toplevel(self.root)
         self.config_window.title(f"Config - {self.selected_game.get()} (Mode {self.game_mode.get()})")
-        
-        # Use saved geometry or default to larger size
+
+        # Safe geometry handling
         if self.config_geometry:
-            self.config_window.geometry(self.config_geometry)
+            try:
+                self.config_window.geometry(self.config_geometry)
+            except Exception:
+                self.config_window.geometry("800x600")
         else:
-            self.config_window.geometry("800x650")
-        
+            self.config_window.geometry("800x600")
+
+        # FIX #5: Restore minsize so window can't be shrunk to nothing
         self.config_window.minsize(600, 400)
+
+        self.config_window.configure(bg="#0f0617")
         self.config_window.transient(self.root)
+
+        # FIX #3: Restore grab_set so the window is modal and grab_release won't error
         self.config_window.grab_set()
-        
-        # Save geometry when window is moved/resized
+
+        # FIX #4: Restore <Configure> binding so geometry saves on move/resize
         self.config_window.bind("<Configure>", self._on_config_window_configure)
-        
+
         # Header with SAVE on left, title in center, CLOSE on right
         header_frame = tk.Frame(self.config_window, bg="#0f0617")
         header_frame.pack(fill="x", padx=10, pady=(10, 5))
-        
+
+        # FIX #2: Use lambda to capture `path` so save_config_file gets its argument
         tk.Button(header_frame, text="SAVE", command=lambda: self.save_config_file(path),
                   bg="#2ea62e", fg="white", font=("Arial", 12, "bold"),
                   width=8, cursor="hand2").pack(side="left")
-        
+
         tk.Label(header_frame, text=f"Config: {self.selected_game.get()} (Mode {self.game_mode.get()})",
                  bg="#0f0617", fg="white", font=("Arial", 16, "bold")).pack(side="left", expand=True)
-        
+
         tk.Button(header_frame, text="CLOSE", command=self.close_config_window,
                   bg="#c93b1e", fg="white", font=("Arial", 12, "bold"),
                   width=8, cursor="hand2").pack(side="right")
-        
+
         # Main content area
         content_frame = tk.Frame(self.config_window, bg="#0f0617")
         content_frame.pack(fill="both", expand=True, padx=10, pady=5)
-        
-        # Simple text with scrollbars
+
+        # Text editor with scrollbars
         self.config_text = tk.Text(content_frame, wrap="none", bg="#12061f", fg="white",
                                     insertbackground="white", font=("Consolas", 12), undo=True)
-        
+
         v_scroll = tk.Scrollbar(content_frame, orient="vertical", command=self.config_text.yview, width=40)
         h_scroll = tk.Scrollbar(content_frame, orient="horizontal", command=self.config_text.xview, width=40)
-        
+
         self.config_text.configure(yscrollcommand=v_scroll.set, xscrollcommand=h_scroll.set)
-        
+
         v_scroll.pack(side="right", fill="y")
         h_scroll.pack(side="bottom", fill="x")
         self.config_text.pack(side="left", fill="both", expand=True)
-        
+
         try:
             with open(path, "r", encoding="utf-8") as f:
                 self.config_text.insert("1.0", f.read())
         except Exception:
             pass
+
+        # Handle window close via X button
+        self.config_window.protocol("WM_DELETE_WINDOW", self.close_config_window)
+
+        self.log(f"Config window opened for: {os.path.basename(path)}")
 
     def _on_config_window_configure(self, event):
         """Save config window geometry when moved/resized."""
@@ -2867,6 +2896,7 @@ class PixelChallengeConsole:
             self.config_geometry = self.config_window.geometry()
 
     def save_config_file(self, path):
+        """Save the config file from the text editor."""
         try:
             parsed = json.loads(self.config_text.get("1.0", "end").strip() or "{}")
             with open(path, "w", encoding="utf-8") as f:
@@ -2877,6 +2907,7 @@ class PixelChallengeConsole:
             messagebox.showerror("Config", f"Failed: {e}")
 
     def close_config_window(self):
+        """Close the config window."""
         if self.config_window and tk.Toplevel.winfo_exists(self.config_window):
             # Save final geometry
             self.config_geometry = self.config_window.geometry()
@@ -2884,7 +2915,7 @@ class PixelChallengeConsole:
             self.config_window.grab_release()
             self.config_window.destroy()
         self.config_window = None
-        self.config_text = None
+        self.config_text = None 
     # =========================================================================
     # SETUP WINDOW
     # =========================================================================

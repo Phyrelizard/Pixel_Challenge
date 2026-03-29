@@ -14,7 +14,7 @@ Supports two modes:
 """
 from __future__ import annotations
 
-VERSION_LABEL = "v1.0.4"
+VERSION_LABEL = "v1.0.5"
 
 import json
 import os
@@ -271,8 +271,15 @@ class SurroundSession(GameSession):
                 self._handle_joystick(player_id, x, y, current_time)
         
         # Handle directional buttons (some controllers send these instead of joystick)
+        # Handle directional buttons (some controllers send these instead of joystick)
         elif normalized_action in ("up", "down", "left", "right"):
             self._process_movement(player_id, normalized_action, current_time)
+        
+        # Handle joystick Y-axis return to center (stop vertical movement)
+        elif normalized_action == "ystop":
+            js_state = self.joystick_state.get(player_id, {})
+            if js_state.get("held_direction") in ("up", "down"):
+                js_state["held_direction"] = None
         
             # Handle color buttons
         # Handle color buttons

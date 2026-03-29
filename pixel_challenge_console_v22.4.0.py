@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v22.3.3
+Pixel Challenge Host Console v22.4.0
 
 """
 import os
@@ -25,7 +25,7 @@ from games.base import PlayerConfig
 # SLA System (v21.8.0)
 from sla import SLAStore, SLACalibration
 
-VERSION_LABEL = "v22.3.3"
+VERSION_LABEL = "v22.4.0"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 DEFAULT_FALCON_IP = "192.168.2.113"
@@ -443,20 +443,8 @@ class PixelChallengeConsole:
         self.host_state = HostState.IDLE
         self.selected_game = tk.StringVar(value="Splash")
         self.players_joined = tk.IntVar(value=0)
-        self.auto_enabled = tk.BooleanVar(value=False)
-        self.auto_was_enabled_before_game = False  # Track auto state before game
-        
-        # Audio settings
-        self.sfx_volume = tk.IntVar(value=100)
-        self.bgm_volume = tk.IntVar(value=100)
-        self.master_volume = tk.IntVar(value=100)
-        self.sfx_muted = tk.BooleanVar(value=False)
-        self.bgm_muted = tk.BooleanVar(value=False)
-        self.master_muted = tk.BooleanVar(value=False)
-        # Store volumes before mute for restore
-        self._sfx_pre_mute = 100
-        self._bgm_pre_mute = 100
-        self._master_pre_mute = 100
+        self.animate_enabled = tk.BooleanVar(value=False)
+        self.animate_was_enabled_before_game = False  # Track animate state before game
         self.cycle_enabled = tk.BooleanVar(value=False)
         self.cycle_seconds = tk.IntVar(value=60)
         self.per_theme_speed = {}
@@ -557,7 +545,6 @@ class PixelChallengeConsole:
         self.apply_reboot = tk.BooleanVar(value=False)
         self.debug_logging = tk.BooleanVar(value=False)
         self.setup_geometry = None
-        self.config_geometry = None
 
         self.setup_window = None
         self.config_window = None
@@ -603,12 +590,11 @@ class PixelChallengeConsole:
         self.root.after(self.current_animation_interval_ms(), self.animation_tick)
 
         self.set_state(HostState.IDLE, "System ready.")
-        self.update_auto_button()
+        self.update_animate_button()
         self.update_cycle_button()
         self.update_lanes_test_button()
         self.update_reassign_button()
         self.update_mode_button()
-        self._init_audio_mute_buttons()
         self.show_selected_game_splash()
 
     def write_startup_log(self):
@@ -700,7 +686,7 @@ class PixelChallengeConsole:
             with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
             self.cycle_enabled.set(bool(data.get("auto_enabled", False)))
-            self.auto_enabled.set(bool(data.get("auto_enabled", False)))
+            self.animate_enabled.set(bool(data.get("animate_enabled", False)))
             self.cycle_seconds.set(int(data.get("cycle_seconds", 60)))
             self.per_theme_speed = data.get("per_theme_speed", {})
             saved_selected = data.get("selected_themes", [])
@@ -727,25 +713,13 @@ class PixelChallengeConsole:
             self.debug_logging.set(bool(data.get("debug_logging", False)))
             self.setup_geometry = data.get("setup_geometry")
             self.game_mode.set(int(data.get("game_mode", 1)))
-            
-            # Audio settings
-            self.sfx_volume.set(int(data.get("sfx_volume", 100)))
-            self.bgm_volume.set(int(data.get("bgm_volume", 100)))
-            self.master_volume.set(int(data.get("master_volume", 100)))
-            self.sfx_muted.set(bool(data.get("sfx_muted", False)))
-            self.bgm_muted.set(bool(data.get("bgm_muted", False)))
-            self.master_muted.set(bool(data.get("master_muted", False)))
-            self._sfx_pre_mute = int(data.get("sfx_pre_mute", 100))
-            self._bgm_pre_mute = int(data.get("bgm_pre_mute", 100))
-            self._master_pre_mute = int(data.get("master_pre_mute", 100))
-            self.config_geometry = data.get("config_geometry")
         except Exception:
             pass
 
     def save_settings(self):
         data = {
             "auto_enabled": bool(self.cycle_enabled.get()),
-            "auto_enabled": bool(self.auto_enabled.get()),
+            "animate_enabled": bool(self.animate_enabled.get()),
             "cycle_seconds": int(self.cycle_seconds.get()),
             "per_theme_speed": self.per_theme_speed,
             "selected_themes": list(self.selected_themes),
@@ -771,16 +745,6 @@ class PixelChallengeConsole:
             "debug_logging": bool(self.debug_logging.get()),
             "setup_geometry": self.setup_geometry,
             "game_mode": int(self.game_mode.get()),
-            "sfx_volume": int(self.sfx_volume.get()),
-            "bgm_volume": int(self.bgm_volume.get()),
-            "master_volume": int(self.master_volume.get()),
-            "sfx_muted": bool(self.sfx_muted.get()),
-            "bgm_muted": bool(self.bgm_muted.get()),
-            "master_muted": bool(self.master_muted.get()),
-            "sfx_pre_mute": self._sfx_pre_mute,
-            "bgm_pre_mute": self._bgm_pre_mute,
-            "master_pre_mute": self._master_pre_mute,
-            "config_geometry": getattr(self, 'config_geometry', None),
         }
         try:
             with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
@@ -850,13 +814,10 @@ class PixelChallengeConsole:
             # Check if this is background music (should loop)
             if "music" in sound_key:
                 pygame.mixer.music.load(path)
-                effective_vol = self._get_effective_volume(self.bgm_volume.get(), self.bgm_muted.get())
-                pygame.mixer.music.set_volume(effective_vol)
+                pygame.mixer.music.set_volume(0.5)
                 pygame.mixer.music.play(-1)  # -1 = loop forever
             else:
                 sound = pygame.mixer.Sound(path)
-                effective_vol = self._get_effective_volume(self.sfx_volume.get(), self.sfx_muted.get())
-                sound.set_volume(effective_vol)
                 sound.play()
                 
         except Exception as e:
@@ -904,19 +865,18 @@ class PixelChallengeConsole:
         return self.selected_game.get().lower().replace(" ", "_")
 
     def config_path_for_current_game(self):
-        """Get the config file path for the currently selected game and mode."""
         key = self.current_game_key()
         if key == "splash":
             return os.path.join(GAMES_ROOT, "global.config.json")
         
-        # Use mode-specific config for games that support it
+        # Use mode-specific config file
         mode = self.game_mode.get()
-        mode_config = os.path.join(GAMES_ROOT, key, f"config_mode{mode}.json")
+        config_filename = f"config_mode{mode}.json"
+        mode_config_path = os.path.join(GAMES_ROOT, key, config_filename)
         
-        # Fall back to regular config.json if mode-specific doesn't exist
-        if os.path.exists(mode_config):
-            return mode_config
-        
+        # Fall back to generic config.json if mode-specific doesn't exist
+        if os.path.exists(mode_config_path):
+            return mode_config_path
         return os.path.join(GAMES_ROOT, key, "config.json")
 
     def viewer_show_splash(self):
@@ -1047,10 +1007,10 @@ class PixelChallengeConsole:
         self.show_selected_game_splash()
         # Animation keeps running (started when game completed)
         # Only restore animate button state, animation already active
-        if self.auto_was_enabled_before_game:
-            self.auto_enabled.set(True)
-            self.update_auto_button()
-            self.log("Auto mode restored after game.")
+        if self.animate_was_enabled_before_game:
+            self.animate_enabled.set(True)
+            self.update_animate_button()
+            self.log("Animate restored after game.")
 
     # =========================================================================
     # THEME HELPERS
@@ -1078,12 +1038,9 @@ class PixelChallengeConsole:
         return 260 - ((speed - 1) * 22)
 
     def lights_should_run(self) -> bool:
-        """AUTO mode runs lights whenever not in active gameplay."""
         has_theme = len(self.get_checked_theme_names()) > 0
-        auto_on = self.auto_enabled.get()
-        # AUTO runs lights unless game is actively running
-        game_active = self.host_state in (HostState.GAME_RUNNING, HostState.COUNTDOWN, HostState.GAME_SETUP)
-        return has_theme and auto_on and not game_active
+        splash_and_anim = self.selected_game.get() == "Splash" and self.animate_enabled.get()
+        return has_theme and (splash_and_anim or self.final_results_active)
 
     def get_checked_theme_names(self):
         return [name for name, var in self.theme_vars.items() if var.get()]
@@ -1115,12 +1072,12 @@ class PixelChallengeConsole:
         self.attract.apply_live_theme_change(self, next_theme)
         self.on_theme_selected_manual(next_theme)
 
-    def update_auto_button(self):
-        if not hasattr(self, 'auto_btn'):
+    def update_animate_button(self):
+        if not hasattr(self, 'animate_btn'):
             return
-        enabled = self.auto_enabled.get()
-        self.auto_btn.configure(
-            text="AUTO",
+        enabled = self.animate_enabled.get()
+        self.animate_btn.configure(
+            text="ANIMATE",
             bg="#58be3d" if enabled else "#c93b1e",
             activebackground="#58be3d" if enabled else "#c93b1e",
         )
@@ -1166,9 +1123,9 @@ class PixelChallengeConsole:
                 activebackground="#9440ff"
             )
 
-    def toggle_auto(self):
-        self.auto_enabled.set(not self.auto_enabled.get())
-        self.update_auto_button()
+    def toggle_animate(self):
+        self.animate_enabled.set(not self.animate_enabled.get())
+        self.update_animate_button()
 
     def toggle_cycle(self):
         self.cycle_enabled.set(not self.cycle_enabled.get())
@@ -1202,7 +1159,7 @@ class PixelChallengeConsole:
         name = self.theme_listbox_selection()
         if not name:
             return
-        if self.lights_should_run() and self.auto_enabled.get() and not self.all_lanes_test_active:
+        if self.lights_should_run() and self.animate_enabled.get() and not self.all_lanes_test_active:
             self.attract.apply_live_theme_change(self, name)
         self.save_settings()
 
@@ -1372,6 +1329,7 @@ class PixelChallengeConsole:
                         self.button_last_state[js_index][axis_x_key] = x_axis
                         
                         # Y axis for up/down movement (if available)
+                        # Y axis for up/down movement (if available)
                         if js.get_numaxes() >= 2:
                             y_axis = js.get_axis(1)  # Y axis for up/down
                             axis_y_key = f"axis_y_{js_index}"
@@ -1388,6 +1346,11 @@ class PixelChallengeConsole:
                                 self.handle_button_press(player_id, "DOWN")
                                 if self.debug_logging.get():
                                     self.log(f"[JOYSTICK] P{player_id} axis DOWN")
+                            elif abs(y_axis) <= DEADZONE and (prev_y_axis < -DEADZONE or prev_y_axis > DEADZONE):
+                                # Joystick returned to center - send STOP to clear held movement
+                                self.handle_button_press(player_id, "YSTOP")
+                                if self.debug_logging.get():
+                                    self.log(f"[JOYSTICK] P{player_id} axis Y-CENTER (stop)")
                             
                             self.button_last_state[js_index][axis_y_key] = y_axis
                     except Exception:
@@ -1505,34 +1468,6 @@ class PixelChallengeConsole:
             self.map_current_button_idx = 0
         self.prompt_next_map_step()
 
-    def on_game_setup_complete(self):
-        """
-        Called by game module when setup phase is complete.
-        For non-color-selection games (Surround, Pixel Pop), start countdown immediately.
-        For color-selection games (Dot Dash), this won't be called - they manage their own flow.
-        """
-        self.log("[SETUP] Game setup complete - starting countdown")
-        
-        # Get current players that are checked in
-        players = []
-        for pid in range(1, 5):
-            if self.player_status[pid]["checked_in"]:
-                from games.base import PlayerConfig
-                lane_map = self.falcon.lane_map.get(pid, {"left": 1, "right": 2})
-                players.append(PlayerConfig(
-                    player_id=pid,
-                    name=f"Player {pid}",
-                    lane_left_universe=lane_map["left"],
-                    lane_right_universe=lane_map["right"],
-                ))
-        
-        if not players:
-            self.log("[SETUP] No players checked in!")
-            return
-        
-        # Start the console-owned countdown
-        self.start_countdown(players)
-        
     # =========================================================================
     # COUNTDOWN SEQUENCE (3-2-1-GO)
     # =========================================================================
@@ -1670,11 +1605,11 @@ class PixelChallengeConsole:
             messagebox.showwarning("No Players", "No players checked in.")
             return
 
-        # Remember auto state before turning it off
-        self.auto_was_enabled_before_game = self.auto_enabled.get()
-        if self.auto_enabled.get():
-            self.auto_enabled.set(False)
-            self.update_auto_button()
+        # Remember animate state before turning it off
+        self.animate_was_enabled_before_game = self.animate_enabled.get()
+        if self.animate_enabled.get():
+            self.animate_enabled.set(False)
+            self.update_animate_button()
 
         self.attract.stop(self)
         self.all_lanes_test_active = False
@@ -1727,8 +1662,8 @@ class PixelChallengeConsole:
             self.log("Failed to start game!")
             self.set_state(HostState.IDLE, "Failed to start game")
             self.attract.start_theme(self, self.current_theme_name())
-            if self.auto_was_enabled_before_game:
-                self.auto_enabled.set(True)
+            if self.animate_was_enabled_before_game:
+                self.animate_enabled.set(True)
                 self.update_animate_button()
             self.pending_players = []
             return
@@ -1830,11 +1765,11 @@ class PixelChallengeConsole:
         self.attract.start_theme(self, self.current_theme_name())
         self.show_selected_game_splash()
         
-        # Restore auto if it was on before
-        if self.auto_was_enabled_before_game:
-            self.auto_enabled.set(True)
-            self.update_auto_button()
-            self.log("Auto mode restored.")
+        # Restore animate if it was on before
+        if self.animate_was_enabled_before_game:
+            self.animate_enabled.set(True)
+            self.update_animate_button()
+            self.log("Animate restored.")
         
         self.refresh_player_status_panel()
         self.refresh_controller_panel()
@@ -1855,7 +1790,7 @@ class PixelChallengeConsole:
                 game.on_enter_setup(self)
         if game_name != "Splash":
             self.final_results_active = False
-            if not self.auto_enabled.get():
+            if not self.animate_enabled.get():
                 self.attract.stop(self)
         self.apply_attract_state()
 
@@ -1904,9 +1839,9 @@ class PixelChallengeConsole:
             self.set_state(HostState.IDLE, "Check-in closed.")
             self.show_selected_game_splash()  # Return to game splash when closing check-in
         else:
-            if self.auto_enabled.get():
-                self.auto_enabled.set(False)
-                self.update_auto_button()
+            if self.animate_enabled.get():
+                self.animate_enabled.set(False)
+                self.update_animate_button()
             self.cancel_viewer_return()
             self.attract.stop(self)
             self.falcon.clear_all_lanes(self)
@@ -2013,9 +1948,9 @@ class PixelChallengeConsole:
     def update_lanes_test_button(self):
         if hasattr(self, "lanes_test_btn"):
             if self.all_lanes_test_active:
-                self.lanes_test_btn.configure(text="STOP\nTEST", bg="#c93b1e", activebackground="#c93b1e")
+                self.lanes_test_btn.configure(text="STOP TEST", bg="#c93b1e", activebackground="#c93b1e")
             else:
-                self.lanes_test_btn.configure(text="TEST\nLANES", bg="#1b63ff", activebackground="#1b63ff")
+                self.lanes_test_btn.configure(text="LANES TEST", bg="#1b63ff", activebackground="#1b63ff")
 
     def on_all_lanes_test(self):
         if self.all_lanes_test_active:
@@ -2030,240 +1965,6 @@ class PixelChallengeConsole:
         self.attract.active = False
         self.falcon.all_lanes_test_frame()
         self.log("Lanes test started.")
-
-            # =========================================================================
-    # AUDIO CONTROL METHODS
-    # =========================================================================
-    def _get_effective_volume(self, channel_volume: int, muted: bool) -> float:
-        """Calculate effective volume considering master and mute state."""
-        if muted or self.master_muted.get():
-            return 0.0
-        master = self.master_volume.get() / 100.0
-        channel = channel_volume / 100.0
-        return master * channel
-
-    def on_sfx_volume_changed(self, value):
-        """Handle SFX volume slider change."""
-        vol = int(float(value))
-        self.sfx_volume.set(vol)
-        if not self.sfx_muted.get():
-            self._apply_sfx_volume()
-        self.save_settings()
-
-    def on_bgm_volume_changed(self, value):
-        """Handle BGM volume slider change."""
-        vol = int(float(value))
-        self.bgm_volume.set(vol)
-        if not self.bgm_muted.get():
-            self._apply_bgm_volume()
-        self.save_settings()
-
-    def on_master_volume_changed(self, value):
-        """Handle master volume slider change."""
-        vol = int(float(value))
-        self.master_volume.set(vol)
-        if not self.master_muted.get():
-            self._apply_all_volumes()
-        self.save_settings()
-
-    def _apply_sfx_volume(self):
-        """Apply SFX volume to pygame."""
-        try:
-            if pygame.mixer.get_init():
-                # SFX uses Sound objects - we'll set a class-level volume factor
-                # This is applied when sounds are played
-                pass  # Volume applied at play time via get_effective_volume
-        except Exception:
-            pass
-
-    def _apply_bgm_volume(self):
-        """Apply BGM volume to pygame music."""
-        try:
-            if pygame.mixer.get_init():
-                effective = self._get_effective_volume(self.bgm_volume.get(), self.bgm_muted.get())
-                pygame.mixer.music.set_volume(effective)
-        except Exception:
-            pass
-
-    def _apply_all_volumes(self):
-        """Apply all volume settings."""
-        self._apply_sfx_volume()
-        self._apply_bgm_volume()
-
-    def toggle_sfx_mute(self):
-        """Toggle SFX mute state."""
-        if self.sfx_muted.get():
-            # Unmute - restore previous volume
-            self.sfx_muted.set(False)
-            self.sfx_volume.set(self._sfx_pre_mute)
-        else:
-            # Mute - save current volume
-            self._sfx_pre_mute = self.sfx_volume.get()
-            self.sfx_muted.set(True)
-        self._update_mute_button(self.sfx_mute_btn, self.sfx_muted.get())
-        self._apply_sfx_volume()
-        self.save_settings()
-
-    def toggle_bgm_mute(self):
-        """Toggle BGM mute state."""
-        if self.bgm_muted.get():
-            # Unmute - restore previous volume
-            self.bgm_muted.set(False)
-            self.bgm_volume.set(self._bgm_pre_mute)
-        else:
-            # Mute - save current volume
-            self._bgm_pre_mute = self.bgm_volume.get()
-            self.bgm_muted.set(True)
-        self._update_mute_button(self.bgm_mute_btn, self.bgm_muted.get())
-        self._apply_bgm_volume()
-        self.save_settings()
-
-    def toggle_master_mute(self):
-        """Toggle master mute state."""
-        if self.master_muted.get():
-            # Unmute - restore previous volume
-            self.master_muted.set(False)
-            self.master_volume.set(self._master_pre_mute)
-        else:
-            # Mute - save current volume
-            self._master_pre_mute = self.master_volume.get()
-            self.master_muted.set(True)
-        self._update_mute_button(self.master_mute_btn, self.master_muted.get())
-        self._apply_all_volumes()
-        self.save_settings()
-
-    def _update_mute_button(self, btn, muted: bool):
-        """Update mute button appearance."""
-        if muted:
-            btn.configure(text="MUTED", bg="#c93b1e", activebackground="#c93b1e")
-        else:
-            btn.configure(text="MUTE", bg="#58be3d", activebackground="#58be3d")
-
-    def _init_audio_mute_buttons(self):
-        """Initialize mute button states after UI is built."""
-        if hasattr(self, 'sfx_mute_btn'):
-            self._update_mute_button(self.sfx_mute_btn, self.sfx_muted.get())
-        if hasattr(self, 'bgm_mute_btn'):
-            self._update_mute_button(self.bgm_mute_btn, self.bgm_muted.get())
-        if hasattr(self, 'master_mute_btn'):
-            self._update_mute_button(self.master_mute_btn, self.master_muted.get())
-        # Apply initial volumes
-        self._apply_all_volumes()
-
-            # =========================================================================
-    # AUDIO CONTROL METHODS
-    # =========================================================================
-    def _get_effective_volume(self, channel_volume: int, muted: bool) -> float:
-        """Calculate effective volume considering master and mute state."""
-        if muted or self.master_muted.get():
-            return 0.0
-        master = self.master_volume.get() / 100.0
-        channel = channel_volume / 100.0
-        return master * channel
-
-    def on_sfx_volume_changed(self, value):
-        """Handle SFX volume slider change."""
-        vol = int(float(value))
-        self.sfx_volume.set(vol)
-        if not self.sfx_muted.get():
-            self._apply_sfx_volume()
-        self.save_settings()
-
-    def on_bgm_volume_changed(self, value):
-        """Handle BGM volume slider change."""
-        vol = int(float(value))
-        self.bgm_volume.set(vol)
-        if not self.bgm_muted.get():
-            self._apply_bgm_volume()
-        self.save_settings()
-
-    def on_master_volume_changed(self, value):
-        """Handle master volume slider change."""
-        vol = int(float(value))
-        self.master_volume.set(vol)
-        if not self.master_muted.get():
-            self._apply_all_volumes()
-        self.save_settings()
-
-    def _apply_sfx_volume(self):
-        """Apply SFX volume to pygame."""
-        # SFX volume is applied at play time via _get_effective_volume
-        pass
-
-    def _apply_bgm_volume(self):
-        """Apply BGM volume to pygame music."""
-        try:
-            if pygame.mixer.get_init():
-                effective = self._get_effective_volume(self.bgm_volume.get(), self.bgm_muted.get())
-                pygame.mixer.music.set_volume(effective)
-        except Exception:
-            pass
-
-    def _apply_all_volumes(self):
-        """Apply all volume settings."""
-        self._apply_sfx_volume()
-        self._apply_bgm_volume()
-
-    def toggle_sfx_mute(self):
-        """Toggle SFX mute state."""
-        if self.sfx_muted.get():
-            # Unmute - restore previous volume
-            self.sfx_muted.set(False)
-            self.sfx_volume.set(self._sfx_pre_mute)
-        else:
-            # Mute - save current volume
-            self._sfx_pre_mute = self.sfx_volume.get()
-            self.sfx_muted.set(True)
-        self._update_mute_button(self.sfx_mute_btn, self.sfx_muted.get())
-        self._apply_sfx_volume()
-        self.save_settings()
-
-    def toggle_bgm_mute(self):
-        """Toggle BGM mute state."""
-        if self.bgm_muted.get():
-            # Unmute - restore previous volume
-            self.bgm_muted.set(False)
-            self.bgm_volume.set(self._bgm_pre_mute)
-        else:
-            # Mute - save current volume
-            self._bgm_pre_mute = self.bgm_volume.get()
-            self.bgm_muted.set(True)
-        self._update_mute_button(self.bgm_mute_btn, self.bgm_muted.get())
-        self._apply_bgm_volume()
-        self.save_settings()
-
-    def toggle_master_mute(self):
-        """Toggle master mute state."""
-        if self.master_muted.get():
-            # Unmute - restore previous volume
-            self.master_muted.set(False)
-            self.master_volume.set(self._master_pre_mute)
-        else:
-            # Mute - save current volume
-            self._master_pre_mute = self.master_volume.get()
-            self.master_muted.set(True)
-        self._update_mute_button(self.master_mute_btn, self.master_muted.get())
-        self._apply_all_volumes()
-        self.save_settings()
-
-    def _update_mute_button(self, btn, muted: bool):
-        """Update mute button appearance."""
-        if muted:
-            btn.configure(text="MUTED", bg="#c93b1e", activebackground="#c93b1e")
-        else:
-            btn.configure(text="MUTE", bg="#58be3d", activebackground="#58be3d")
-
-    def _init_audio_mute_buttons(self):
-        """Initialize mute button states after UI is built."""
-        if hasattr(self, 'sfx_mute_btn'):
-            self._update_mute_button(self.sfx_mute_btn, self.sfx_muted.get())
-        if hasattr(self, 'bgm_mute_btn'):
-            self._update_mute_button(self.bgm_mute_btn, self.bgm_muted.get())
-        if hasattr(self, 'master_mute_btn'):
-            self._update_mute_button(self.master_mute_btn, self.master_muted.get())
-        # Apply initial volumes
-        self._apply_all_volumes()
-
 
     # =========================================================================
     # REDEEM POINTS
@@ -2472,20 +2173,10 @@ class PixelChallengeConsole:
         anim_row.pack(fill="x", pady=6)
         self.cycle_btn = self.neon_button(anim_row, "CYCLE", self.toggle_cycle, bg="#c93b1e", width=6)
         self.cycle_btn.pack(side="left", padx=(0, 6))
-        
-        # TEST LANES button with stacked text
-        self.lanes_test_btn = tk.Button(anim_row, text="TEST\nLANES", command=self.on_all_lanes_test,
-                                         bg="#1b63ff", fg="white", activebackground="#1b63ff",
-                                         activeforeground="white", relief="raised", bd=3,
-                                         font=("Arial", 12, "bold"), width=6, cursor="hand2")
+        self.animate_btn = self.neon_button(anim_row, "ANIMATE", self.toggle_animate, bg="#c93b1e", width=10)
+        self.animate_btn.pack(side="left", padx=(0, 6))
+        self.lanes_test_btn = self.neon_button(anim_row, "LANES TEST", self.on_all_lanes_test, bg="#1b63ff", width=12)
         self.lanes_test_btn.pack(side="left", padx=(0, 6))
-        
-        # AUTO button
-        self.auto_btn = tk.Button(anim_row, text="AUTO", command=self.toggle_auto,
-                                   bg="#c93b1e", fg="white", activebackground="#c93b1e",
-                                   activeforeground="white", relief="raised", bd=3,
-                                   font=("Arial", 14, "bold"), width=6, cursor="hand2")
-        self.auto_btn.pack(side="left", padx=(0, 6))
         tk.Label(left_body, text="CYCLE DURATION (secs)", bg="#17071f", fg="#cccccc", font=("Arial", 14, "bold")).pack(anchor="center", pady=(6, 2))
         tk.Scale(left_body, from_=20, to=200, resolution=20, orient="horizontal", variable=self.cycle_seconds, bg="#17071f", fg="white", troughcolor="#071a30", highlightthickness=0, font=("Arial", 12, "bold"), command=self.on_cycle_changed, length=520).pack(fill="x", pady=(0, 8))
         tk.Label(left_body, text="THEME BRIGHTNESS (%)", bg="#17071f", fg="#cccccc", font=("Arial", 14, "bold")).pack(anchor="center", pady=(4, 2))
@@ -2496,7 +2187,7 @@ class PixelChallengeConsole:
         theme_frame = tk.Frame(left_body, bg="#17071f")
         theme_frame.pack(fill="both", expand=True, pady=(0, 6))
         canvas = tk.Canvas(theme_frame, bg="#17071f", highlightthickness=0, width=320, height=680)
-        vsb = tk.Scrollbar(theme_frame, orient="vertical", command=canvas.yview, width=40)
+        vsb = tk.Scrollbar(theme_frame, orient="vertical", command=canvas.yview)
         self.theme_listbox = tk.Frame(canvas, bg="#17071f")
         self.theme_listbox.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
         canvas.create_window((0, 0), window=self.theme_listbox, anchor="nw")
@@ -2522,12 +2213,8 @@ class PixelChallengeConsole:
         self.theme_select_box.bind("<<ListboxSelect>>", self.on_theme_selected)
 
     def build_center_area(self, parent):
-        parent.grid_rowconfigure(0, weight=0)  # Enroll panel
-        parent.grid_rowconfigure(1, weight=0)  # Player status
-        parent.grid_rowconfigure(2, weight=1)  # Audio panel (expandable)
+        parent.grid_rowconfigure(2, weight=1)
         parent.grid_columnconfigure(0, weight=1)
-        
-        # Enroll panel
         enroll_panel, enroll_body = self.panel(parent, "")
         enroll_panel.grid(row=0, column=0, sticky="ew", pady=(0, 10))
         self.checkin_button = self.neon_button(enroll_body, "PLAYER CHECK-IN", self.on_player_checkin, bg="#1b63ff")
@@ -2537,81 +2224,12 @@ class PixelChallengeConsole:
         tk.Label(joined_row, text="PLAYERS JOINED:", bg="#17071f", fg="#ffd74f", font=("Arial", 26, "bold")).pack(side="left")
         tk.Label(joined_row, textvariable=self.players_joined, bg="#24101f", fg="#ffd74f", font=("Arial", 28, "bold"), width=3).pack(side="right")
         self.neon_button(enroll_body, "CONFIRM PLAYERS", self.on_confirm_players, bg="#1b63ff").pack(fill="x")
-        
-        # Player status panel
         status_panel, status_body = self.panel(parent, "PLAYER STATUS")
         status_panel.grid(row=1, column=0, sticky="ew")
         status_body.grid_columnconfigure((0, 1, 2, 3), weight=1)
         self.status_body = status_body
-        
-        # Audio panel (in a paned window for resizing)
-        self.center_audio_paned = tk.PanedWindow(parent, orient="vertical", sashwidth=8, 
-                                                   sashrelief="raised", bg="#0b0314", opaqueresize=True)
-        self.center_audio_paned.grid(row=2, column=0, sticky="nsew", pady=(10, 0))
-        
-        # Spacer above audio (allows resizing)
-        spacer = tk.Frame(self.center_audio_paned, bg="#12061f", height=20)
-        self.center_audio_paned.add(spacer, minsize=10)
-        
-        # Audio controls panel
-        audio_panel, audio_body = self.panel(self.center_audio_paned, "AUDIO")
-        self.center_audio_paned.add(audio_panel, minsize=150)
-        
-        # Audio sliders container
-        audio_body.grid_columnconfigure((0, 1, 2), weight=1)
-        audio_body.grid_rowconfigure(0, weight=1)
-        audio_body.grid_rowconfigure(1, weight=0)
-        
-        # SFX Slider
-        sfx_frame = tk.Frame(audio_body, bg="#17071f")
-        sfx_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=5)
-        tk.Label(sfx_frame, text="SFX", bg="#17071f", fg="white", font=("Arial", 14, "bold")).pack(pady=(5, 10))
-        self.sfx_slider = tk.Scale(sfx_frame, from_=100, to=0, orient="vertical",
-                                    variable=self.sfx_volume, bg="#17071f", fg="white",
-                                    troughcolor="#071a30", highlightthickness=0,
-                                    font=("Arial", 10, "bold"), width=40, length=150,
-                                    command=self.on_sfx_volume_changed)
-        self.sfx_slider.pack(fill="y", expand=True, pady=(0, 10))
-        self.sfx_mute_btn = tk.Button(sfx_frame, text="MUTE", command=self.toggle_sfx_mute,
-                                       bg="#58be3d", fg="white", activebackground="#58be3d",
-                                       activeforeground="white", font=("Arial", 10, "bold"),
-                                       width=6, cursor="hand2")
-        self.sfx_mute_btn.pack(pady=(0, 5))
-        
-        # BGM Slider
-        bgm_frame = tk.Frame(audio_body, bg="#17071f")
-        bgm_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=5)
-        tk.Label(bgm_frame, text="BGM", bg="#17071f", fg="white", font=("Arial", 14, "bold")).pack(pady=(5, 10))
-        self.bgm_slider = tk.Scale(bgm_frame, from_=100, to=0, orient="vertical",
-                                    variable=self.bgm_volume, bg="#17071f", fg="white",
-                                    troughcolor="#071a30", highlightthickness=0,
-                                    font=("Arial", 10, "bold"), width=40, length=150,
-                                    command=self.on_bgm_volume_changed)
-        self.bgm_slider.pack(fill="y", expand=True, pady=(0, 10))
-        self.bgm_mute_btn = tk.Button(bgm_frame, text="MUTE", command=self.toggle_bgm_mute,
-                                       bg="#58be3d", fg="white", activebackground="#58be3d",
-                                       activeforeground="white", font=("Arial", 10, "bold"),
-                                       width=6, cursor="hand2")
-        self.bgm_mute_btn.pack(pady=(0, 5))
-        
-        # Master Slider
-        master_frame = tk.Frame(audio_body, bg="#17071f")
-        master_frame.grid(row=0, column=2, sticky="nsew", padx=10, pady=5)
-        tk.Label(master_frame, text="MASTER", bg="#17071f", fg="white", font=("Arial", 14, "bold")).pack(pady=(5, 10))
-        self.master_slider = tk.Scale(master_frame, from_=100, to=0, orient="vertical",
-                                       variable=self.master_volume, bg="#17071f", fg="white",
-                                       troughcolor="#071a30", highlightthickness=0,
-                                       font=("Arial", 10, "bold"), width=40, length=150,
-                                       command=self.on_master_volume_changed)
-        self.master_slider.pack(fill="y", expand=True, pady=(0, 10))
-        self.master_mute_btn = tk.Button(master_frame, text="MUTE", command=self.toggle_master_mute,
-                                          bg="#58be3d", fg="white", activebackground="#58be3d",
-                                          activeforeground="white", font=("Arial", 10, "bold"),
-                                          width=6, cursor="hand2")
-        self.master_mute_btn.pack(pady=(0, 5))
-        
-        # Bind paned window sash movement
-        self.center_audio_paned.bind("<ButtonRelease-1>", self.save_sash_positions)
+        filler = tk.Frame(parent, bg="#12061f")
+        filler.grid(row=2, column=0, sticky="nsew")
 
     def build_controllers_area(self, parent):
         parent.grid_rowconfigure(0, weight=1)
@@ -2794,9 +2412,6 @@ class PixelChallengeConsole:
     # =========================================================================
     # CONFIG WINDOW
     # =========================================================================
-    # =========================================================================
-    # CONFIG WINDOW
-    # =========================================================================
     def open_config_window(self):
         if self.config_window and tk.Toplevel.winfo_exists(self.config_window):
             self.config_window.focus_set()
@@ -2806,65 +2421,23 @@ class PixelChallengeConsole:
         if not os.path.exists(path):
             with open(path, "w", encoding="utf-8") as f:
                 json.dump({"difficulty": "normal"}, f, indent=2)
-        
         self.config_window = tk.Toplevel(self.root, bg="#0f0617")
-        self.config_window.title(f"Config - {self.selected_game.get()} (Mode {self.game_mode.get()})")
-        
-        # Use saved geometry or default to larger size
-        if self.config_geometry:
-            self.config_window.geometry(self.config_geometry)
-        else:
-            self.config_window.geometry("800x650")
-        
-        self.config_window.minsize(600, 400)
+        self.config_window.title("Config")
+        self.config_window.geometry("640x520")
         self.config_window.transient(self.root)
         self.config_window.grab_set()
-        
-        # Save geometry when window is moved/resized
-        self.config_window.bind("<Configure>", self._on_config_window_configure)
-        
-        # Header with SAVE on left, title in center, CLOSE on right
-        header_frame = tk.Frame(self.config_window, bg="#0f0617")
-        header_frame.pack(fill="x", padx=10, pady=(10, 5))
-        
-        tk.Button(header_frame, text="SAVE", command=lambda: self.save_config_file(path),
-                  bg="#2ea62e", fg="white", font=("Arial", 12, "bold"),
-                  width=8, cursor="hand2").pack(side="left")
-        
-        tk.Label(header_frame, text=f"Config: {self.selected_game.get()} (Mode {self.game_mode.get()})",
-                 bg="#0f0617", fg="white", font=("Arial", 16, "bold")).pack(side="left", expand=True)
-        
-        tk.Button(header_frame, text="CLOSE", command=self.close_config_window,
-                  bg="#c93b1e", fg="white", font=("Arial", 12, "bold"),
-                  width=8, cursor="hand2").pack(side="right")
-        
-        # Main content area
-        content_frame = tk.Frame(self.config_window, bg="#0f0617")
-        content_frame.pack(fill="both", expand=True, padx=10, pady=5)
-        
-        # Simple text with scrollbars
-        self.config_text = tk.Text(content_frame, wrap="none", bg="#12061f", fg="white",
-                                    insertbackground="white", font=("Consolas", 12), undo=True)
-        
-        v_scroll = tk.Scrollbar(content_frame, orient="vertical", command=self.config_text.yview, width=40)
-        h_scroll = tk.Scrollbar(content_frame, orient="horizontal", command=self.config_text.xview, width=40)
-        
-        self.config_text.configure(yscrollcommand=v_scroll.set, xscrollcommand=h_scroll.set)
-        
-        v_scroll.pack(side="right", fill="y")
-        h_scroll.pack(side="bottom", fill="x")
-        self.config_text.pack(side="left", fill="both", expand=True)
-        
+        tk.Label(self.config_window, text=f"Config: {self.selected_game.get()}", bg="#0f0617", fg="white", font=("Arial", 18, "bold")).pack(pady=6)
+        self.config_text = tk.Text(self.config_window, wrap="none", bg="#12061f", fg="white", insertbackground="white", font=("Consolas", 12), undo=True)
+        self.config_text.pack(fill="both", expand=True, padx=8, pady=6)
         try:
             with open(path, "r", encoding="utf-8") as f:
                 self.config_text.insert("1.0", f.read())
         except Exception:
             pass
-
-    def _on_config_window_configure(self, event):
-        """Save config window geometry when moved/resized."""
-        if self.config_window and event.widget == self.config_window:
-            self.config_geometry = self.config_window.geometry()
+        btn_frame = tk.Frame(self.config_window, bg="#0f0617")
+        btn_frame.pack(fill="x", pady=(4, 8))
+        self.neon_button(btn_frame, "SAVE", lambda: self.save_config_file(path), bg="#2ea62e", width=8).pack(side="left", padx=6)
+        self.neon_button(btn_frame, "CLOSE", self.close_config_window, bg="#c93b1e", width=8).pack(side="right", padx=6)
 
     def save_config_file(self, path):
         try:
@@ -2878,13 +2451,11 @@ class PixelChallengeConsole:
 
     def close_config_window(self):
         if self.config_window and tk.Toplevel.winfo_exists(self.config_window):
-            # Save final geometry
-            self.config_geometry = self.config_window.geometry()
-            self.save_settings()
             self.config_window.grab_release()
             self.config_window.destroy()
         self.config_window = None
         self.config_text = None
+
     # =========================================================================
     # SETUP WINDOW
     # =========================================================================

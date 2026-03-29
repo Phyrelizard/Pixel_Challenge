@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v22.3.3
+Pixel Challenge Host Console v22.3.1
 
 """
 import os
@@ -25,7 +25,7 @@ from games.base import PlayerConfig
 # SLA System (v21.8.0)
 from sla import SLAStore, SLACalibration
 
-VERSION_LABEL = "v22.3.3"
+VERSION_LABEL = "v22.3.1"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 DEFAULT_FALCON_IP = "192.168.2.113"
@@ -904,19 +904,18 @@ class PixelChallengeConsole:
         return self.selected_game.get().lower().replace(" ", "_")
 
     def config_path_for_current_game(self):
-        """Get the config file path for the currently selected game and mode."""
         key = self.current_game_key()
         if key == "splash":
             return os.path.join(GAMES_ROOT, "global.config.json")
         
-        # Use mode-specific config for games that support it
+        # Use mode-specific config file
         mode = self.game_mode.get()
-        mode_config = os.path.join(GAMES_ROOT, key, f"config_mode{mode}.json")
+        config_filename = f"config_mode{mode}.json"
+        mode_config_path = os.path.join(GAMES_ROOT, key, config_filename)
         
-        # Fall back to regular config.json if mode-specific doesn't exist
-        if os.path.exists(mode_config):
-            return mode_config
-        
+        # Fall back to generic config.json if mode-specific doesn't exist
+        if os.path.exists(mode_config_path):
+            return mode_config_path
         return os.path.join(GAMES_ROOT, key, "config.json")
 
     def viewer_show_splash(self):
@@ -2794,9 +2793,6 @@ class PixelChallengeConsole:
     # =========================================================================
     # CONFIG WINDOW
     # =========================================================================
-    # =========================================================================
-    # CONFIG WINDOW
-    # =========================================================================
     def open_config_window(self):
         if self.config_window and tk.Toplevel.winfo_exists(self.config_window):
             self.config_window.focus_set()
@@ -2885,6 +2881,7 @@ class PixelChallengeConsole:
             self.config_window.destroy()
         self.config_window = None
         self.config_text = None
+
     # =========================================================================
     # SETUP WINDOW
     # =========================================================================
