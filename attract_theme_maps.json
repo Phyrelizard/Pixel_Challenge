@@ -1,6 +1,5 @@
 {
   "auto_enabled": true,
-  "animate_enabled": false,
   "cycle_seconds": 40,
   "per_theme_speed": {
     "Fire Burst": 6,
@@ -19,12 +18,12 @@
     "Bounce Chase",
     "Lane Chase LR"
   ],
-  "sash_left_attract_bottom": 818,
+  "sash_left_attract_bottom": 726,
   "sash_center_ctrl": 677,
   "sash_main_info": 510,
-  "sash_bottom_log": 687,
+  "sash_bottom_log": 685,
   "falcon_brightness": 14,
-  "gameplay_brightness": 39,
+  "gameplay_brightness": 10,
   "falcon_ip": "192.168.2.113",
   "wifi_ssid": "",
   "wifi_psk": "",
@@ -40,5 +39,15 @@
   "apply_reboot": true,
   "debug_logging": false,
   "setup_geometry": "1920x998+1920+82",
-  "game_mode": 1
+  "game_mode": 1,
+  "sfx_volume": 100,
+  "bgm_volume": 100,
+  "master_volume": 100,
+  "sfx_muted": false,
+  "bgm_muted": false,
+  "master_muted": false,
+  "sfx_pre_mute": 100,
+  "bgm_pre_mute": 100,
+  "master_pre_mute": 100,
+  "config_geometry": "800x650+0+0"
 }

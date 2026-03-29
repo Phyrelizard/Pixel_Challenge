@@ -21,10 +21,9 @@ cd /home/ledgame/easter_game
 #python /home/ledgame/easter_game/pixel_challenge_console_v22.1.3.py
 #python /home/ledgame/easter_game/pixel_challenge_console_v22.1.4.py
 #python /home/ledgame/easter_game/pixel_challenge_console_v22.1.5.py
+#python /home/ledgame/easter_game/pixel_challenge_console_v22.2.0.py
 
-python /home/ledgame/easter_game/pixel_challenge_console_v22.2.0.py
-
-#python /home/ledgame/easter_game/pixel_challenge_console_v22._._py
+python /home/ledgame/easter_game/pixel_challenge_console_v22.3.1.py
 #python /home/ledgame/easter_game/pixel_challenge_console_v22._._py
 #python /home/ledgame/easter_game/pixel_challenge_console_v22._._py
 #python /home/ledgame/easter_game/pixel_challenge_console_v22._._py
