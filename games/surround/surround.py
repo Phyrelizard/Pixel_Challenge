@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 # -*- coding: utf-8 -*-
 """
-surround.py Game Module v1.0.4
+surround.py Game Module v1.0.5
 first tested with pixel_challenge_console.py v22.1.3
-updated for pixel_challenge_console.py v22.1.5
+updated for pixel_challenge_console.py v22.5.0
 
 A center-defense, two-lane, dual-direction pressure game with eggs,
 hatch events, and special hunter threats.
@@ -548,7 +548,7 @@ class SurroundSession(GameSession):
                 if time_since_switch_ms >= self.lane_switch_cooldown_ms:
                     ps.current_lane = "right"
                     ps.last_lane_switch_time = current_time
-                    ps.vertical_direction = VerticalDirection.NONE  # Reset direction on lane switch
+                    # Do NOT reset vertical_direction; keep last fire direction
                     self.host.log(f"[SURROUND] P{player_id} switched to RIGHT lane")
         
             # UP = move marker toward pixel 99 (forward on joystick = toward end of lane)

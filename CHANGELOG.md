@@ -1,5 +1,12 @@
 # Changelog
 
+v22.5.0 (2026-03-29)
+
+Console: Renamed ANIMATE button to AUTO and changed behavior so attract lighting runs whenever AUTO is on and no game is active (including post-game scoreboard); AUTO stops automatically during active gameplay.
+Console settings: Renamed animate_enabled to auto_enabled in state/save/load to match the new behavior.
+Surround: Preserved last vertical fire direction across lane switches (no reset to NONE when changing lanes).
+Version label bumped to v22.5.0.
+
 v22.1.6 (2026-03-29)
 Console (pixel_challenge_console_v22.1.6.py)
 Fixed:

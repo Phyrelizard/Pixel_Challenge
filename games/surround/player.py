@@ -174,7 +174,7 @@ class PlayerState:
             self.transition_progress = 0.0
         
         self.current_lane = new_lane
-        self.vertical_direction = VerticalDirection.NONE  # Reset direction
+        # Keep existing vertical_direction so firing direction is remembered
         self.last_lane_switch_time = time.time()
         
         return True

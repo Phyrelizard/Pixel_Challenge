@@ -1,6 +1,5 @@
 {
-  "auto_enabled": true,
-  "animate_enabled": false,
+  "auto_enabled": false,
   "cycle_seconds": 40,
   "per_theme_speed": {
     "Fire Burst": 6,
@@ -20,10 +19,10 @@
     "Rainbow Pulse",
     "Fire Burst"
   ],
-  "sash_left_attract_bottom": 726,
+  "sash_left_attract_bottom": 818,
   "sash_center_ctrl": 677,
   "sash_main_info": 510,
-  "sash_bottom_log": 196,
+  "sash_bottom_log": 357,
   "falcon_brightness": 14,
   "gameplay_brightness": 10,
   "falcon_ip": "192.168.2.113",
@@ -39,7 +38,7 @@
   "auto_start": true,
   "backup_restore": true,
   "apply_reboot": true,
-  "debug_logging": true,
+  "debug_logging": false,
   "setup_geometry": "1920x998+1920+82",
   "game_mode": 1
 }
