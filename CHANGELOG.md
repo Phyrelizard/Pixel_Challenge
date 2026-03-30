@@ -1,5 +1,15 @@
 # Changelog
 
+## [v22.5.3] - 2026-03-30
+
+### Fixed
+- AUTO attract lighting now correctly restores after game ends for ALL games (Surround, Pixel Pop, and others)
+- Root cause: attract.start_theme in finish_results_screen was gated on animate_was_enabled_before_game flag; if AUTO was already off when game started (due to prior broken session), the flag was False and attract never restarted
+- Fix: attract.start_theme is now called unconditionally whenever AUTO is on at the end of the results screen, regardless of pre-game flag state
+- Removed duplicate final_results_active and show_selected_game_splash lines that were left in finish_results_screen from a prior patch
+
+---
+
 ## [v22.5.2] - 2026-03-30
 
 ### Not Fixed
