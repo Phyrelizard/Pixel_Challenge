@@ -1,5 +1,41 @@
 # Changelog
 
+# Changelog
+
+# Changelog
+
+## [v22.5.5] - 2026-03-30
+
+### Fixed
+- **Surround: Invisible projectile bug** - fired missiles were not rendering on the pixel strings but were still hitting and destroying targets invisibly
+  - Root cause: duplicate `get_render_pixels()` method in `games/surround/snake.py` (Projectile class). Python silently overwrites the first method when a second method with the same name is defined - the version accepting `trail_length` and `trail_brightness` kwargs was overwritten by a simpler version that only accepted `current_time`
+  - `surround.py` line 1361 calls `proj.get_render_pixels(trail_length=..., trail_brightness=...)` which raised `TypeError: unexpected keyword argument 'trail_length'` on every tick
+  - Fix: merged both methods into a single unified `get_render_pixels()` that accepts `trail_length`, `trail_brightness`, and `current_time` as optional kwargs
+- **Surround: Severe marker lag during gameplay** - player marker movement became choppy and unresponsive after firing
+  - Root cause: the `TypeError` above was raised and caught ~60 times per second (every tick), each time generating a full stack trace string via `traceback.format_exc()` - this consumed significant CPU time and starved the game loop
+  - Fix: eliminating the duplicate method error stops the exception flood, restoring fluid marker movement
+- **Surround: Direction comparison hardened** - changed `self.direction.value == "top_to_bottom"` (string comparison) to `self.direction == TravelDirection.TOP_TO_BOTTOM` (proper enum comparison) in projectile trail rendering
+
+### Changed
+- Surround game module version bumped to v1.1.0 (`games/surround/surround.py`)
+- Console version bumped to v22.5.5 (`pixel_challenge_console_v22.5.5.py`)
+
+### Files Modified
+- `games/surround/snake.py` - removed duplicate `get_render_pixels()` method (lines 810-817), merged `current_time` kwarg into the primary method
+- `pixel_challenge_console_v22.5.5.py` - version label update
+
+---
+
+### Changed
+- Surround game module version bumped to v1.1.0 (`games/surround/surround.py`)
+- Console version bumped to v22.5.5 (`pixel_challenge_console_v22.5.5.py`)
+
+### Files Modified
+- `games/surround/snake.py` — removed duplicate `get_render_pixels()` method (lines 810-817), merged `current_time` kwarg into the primary method
+- `pixel_challenge_console_v22.5.5.py` — version label update
+
+---
+
 ## [v22.5.3] - 2026-03-30
 
 ### Fixed
