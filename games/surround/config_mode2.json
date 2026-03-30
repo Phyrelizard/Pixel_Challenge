@@ -55,9 +55,10 @@
   },
 
   "projectile": {
-    "speed_ms_per_pixel": 8,
-    "color": "red",
+    "speed_ms_per_pixel": 20,
     "length_pixels": 1,
+    "trail_length_pixels": 3,
+    "trail_brightness": 0.15,
     "dual_fire_on_matching_heads": true
   },
 

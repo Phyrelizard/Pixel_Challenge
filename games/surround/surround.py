@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # -*- coding: utf-8 -*-
 """
-surround.py Game Module v1.0.6
+surround.py Game Module v1.1.0
 first tested with pixel_challenge_console.py v22.1.3
 updated for pixel_challenge_console.py v22.5.0
 
@@ -14,7 +14,7 @@ Supports two modes:
 """
 from __future__ import annotations
 
-VERSION_LABEL = "v1.0.6"
+VERSION_LABEL = "v1.1.0"
 
 import json
 import os
@@ -110,7 +110,9 @@ class SurroundSession(GameSession):
         
         # Projectile config
         self.projectile_config = self.config.get("projectile", {})
-        self.projectile_speed_ms = self.projectile_config.get("speed_ms_per_pixel", 8)
+        self.projectile_speed_ms = self.projectile_config.get("speed_ms_per_pixel", 8.0)
+        self.projectile_trail_length = self.projectile_config.get("trail_length_pixels", 0)
+        self.projectile_trail_brightness = self.projectile_config.get("trail_brightness", 0.35)
         self.dual_fire_enabled = self.projectile_config.get("dual_fire_on_matching_heads", True)
         
         # Snake management per player
@@ -681,6 +683,9 @@ class SurroundSession(GameSession):
             self.projectiles[player_id].append(projectile)
         
         ps.record_shot(hit=False)
+        self.host.play_sound("su_shot_fire")
+        if lanes_to_fire:
+            self.host.play_sound("su_shot_fire")
     
     def _lane_has_head_color(self, player_id: int, lane: str, color: str) -> bool:
         """Check if any snake in lane has a head of the given color."""
@@ -927,20 +932,18 @@ class SurroundSession(GameSession):
                     snake.destroy()
                     ps.record_shot(hit=True)
                     ps.record_kill()
-                    
+
                     snake_scores = self.scoring_config.get("snake_destroy", {})
                     points = snake_scores.get(snake.color, 50)
                     ps.add_score(points)
-                    
+
                     self._check_extra_life(player_id)
+                    self.host.play_sound("su_shot_hit")
                     return True
                 else:
-                    if self.snakes_config.get("miss_growth_enabled", True):
-                        growth = self.snakes_config.get("miss_growth_pixels", 2)
-                        snake.grow(growth)
-                    
                     ps.record_shot(hit=False, wrong_color=True)
                     ps.add_score(self.scoring_config.get("wrong_color_penalty", -5))
+                    self.host.play_sound("su_shot_wrong")
                     return True
         
         # Check baby snakes
@@ -1351,11 +1354,14 @@ class SurroundSession(GameSession):
                 if 0 <= egg.row < self.lane_length:
                     pixels[egg.lane][egg.row] = egg.get_current_color()
         
-        # Draw projectiles
+
+        # Draw projectiles (with optional comet trail)
         for proj in self.projectiles.get(player_id, []):
             if proj.is_active:
-                color = proj.get_color_rgb()
-                for pixel in proj.get_occupied_pixels():
+                for pixel, color in proj.get_render_pixels(
+                    trail_length=self.projectile_trail_length,
+                    trail_brightness=self.projectile_trail_brightness
+                ):
                     if 0 <= pixel < self.lane_length:
                         pixels[proj.lane][pixel] = color
         

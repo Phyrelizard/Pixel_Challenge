@@ -14,8 +14,8 @@
     "Lane Chase RL": 6
   },
   "selected_themes": [
-    "Bounce Chase",
-    "Lane Chase LR"
+    "Lane Chase LR",
+    "Bounce Chase"
   ],
   "sash_left_attract_bottom": 726,
   "sash_center_ctrl": 677,

@@ -111,9 +111,9 @@ class Snake:
             self.tail_position = self.head_position + self.size - 1
     
     def get_color_rgb(self) -> Tuple[int, int, int]:
-        """Get the RGB color of this snake."""
-        return COLOR_RGB.get(self.color, (255, 255, 255))
-    
+        """Get RGB color of projectile."""
+        return COLOR_RGB.get(self.color, (255, 0, 0))
+
     def get_occupied_pixels(self) -> List[int]:
         """
         Get list of pixel indices currently occupied by this snake.
@@ -135,6 +135,46 @@ class Snake:
                 pixels.append(i)
         
         return pixels
+
+    def get_render_pixels(self, trail_length: int = 0, trail_brightness: float = 0.35) -> List[Tuple[int, Tuple[int, int, int]]]:
+        """
+        Get (pixel_index, rgb) pairs for rendering with optional comet trail.
+
+        trail_length: number of trailing pixels behind the head (0 = no trail, solid)
+        trail_brightness: brightness factor for the dimmest tail pixel (0.0-1.0).
+                          Pixels between head and tail fade linearly.
+        """
+        result = []
+        pos = int(self.position)
+        base_rgb = self.get_color_rgb()
+
+        # Head pixel(s) — full brightness
+        for i in range(self.length_pixels):
+            if self.direction == TravelDirection.TOP_TO_BOTTOM:
+                pixel = pos + i
+            else:
+                pixel = pos - i
+            if 0 <= pixel < self.lane_length:
+                result.append((pixel, base_rgb))
+
+        if trail_length > 0:
+            # Trail pixels behind the head — fade from full brightness to trail_brightness
+            for t in range(1, trail_length + 1):
+                # t=1 is immediately behind head, t=trail_length is dimmest
+                factor = 1.0 - (t / (trail_length + 1)) * (1.0 - trail_brightness)
+                trail_rgb = (
+                    int(base_rgb[0] * factor),
+                    int(base_rgb[1] * factor),
+                    int(base_rgb[2] * factor),
+                )
+                if self.direction == TravelDirection.TOP_TO_BOTTOM:
+                    pixel = pos - t  # behind = lower index
+                else:
+                    pixel = pos + t  # behind = higher index
+                if 0 <= pixel < self.lane_length:
+                    result.append((pixel, trail_rgb))
+
+        return result
     
     def get_head_pixel(self) -> int:
         """Get the pixel index of the snake's head."""
@@ -736,3 +776,42 @@ class Projectile:
     def deactivate(self) -> None:
         """Deactivate projectile (hit something)."""
         self.is_active = False
+
+    def get_render_pixels(
+        self,
+        trail_length: int = 0,
+        trail_brightness: float = 0.4,
+    ):
+        """
+        Yield (pixel_index, color_rgb) tuples for rendering.
+        Supports an optional trailing glow behind the projectile head.
+
+        trail_length  - number of pixels of fade trail behind the head
+        trail_brightness - brightness factor (0.0-1.0) applied to trail pixels
+        """
+        base_color = self.get_color_rgb()
+        head_pixels = self.get_occupied_pixels()
+
+        # Yield the main (head) pixels at full brightness
+        for pixel in head_pixels:
+            yield (pixel, base_color)
+
+        # Yield trail pixels behind the head at reduced brightness
+        if trail_length > 0:
+            trail_color = tuple(int(c * trail_brightness) for c in base_color)
+            for i in range(1, trail_length + 1):
+                if self.direction.value == "top_to_bottom":
+                    trail_pixel = int(self.position) - i
+                else:
+                    trail_pixel = int(self.position) + i
+                if 0 <= trail_pixel < self.lane_length:
+                    yield (trail_pixel, trail_color)
+
+    def get_render_pixels(self, current_time: float = 0.0):
+        """
+        Yield (pixel_index, color_rgb) tuples for rendering.
+        Matches the get_render_pixels() call signature in surround.py.
+        """
+        color = self.get_color_rgb()
+        for pixel in self.get_occupied_pixels():
+            yield (pixel, color)
