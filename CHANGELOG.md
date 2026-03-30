@@ -1,5 +1,26 @@
 # Changelog
 
+## [v22.5.2] - 2026-03-30
+
+### Not Fixed
+- AUTO attract lighting still not working after end of game when enabled.
+
+### Fixed
+
+- Reordered finish_results_screen so auto_enabled is set back to True before final_results_active is cleared, preventing lights_should_run from returning False during the transition
+- Added explicit attract.start_theme call at end of finish_results_screen so lane lighting restarts immediately when the game splash is shown
+- Added consume of animate_was_enabled_before_game flag in finish_results_screen to prevent double-restore
+
+---
+
+## [v22.5.1] - 2026-03-30
+
+### Fixed
+- Surround: projectile firing now correctly persists last vertical direction when switching from RIGHT lane back to LEFT lane; right-to-left lane switch no longer resets fire direction to NONE
+- Surround: firing was already working left-to-right; this fix makes right-to-left behave identically
+
+---
+
 v22.5.0 (2026-03-29)
 
 Console: Renamed ANIMATE button to AUTO and changed behavior so attract lighting runs whenever AUTO is on and no game is active (including post-game scoreboard); AUTO stops automatically during active gameplay.

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # -*- coding: utf-8 -*-
 """
-surround.py Game Module v1.0.5
+surround.py Game Module v1.0.6
 first tested with pixel_challenge_console.py v22.1.3
 updated for pixel_challenge_console.py v22.5.0
 
@@ -14,7 +14,7 @@ Supports two modes:
 """
 from __future__ import annotations
 
-VERSION_LABEL = "v1.0.5"
+VERSION_LABEL = "v1.0.6"
 
 import json
 import os
@@ -539,7 +539,7 @@ class SurroundSession(GameSession):
                 if time_since_switch_ms >= self.lane_switch_cooldown_ms:
                     ps.current_lane = "left"
                     ps.last_lane_switch_time = current_time
-                    ps.vertical_direction = VerticalDirection.NONE  # Reset direction on lane switch
+                    # Do NOT reset vertical_direction; keep last fire direction
                     self.host.log(f"[SURROUND] P{player_id} switched to LEFT lane")
         
         elif direction == "right":
@@ -1388,7 +1388,7 @@ class SurroundModule(GameModule):
         title="Surround",
         min_players=1,
         max_players=4,
-        version="v1.0.2",
+        version="v1.0.6",
         requires_color_selection=False,
         supports_sla=False,
         description="Center-defense game with dual-direction snakes and Hunter bosses"

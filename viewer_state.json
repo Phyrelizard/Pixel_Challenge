@@ -1,15 +1,19 @@
 {
-  "game": "pixel_pop",
-  "phase": "running",
-  "time_remaining": 0,
-  "bonus_active": false,
+  "game_key": "dot_dash",
+  "phase": "round_complete",
+  "title": "Dot Dash",
+  "instruction": "ROUND COMPLETE!",
   "players": [
     {
-      "player_id": 2,
-      "score": 305,
-      "selected_lane": "left",
-      "is_active": true,
-      "lives": null
+      "id": 2,
+      "score": 2030,
+      "colors": [
+        "GREEN",
+        "ORANGE"
+      ],
+      "finished": true,
+      "timed_out": false,
+      "first_finisher": true
     }
   ]
 }
