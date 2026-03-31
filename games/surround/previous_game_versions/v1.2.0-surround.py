@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # -*- coding: utf-8 -*-
 """
-surround.py Game Module v1.2.1
+surround.py Game Module v1.2.0
 first tested with pixel_challenge_console.py v22.1.3
 updated for pixel_challenge_console.py v22.5.0
 
@@ -14,7 +14,7 @@ Supports two modes:
 """
 from __future__ import annotations
 
-VERSION_LABEL = "v1.2.1"
+VERSION_LABEL = "v1.2.0"
 
 import json
 import os
@@ -457,9 +457,6 @@ class SurroundSession(GameSession):
         self.surround_phase = SurroundPhase.ROUND_END
         self.phase = BaseGamePhase.ROUND_COMPLETE
         self.game_complete = True
-        # Stop background music before playing round-end sound
-        if hasattr(self.host, 'stop_music'):
-            self.host.stop_music()
         self.host.play_sound("su_round_end")
         
         # Calculate final scores

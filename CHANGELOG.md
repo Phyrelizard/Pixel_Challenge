@@ -1,8 +1,23 @@
 # Changelog
 
-# Changelog
+## [v22.6.2] - 2026-03-31
 
-# Changelog
+### Fixed
+- **Console: Background music not stopping on manual STOP** - pressing the STOP button during active gameplay would abort the game but background music continued playing indefinitely
+  - Root cause: `on_stop_game()` called `self.game_manager.abort_game()` but never called `self.stop_music()`, so the pygame mixer kept looping the gameplay track
+  - Fix: added `self.stop_music()` call before `abort_game()` in `on_stop_game()`  music now fades out over 1.5 seconds on manual stop, identical to normal game-end behavior
+- **Console: Duplicate result/scoreboard block in `game_tick()`** - when a game completed naturally, `record_score_history()` and `show_scoreboard_temporarily()` were called **twice**, and `set_state(RESULTS_READY)` was called twice
+  - Root cause: copy-paste error left a duplicate `if result:` block and duplicate `set_state()` call inside the `is_current_game_complete()` handler
+  - Fix: removed the duplicate block  results are now recorded exactly once per game completion
+
+### Changed
+- Console version bumped to v22.6.2 (`pixel_challenge_console_v22.6.2.py`)
+
+### Files Modified
+- `pixel_challenge_console_v22.6.2.py`  version label update, `stop_music()` added to `on_stop_game()`, duplicate result block removed from `game_tick()`
+
+---
+
 
 ## [v22.5.5] - 2026-03-30
 
