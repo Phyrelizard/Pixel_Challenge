@@ -5,9 +5,9 @@
   "bonus_active": false,
   "players": [
     {
-      "player_id": 1,
-      "score": 590,
-      "selected_lane": "left",
+      "player_id": 2,
+      "score": 615,
+      "selected_lane": "right",
       "is_active": true,
       "lives": null
     }

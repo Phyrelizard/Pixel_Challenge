@@ -1,5 +1,95 @@
 # Changelog
 
+## [v22.7.0] - 2026-03-31
+
+### Added - Audio System for Three Games
+- **Console: Full sound effect registry for Pixel Pop, Surround, and Dot Dash**
+  - `play_sound()` method now registers all sound keys for three game prefixes: `pp_`, `su_`, `dd_`
+  - Each game has its own audio subdirectory under `assets/audio/`
+  - Background music support with looping (`music` in key name auto-loops via pygame mixer)
+  - `stop_music()` method with 1.5-second fade-out for clean transitions
+- **Pixel Pop audio keys (`pp_` prefix):**
+  - `pp_shot_fire`, `pp_shot_hit_correct`, `pp_shot_hit_wrong`
+  - `pp_snake_grow`, `pp_lane_switch`, `pp_snake_warning`, `pp_snake_reached_end`
+  - `pp_lane_clear`, `pp_bonus_start`, `pp_bonus_end`
+  - `pp_round_start`, `pp_round_end`, `pp_music_gameplay`
+- **Surround audio keys (`su_` prefix):**
+  - `su_shot_fire`, `su_shot_hit_correct`, `su_shot_hit_wrong`
+  - `su_lane_switch`, `su_lane_clear`, `su_snake_grow`, `su_snake_warning`, `su_snake_reached_end`
+  - `su_round_start`, `su_round_end`, `su_bonus_start`, `su_bonus_end`, `su_music_gameplay`
+- **Dot Dash audio keys (`dd_` prefix):**
+  - `dd_shot_fire`, `dd_shot_hit_correct`, `dd_shot_hit_wrong`
+  - `dd_lane_switch`, `dd_lane_clear`, `dd_snake_grow`, `dd_snake_warning`, `dd_snake_reached_end`
+  - `dd_round_start`, `dd_round_end`, `dd_bonus_start`, `dd_bonus_end`, `dd_music_gameplay`
+- **Shared audio keys:**
+  - `countdown_tick`, `countdown_go`
+
+### Added - Surround Audio Integration
+- **Surround game module now calls sound effects during gameplay:**
+  - `su_shot_fire` on projectile fire
+  - `su_shot_hit_correct` on matching color kill, `su_shot_hit_wrong` on wrong color hit
+  - `su_lane_switch` on lane change
+  - `su_snake_reached_end` when snake exits the lane
+  - `su_snake_warning` when player takes damage
+  - `su_bonus_start` on egg hatch event
+  - `su_round_start` at round begin, `su_round_end` at round finish
+  - `su_music_gameplay` loops as background music during active play
+  - Background music stops (fade-out) on game end and session exit
+
+### Added - Dot Dash Audio Integration
+- **Dot Dash game module wired to `dd_` sound keys:**
+  - `dd_shot_fire` on color button selection during setup
+  - `dd_shot_hit_correct` on correct button press and color lock confirmation
+  - `dd_shot_hit_wrong` on wrong button press
+  - `dd_lane_switch` on turnaround (outbound to return transition)
+  - `dd_round_start` when all players are ready
+  - `dd_lane_clear` when winner finishes
+  - `dd_snake_reached_end` when other players finish
+  - `dd_round_end` on round completion
+  - `dd_snake_warning` on timeout
+  - `dd_music_gameplay` loops as background music during active play
+  - `stop_music()` called on session exit for clean audio teardown
+- **Dot Dash previously used generic placeholder keys** (`button_select`, `tap_valid`, `tap_invalid`, `turnaround`, etc.) that were never registered in the console -- all sounds were silently skipped; now all events produce audible feedback
+
+### Changed
+- Console version bumped to v22.7.0 (`pixel_challenge_console_v22.7.0.py`)
+- Surround game module version remains v1.2.1 (audio calls were already present, no logic changes)
+- Dot Dash game module version bumped to v21.7 (sound key rewiring)
+
+### Audio Directory Structure
+```
+assets/audio/
+  pixel_pop/     pp_*.wav, pp_*.ogg
+  surround/      su_*.wav, su_*.ogg
+  dot_dash/      dd_*.wav, dd_*.ogg
+  shared/        countdown_tick.wav, countdown_go.wav
+```
+
+### Sound Key Mapping - Dot Dash
+
+| Game Event                  | Old Key (unused)    | New Key               |
+|-----------------------------|---------------------|-----------------------|
+| Color selected in setup     | button_select       | dd_shot_fire          |
+| 2 colors locked             | color_locked        | dd_shot_hit_correct   |
+| Correct button press        | tap_valid           | dd_shot_hit_correct   |
+| Wrong button press          | tap_invalid         | dd_shot_hit_wrong     |
+| Turnaround                  | turnaround          | dd_lane_switch        |
+| All players ready           | all_ready           | dd_round_start        |
+| Winner finishes             | winner              | dd_lane_clear         |
+| Other player finishes       | player_finished     | dd_snake_reached_end  |
+| Round complete              | round_complete      | dd_round_end          |
+| Timeout                     | timeout             | dd_snake_warning      |
+| Gameplay starts             | (none)              | dd_music_gameplay     |
+| Session exit                | (none)              | stop_music()          |
+
+### Files Modified
+- `pixel_challenge_console_v22.7.0.py` -- version label, `dd_` sound keys added to `play_sound()` registry
+- `games/dot_dash/dot_dash.py` -- version bumped to v21.7, all `play_sound()` calls rewired from generic keys to `dd_` prefixed keys, `stop_music()` added to `on_exit()`, `dd_music_gameplay` added to `_start_round()`
+- `assets/audio/dot_dash/` -- new directory with 13 audio files (initially copied from surround as placeholders, replaceable with game-specific audio)
+
+---
+
+
 ## [v22.6.2] - 2026-03-31
 
 ### Fixed

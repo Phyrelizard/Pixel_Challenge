@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Tuple
 
 from games.base import GameMeta, GameModule, GamePhase, GameResult, GameSession, PlayerConfig
 
-VERSION_LABEL = "dot_dash_v21.6"
+VERSION_LABEL = "dot_dash_v21.7"
 
 # Type alias for RGB colors
 Color = Tuple[int, int, int]
@@ -167,7 +167,7 @@ class DotDashSession(GameSession):
             ps.selected_colors = []
             ps.setup_complete = False
         
-        self.host.log("=== DOT DASH v21.6 ===")
+        self.host.log("=== DOT DASH v21.7 ===")
         self.host.log(f"Players: {[p.player_id for p in self.players]}")
         self.host.log("Waiting for players to select 2 colors each...")
         self.host.log("Press any colored button to select that color.")
@@ -242,14 +242,14 @@ class DotDashSession(GameSession):
         # Only add if not already selected by this player
         if color_name not in ps.selected_colors:
             ps.selected_colors.append(color_name)
-            self.host.play_sound("button_select")
+            self.host.play_sound("dd_shot_fire")
             self.host.log(f"[SETUP] P{ps.player_id} selected: {color_name} ({len(ps.selected_colors)}/2)")
 
             # Check if player has selected 2 colors
             if len(ps.selected_colors) >= 2:
                 ps.setup_complete = True
                 ps.phase = "ready"
-                self.host.play_sound("color_locked")
+                self.host.play_sound("dd_shot_hit_correct")
                 self.host.log(f"[SETUP] P{ps.player_id} READY with colors: {ps.selected_colors}")
         else:
             self.host.log(f"[SETUP] P{ps.player_id} already has {color_name}")
@@ -306,7 +306,7 @@ class DotDashSession(GameSession):
                 if ps.outbound_index >= self.lane_pixel_count:
                     ps.phase = "return"
                     ps.return_head_index = self.lane_pixel_count - 1
-                    self.host.play_sound("turnaround")
+                    self.host.play_sound("dd_lane_switch")
                     self.host.log(f"[GAME] P{ps.player_id} TURNAROUND! Returning...")
 
             elif ps.phase == "return":
@@ -317,11 +317,11 @@ class DotDashSession(GameSession):
                     self._finish_player(ps, now)
 
             # Play feedback sound
-            self.host.play_sound("tap_valid")
+            self.host.play_sound("dd_shot_hit_correct")
 
         else:
             # WRONG BUTTON
-            self.host.play_sound("tap_invalid")
+            self.host.play_sound("dd_shot_hit_wrong")
             self.host.log(f"[GAME] P{ps.player_id} wrong! Pressed {color_name}, expected {expected_color}")
 
         # Update display
@@ -340,7 +340,7 @@ class DotDashSession(GameSession):
                 ps.phase = "ready"
             
             self.host.log("[GAME] All players ready! Notifying console...")
-            self.host.play_sound("all_ready")
+            self.host.play_sound("dd_round_start")
             
             # Notify console that setup is complete - console owns the 4-second hold and countdown
             if hasattr(self.host, 'on_game_setup_complete'):
@@ -358,10 +358,10 @@ class DotDashSession(GameSession):
             self.first_finisher_id = ps.player_id
             ps.first_finisher = True
             self.host.log(f"[GAME] P{ps.player_id} WINS! Time: {completion_time:.2f}s")
-            self.host.play_sound("winner")
+            self.host.play_sound("dd_lane_clear")
         else:
             self.host.log(f"[GAME] P{ps.player_id} finished. Time: {completion_time:.2f}s")
-            self.host.play_sound("player_finished")
+            self.host.play_sound("dd_snake_reached_end")
 
     def tick(self, now_monotonic: float) -> None:
         """Update game state - called every frame (~30Hz)."""
@@ -400,7 +400,7 @@ class DotDashSession(GameSession):
                 if self._winner_blink_done(now_monotonic):
                     self.phase = GamePhase.ROUND_COMPLETE
                     self.completed_at = now_monotonic
-                    self.host.play_sound("round_complete")
+                    self.host.play_sound("dd_round_end")
                     self.host.log("[GAME] Round complete!")
                 
             self._update_viewer()
@@ -429,7 +429,7 @@ class DotDashSession(GameSession):
         self.all_finished_at = None  # Reset
 
         self.host.log("[GAME] GO! GO! GO!")
-        # Console handles GO sound/display
+        self.host.play_sound("dd_music_gameplay")
 
         for ps in self.state.values():
             ps.phase = "armed"
@@ -657,6 +657,8 @@ class DotDashSession(GameSession):
     
     def on_exit(self) -> None:
         """Clean up when game session ends."""
+        if hasattr(self.host, 'stop_music'):
+            self.host.stop_music()
         self.host.clear_all_pixels()
         self.host.log("[GAME] Dot Dash session exited.")
 
