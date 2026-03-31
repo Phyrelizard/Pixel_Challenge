@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # -*- coding: utf-8 -*-
 """
-surround.py Game Module v1.2.0
+surround.py Game Module v1.1.0
 first tested with pixel_challenge_console.py v22.1.3
 updated for pixel_challenge_console.py v22.5.0
 
@@ -14,7 +14,7 @@ Supports two modes:
 """
 from __future__ import annotations
 
-VERSION_LABEL = "v1.2.0"
+VERSION_LABEL = "v1.1.0"
 
 import json
 import os
@@ -423,8 +423,6 @@ class SurroundSession(GameSession):
         self.surround_phase = SurroundPhase.PLAYING
         self.phase = BaseGamePhase.RUNNING
         self.host.log(f"[SURROUND] Phase set to PLAYING, {len(self.players)} player(s)")
-        self.host.play_sound("su_round_start")
-        self.host.play_sound("su_music_gameplay")
         self.round_start_time = current_time
         self.last_tick_time = current_time
         
@@ -454,7 +452,6 @@ class SurroundSession(GameSession):
         self.surround_phase = SurroundPhase.ROUND_END
         self.phase = BaseGamePhase.ROUND_COMPLETE
         self.game_complete = True
-        self.host.play_sound("su_round_end")
         
         # Calculate final scores
         for pid, ps in self.player_states.items():
@@ -538,7 +535,6 @@ class SurroundSession(GameSession):
             return
         
         # LEFT/RIGHT = lane switching
-        # LEFT/RIGHT = lane switching
         if direction == "left":
             if ps.current_lane != "left":
                 time_since_switch_ms = (current_time - ps.last_lane_switch_time) * 1000
@@ -546,7 +542,6 @@ class SurroundSession(GameSession):
                     ps.current_lane = "left"
                     ps.last_lane_switch_time = current_time
                     # Do NOT reset vertical_direction; keep last fire direction
-                    self.host.play_sound("su_lane_switch")
                     self.host.log(f"[SURROUND] P{player_id} switched to LEFT lane")
         
         elif direction == "right":
@@ -556,7 +551,6 @@ class SurroundSession(GameSession):
                     ps.current_lane = "right"
                     ps.last_lane_switch_time = current_time
                     # Do NOT reset vertical_direction; keep last fire direction
-                    self.host.play_sound("su_lane_switch")
                     self.host.log(f"[SURROUND] P{player_id} switched to RIGHT lane")
         
             # UP = move marker toward pixel 99 (forward on joystick = toward end of lane)
@@ -690,6 +684,8 @@ class SurroundSession(GameSession):
         
         ps.record_shot(hit=False)
         self.host.play_sound("su_shot_fire")
+        if lanes_to_fire:
+            self.host.play_sound("su_shot_fire")
     
     def _lane_has_head_color(self, player_id: int, lane: str, color: str) -> bool:
         """Check if any snake in lane has a head of the given color."""
@@ -772,9 +768,7 @@ class SurroundSession(GameSession):
             active_snakes = []
             for snake in player_snakes.get(lane, []):
                 if snake.is_active:
-                    result = snake.update(current_time, delta_ms)
-                    if result == "exited":
-                        self.host.play_sound("su_snake_reached_end")
+                    snake.update(current_time, delta_ms)
                     if snake.is_active:
                         active_snakes.append(snake)
             player_snakes[lane] = active_snakes
@@ -857,7 +851,6 @@ class SurroundSession(GameSession):
         if not egg:
             return
         
-        self.host.play_sound("su_bonus_start")
         spawn_row = egg.row
         baby_config = self.baby_snakes_config
         
@@ -945,12 +938,12 @@ class SurroundSession(GameSession):
                     ps.add_score(points)
 
                     self._check_extra_life(player_id)
-                    self.host.play_sound("su_shot_hit_correct")
+                    self.host.play_sound("su_shot_hit")
                     return True
                 else:
                     ps.record_shot(hit=False, wrong_color=True)
                     ps.add_score(self.scoring_config.get("wrong_color_penalty", -5))
-                    self.host.play_sound("su_shot_hit_wrong")
+                    self.host.play_sound("su_shot_wrong")
                     return True
         
         # Check baby snakes
@@ -1072,7 +1065,6 @@ class SurroundSession(GameSession):
         
         alive = ps.take_damage(current_time)
         ps.add_score(self.scoring_config.get("player_hit_penalty", -20))
-        self.host.play_sound("su_snake_warning")
         
         if not alive and self.mode == 2:
             # Player died in Mode 2

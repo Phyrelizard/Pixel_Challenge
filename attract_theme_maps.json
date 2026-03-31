@@ -1,5 +1,5 @@
 {
-  "auto_enabled": true,
+  "auto_enabled": false,
   "cycle_seconds": 40,
   "per_theme_speed": {
     "Fire Burst": 6,
@@ -14,7 +14,6 @@
     "Lane Chase RL": 6
   },
   "selected_themes": [
-    "Lane Chase LR",
     "Bounce Chase"
   ],
   "sash_left_attract_bottom": 818,
