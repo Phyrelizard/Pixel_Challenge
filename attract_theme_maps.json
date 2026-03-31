@@ -1,5 +1,5 @@
 {
-  "auto_enabled": true,
+  "auto_enabled": false,
   "cycle_seconds": 40,
   "per_theme_speed": {
     "Fire Burst": 6,
