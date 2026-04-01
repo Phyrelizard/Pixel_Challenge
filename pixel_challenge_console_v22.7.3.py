@@ -971,7 +971,8 @@ class PixelChallengeConsole:
         # Start splash background music for the selected game
         self._play_splash_music()
 
-        def _play_splash_music(self):  """Play background music for the current splash screen."""
+    def _play_splash_music(self):
+        """Play background music for the current splash screen."""
         # Map game names to their splash music keys
         splash_music_map = {
             "Splash": "splash_music_main",
