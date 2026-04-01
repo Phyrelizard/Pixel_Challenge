@@ -456,6 +456,9 @@ class PixelChallengeConsole:
         self.theme_brightness_percent = tk.IntVar(value=100)
         self.gameplay_brightness_percent = tk.IntVar(value=100)
 
+        self.music_volume = tk.IntVar(value=50)
+        self.sfx_volume = tk.IntVar(value=100)
+
         self.checkin_open = False
         self.players_confirmed = False
         self.session_started = False
@@ -709,6 +712,8 @@ class PixelChallengeConsole:
             self.sash_bottom_log = data.get("sash_bottom_log")
             self.theme_brightness_percent.set(int(data.get("falcon_brightness", 100)))
             self.gameplay_brightness_percent.set(int(data.get("gameplay_brightness", 100)))
+            self.music_volume.set(int(data.get("music_volume", 50)))
+            self.sfx_volume.set(int(data.get("sfx_volume", 100)))
             self.falcon_ip = data.get("falcon_ip", DEFAULT_FALCON_IP)
             self.wifi_ssid.set(data.get("wifi_ssid", ""))
             self.wifi_psk.set(data.get("wifi_psk", ""))
@@ -741,6 +746,8 @@ class PixelChallengeConsole:
             "sash_bottom_log": self.sash_bottom_log,
             "falcon_brightness": int(self.theme_brightness_percent.get()),
             "gameplay_brightness": int(self.gameplay_brightness_percent.get()),
+            "music_volume": int(self.music_volume.get()),
+            "sfx_volume": int(self.sfx_volume.get()),
             "falcon_ip": self.falcon_ip,
             "wifi_ssid": self.wifi_ssid.get(),
             "wifi_psk": self.wifi_psk.get(),
@@ -886,10 +893,11 @@ class PixelChallengeConsole:
             # Check if this is background music (should loop)
             if "music" in sound_key:
                 pygame.mixer.music.load(path)
-                pygame.mixer.music.set_volume(0.5)
+                pygame.mixer.music.set_volume(self.music_volume.get() / 100.0)
                 pygame.mixer.music.play(-1)  # -1 = loop forever
             else:
                 sound = pygame.mixer.Sound(path)
+                sound.set_volume(self.sfx_volume.get() / 100.0)
                 sound.play()
                 
         except Exception as e:
@@ -1254,6 +1262,20 @@ class PixelChallengeConsole:
         self.gameplay_brightness_percent.set(pct)
         if self.host_state == HostState.GAME_RUNNING:
             self.falcon.set_brightness(pct)
+        self.save_settings()
+
+    def on_music_volume_changed(self, value):
+        vol = int(float(value))
+        self.music_volume.set(vol)
+        try:
+            if pygame.mixer.get_init() and pygame.mixer.music.get_busy():
+                pygame.mixer.music.set_volume(vol / 100.0)
+        except Exception:
+            pass
+        self.save_settings()
+
+    def on_sfx_volume_changed(self, value):
+        self.sfx_volume.set(int(float(value)))
         self.save_settings()
 
     def on_theme_checked(self):
@@ -2379,9 +2401,16 @@ class PixelChallengeConsole:
         self.bottom_paned = tk.PanedWindow(parent, orient="horizontal", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
         self.bottom_paned.grid(row=0, column=0, sticky="nsew")
 
-        # Left side - empty/filler (adjustable width)
-        left_filler = tk.Frame(self.bottom_paned, bg="#12061f")
-        self.bottom_paned.add(left_filler, minsize=50)
+        # Left side - Audio Mixer panel
+        mixer_panel, mixer_body = self.panel(self.bottom_paned, "AUDIO MIXER")
+
+        tk.Label(mixer_body, text="MUSIC VOLUME (%)", bg="#17071f", fg="#cccccc", font=("Arial", 14, "bold")).pack(anchor="center", pady=(6, 2))
+        tk.Scale(mixer_body, from_=0, to=100, resolution=1, orient="horizontal", variable=self.music_volume, bg="#17071f", fg="white", troughcolor="#071a30", highlightthickness=0, font=("Arial", 12, "bold"), command=self.on_music_volume_changed).pack(fill="x", pady=(0, 8))
+
+        tk.Label(mixer_body, text="SFX VOLUME (%)", bg="#17071f", fg="#cccccc", font=("Arial", 14, "bold")).pack(anchor="center", pady=(4, 2))
+        tk.Scale(mixer_body, from_=0, to=100, resolution=1, orient="horizontal", variable=self.sfx_volume, bg="#17071f", fg="white", troughcolor="#071a30", highlightthickness=0, font=("Arial", 12, "bold"), command=self.on_sfx_volume_changed).pack(fill="x", pady=(0, 8))
+
+        self.bottom_paned.add(mixer_panel, minsize=50)
 
         # Right side - log panel
         info_panel = tk.Frame(self.bottom_paned, bg="#3a1b53", bd=2, relief="groove")
