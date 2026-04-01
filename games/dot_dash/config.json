@@ -1,8 +1,8 @@
 {
-  "countdown_seconds": 3,
+  "countdown_seconds": 5,
   "lane_pixel_count": 100,
-  "dash_length": 3,
-  "round_timeout_sec": 20,
+  "dash_length": 6,
+  "round_timeout_sec": 40,
   "show_scoreboard": true,
   "sound_pack": "default",
   "difficulty_preset": "normal",
@@ -23,8 +23,14 @@
     "first_finisher_bonus": 200
   },
   "difficulty_presets": {
-    "easy": { "round_timeout_sec": 25 },
-    "normal": { "round_timeout_sec": 20 },
-    "hard": { "round_timeout_sec": 15 }
+    "easy": {
+      "round_timeout_sec": 25
+    },
+    "normal": {
+      "round_timeout_sec": 20
+    },
+    "hard": {
+      "round_timeout_sec": 15
+    }
   }
 }
