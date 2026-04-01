@@ -121,19 +121,10 @@ class DotDashSession(GameSession):
         super().__init__(host, players, settings=settings)
 
         # Merge default config with any overrides from settings
-        # Merge default config with any overrides from settings
-        # Use deep copy so nested dicts (like brightness) aren't shared
-        import copy
-        config = copy.deepcopy(DEFAULT_CONFIG)
+        config = DEFAULT_CONFIG.copy()
         if settings:
             if "config_override" in settings:
-                override = settings["config_override"]
-                for key, value in override.items():
-                    # For nested dicts, merge instead of replace
-                    if key in config and isinstance(config[key], dict) and isinstance(value, dict):
-                        config[key].update(value)
-                    else:
-                        config[key] = value
+                config.update(settings["config_override"])
             # Also check for direct settings
             for key in DEFAULT_CONFIG.keys():
                 if key in settings:

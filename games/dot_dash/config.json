@@ -1,8 +1,8 @@
 {
   "countdown_seconds": 5,
   "lane_pixel_count": 100,
-  "dash_length": 6,
-  "round_timeout_sec": 40,
+  "dash_length": 3,
+  "round_timeout_sec": 50,
   "show_scoreboard": true,
   "sound_pack": "default",
   "difficulty_preset": "normal",

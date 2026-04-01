@@ -15,10 +15,10 @@
     "Lane Chase RL": 6
   },
   "selected_themes": [
-    "Bounce Chase",
-    "Ice Burst"
+    "Ice Burst",
+    "Bounce Chase"
   ],
-  "sash_left_attract_bottom": 818,
+  "sash_left_attract_bottom": 726,
   "sash_center_ctrl": 677,
   "sash_main_info": 510,
   "sash_bottom_log": 357,

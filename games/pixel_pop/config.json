@@ -50,7 +50,7 @@
     "sla_speed_factor": 0.5
   },
   "visuals": {
-    "head_brightness_boost": 1.5,
+    "head_brightness_boost": 5.5,
     "selected_lane_glow_pixels": 5,
     "selected_lane_glow_color": "white",
     "projectile_color": "white",

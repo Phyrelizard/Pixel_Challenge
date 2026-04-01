@@ -582,6 +582,17 @@ class PixelChallengeConsole:
         self.apply_brightness_for_state()
 
         self.build_ui()
+
+        # --- Apply loaded settings to UI widgets (must happen AFTER build_ui) ---
+        # Restore theme checkbox states from saved selected_themes
+        for theme_name, var in self.theme_vars.items():
+            var.set(theme_name in self.selected_themes)
+        # Restore per-theme speed slider values from saved per_theme_speed
+        for theme_name, speed_var in self.theme_speed_vars.items():
+            if theme_name in self.per_theme_speed:
+                speed_var.set(self.per_theme_speed[theme_name])
+        # --- End apply loaded settings ---
+
         self.refresh_player_status_panel()
         self.refresh_controller_panel()
         self.refresh_info_window()
@@ -1757,6 +1768,18 @@ class PixelChallengeConsole:
         # Start game in SETUP phase (game handles color selection)
         # Pass the selected mode to the game
         game_settings = {"mode": self.game_mode.get()}
+
+        # Load game config.json and pass as config_override so game module uses edited values
+        config_path = self.config_path_for_current_game()
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config_data = json.load(f)
+                game_settings["config_override"] = config_data
+                self.log(f"Loaded game config: {config_path}")
+            except Exception as e:
+                self.log(f"Failed to load game config: {e}")
+
         success = self.game_manager.start_game(game_key, players, settings=game_settings)
         if not success:
             self.log("Failed to start game!")
