@@ -684,8 +684,8 @@ class PixelChallengeConsole:
         try:
             with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            self.cycle_enabled.set(bool(data.get("auto_enabled", False)))
-            self.auto_enabled.set(bool(data.get("auto_enabled", False)))
+            self.auto_enabled.set(bool(data.get("auto_enabled", True)))
+            self.cycle_enabled.set(bool(data.get("cycle_enabled", True)))
             self.cycle_seconds.set(int(data.get("cycle_seconds", 60)))
             self.per_theme_speed = data.get("per_theme_speed", {})
             saved_selected = data.get("selected_themes", [])
@@ -717,8 +717,8 @@ class PixelChallengeConsole:
 
     def save_settings(self):
         data = {
-            "auto_enabled": bool(self.cycle_enabled.get()),
             "auto_enabled": bool(self.auto_enabled.get()),
+            "cycle_enabled": bool(self.cycle_enabled.get()),
             "cycle_seconds": int(self.cycle_seconds.get()),
             "per_theme_speed": self.per_theme_speed,
             "selected_themes": list(self.selected_themes),

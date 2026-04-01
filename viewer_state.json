@@ -1,15 +1,16 @@
 {
-  "game": "pixel_pop",
-  "phase": "running",
-  "time_remaining": 0,
-  "bonus_active": false,
+  "game_key": "dot_dash",
+  "phase": "setup",
+  "title": "Dot Dash",
+  "instruction": "SELECT 2 COLORS",
   "players": [
     {
-      "player_id": 2,
-      "score": -55,
-      "selected_lane": "right",
-      "is_active": true,
-      "lives": null
+      "id": 2,
+      "score": 0,
+      "colors": [],
+      "finished": false,
+      "timed_out": false,
+      "first_finisher": false
     }
   ]
 }
