@@ -1,13 +1,16 @@
 {
   "game_key": "dot_dash",
-  "phase": "setup",
+  "phase": "running",
   "title": "Dot Dash",
-  "instruction": "SELECT 2 COLORS",
+  "instruction": "GO!",
   "players": [
     {
       "id": 2,
       "score": 0,
-      "colors": [],
+      "colors": [
+        "GREEN",
+        "BLUE"
+      ],
       "finished": false,
       "timed_out": false,
       "first_finisher": false
