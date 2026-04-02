@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v22.7.0
+Pixel Challenge Host Console v22.8.4
 
 """
 
@@ -26,7 +26,7 @@ from games.base import PlayerConfig
 # SLA System (v21.8.0)
 from sla import SLAStore, SLACalibration
 
-VERSION_LABEL = "v22.7.0"
+VERSION_LABEL = "v22.8.4"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 DEFAULT_FALCON_IP = "192.168.2.113"
@@ -444,9 +444,9 @@ class PixelChallengeConsole:
         self.host_state = HostState.IDLE
         self.selected_game = tk.StringVar(value="Splash")
         self.players_joined = tk.IntVar(value=0)
-        self.auto_enabled = tk.BooleanVar(value=False)
-        self.animate_was_enabled_before_game = False  # Track animate state before game
-        self.cycle_enabled = tk.BooleanVar(value=False)
+        self.auto_enabled = tk.BooleanVar(value=True)
+        self.animate_was_enabled_before_game = False
+        self.cycle_enabled = tk.BooleanVar(value=True)
         self.cycle_seconds = tk.IntVar(value=60)
         self.per_theme_speed = {}
         self.selected_themes = set()
@@ -582,6 +582,17 @@ class PixelChallengeConsole:
         self.apply_brightness_for_state()
 
         self.build_ui()
+
+        # --- Apply loaded settings to UI widgets (must happen AFTER build_ui) ---
+        # Restore theme checkbox states from saved selected_themes
+        for theme_name, var in self.theme_vars.items():
+            var.set(theme_name in self.selected_themes)
+        # Restore per-theme speed slider values from saved per_theme_speed
+        for theme_name, speed_var in self.theme_speed_vars.items():
+            if theme_name in self.per_theme_speed:
+                speed_var.set(self.per_theme_speed[theme_name])
+        # --- End apply loaded settings ---
+
         self.refresh_player_status_panel()
         self.refresh_controller_panel()
         self.refresh_info_window()
@@ -686,8 +697,8 @@ class PixelChallengeConsole:
         try:
             with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            self.cycle_enabled.set(bool(data.get("auto_enabled", False)))
-            self.auto_enabled.set(bool(data.get("auto_enabled", False)))
+            self.auto_enabled.set(bool(data.get("auto_enabled", True)))
+            self.cycle_enabled.set(bool(data.get("cycle_enabled", True)))
             self.cycle_seconds.set(int(data.get("cycle_seconds", 60)))
             self.per_theme_speed = data.get("per_theme_speed", {})
             saved_selected = data.get("selected_themes", [])
@@ -719,8 +730,8 @@ class PixelChallengeConsole:
 
     def save_settings(self):
         data = {
-            "auto_enabled": bool(self.cycle_enabled.get()),
             "auto_enabled": bool(self.auto_enabled.get()),
+            "cycle_enabled": bool(self.cycle_enabled.get()),
             "cycle_seconds": int(self.cycle_seconds.get()),
             "per_theme_speed": self.per_theme_speed,
             "selected_themes": list(self.selected_themes),
@@ -837,9 +848,24 @@ class PixelChallengeConsole:
             "countdown_tick": "/home/ledgame/easter_game/assets/audio/shared/countdown_tick.wav",
             "countdown_go": "/home/ledgame/easter_game/assets/audio/shared/countdown_go.wav",
 
-            # Shared sounds
+            # Screen transition sounds (v22.7.4)
+            "screen_press_button_start": "/home/ledgame/easter_game/assets/audio/shared/screen_press_button_start.wav",
+            "screen_checkin": "/home/ledgame/easter_game/assets/audio/shared/screen_checkin.wav",
+
+            # Screen voice prompts (v22.8.0)
+            "voice_select_two_colors": "/home/ledgame/easter_game/assets/audio/shared/voice_select_two_colors.wav",
+            "voice_press_white_to_start": "/home/ledgame/easter_game/assets/audio/shared/voice_press_white_to_start.wav",
+
+            # Splash screen background music (per-game + main)
+            "splash_music_main": "/home/ledgame/easter_game/assets/audio/splash/splash_music_main.ogg",
+            "splash_music_dot_dash": "/home/ledgame/easter_game/assets/audio/splash/splash_music_dot_dash.ogg",
+            "splash_music_pixel_pop": "/home/ledgame/easter_game/assets/audio/splash/splash_music_pixel_pop.ogg",
+            "splash_music_surround": "/home/ledgame/easter_game/assets/audio/splash/splash_music_surround.ogg",
+            "splash_music_ascend": "/home/ledgame/easter_game/assets/audio/splash/splash_music_ascend.ogg",
 
         }
+
+      
         
         path = sound_paths.get(sound_key)
         if not path:
@@ -961,6 +987,23 @@ class PixelChallengeConsole:
                 self.viewer_show_splash()
         else:
             self.viewer_show_splash()
+        # Start splash background music for the selected game
+        self._play_splash_music()
+
+    def _play_splash_music(self):
+        """Play background music for the current splash screen."""
+        # Map game names to their splash music keys
+        splash_music_map = {
+            "Splash": "splash_music_main",
+            "Dot Dash": "splash_music_dot_dash",
+            "Pixel Pop": "splash_music_pixel_pop",
+            "Surround": "splash_music_surround",
+            "Ascend": "splash_music_ascend",
+        }
+        game_name = self.selected_game.get()
+        music_key = splash_music_map.get(game_name, "splash_music_main")
+        self.play_sound(music_key)
+
 
     # =========================================================================
     # SCOREBOARD METHODS
@@ -1458,17 +1501,14 @@ class PixelChallengeConsole:
             self.log(f"Player {player_id} CHECKED IN")
             self.refresh_player_status_panel()
             self.refresh_checkin_button()
-            
-            def update_player_status_display(self):        
-                """Update the player status display with current SLA values from sla_store."""
+
+    def update_player_status_display(self):
+        """Update the player status display with current SLA values from sla_store."""
         try:
             for pid in range(1, 5):
                 if pid in self.player_status:
-                    # Get SLA from store
                     sla = self.sla_store.get_player_sla(pid)
                     self.player_status[pid]['sla'] = sla
-            
-            # Refresh the UI panel
             self.refresh_player_status_panel()
         except Exception as e:
             self.log(f"update_player_status_display error: {e}")
@@ -1558,6 +1598,9 @@ class PixelChallengeConsole:
             self.viewer.show_countdown(self.countdown_value)
             self.log(f"COUNTDOWN: {self.countdown_value}")
             
+            # Play countdown tick tone
+            self.play_sound("countdown_tick")
+            
             # Flash lanes: 5=red, 4=red, 3=red, 2=yellow, 1=yellow (racing light style)
             countdown_colors = {5: "red", 4: "red", 3: "red", 2: "yellow", 1: "yellow"}
             color = countdown_colors.get(self.countdown_value, "red")
@@ -1566,16 +1609,19 @@ class PixelChallengeConsole:
             self.countdown_value -= 1
             self.countdown_after_id = self.root.after(1000, self.run_countdown_step)
         elif self.countdown_value == 0:
-            # Show GO! on screen but DON'T flash green on lanes
-            # The game module will show green when it enters "armed" state
+            # Show GO! on screen and flash lanes GREEN briefly
             self.viewer.show_countdown(0)  # 0 means "GO"
             self.log("COUNTDOWN: GO!")
-            # Clear lanes - game will immediately set them to green via armed state
-            self.falcon.clear_all_lanes(None)
+            
+            # Play GO tone (separate sound from the tick)
+            self.play_sound("countdown_go")
+            
+            # Flash all lanes green so players see the GO signal on the pixels too
+            self.falcon.flash_all_lanes("green")
             
             self.countdown_value = -1
-            # Short delay then start game (game will render green immediately)
-            self.countdown_after_id = self.root.after(50, self.run_countdown_step)
+            # Brief GO flash (1 second) then immediately start game - no delay
+            self.countdown_after_id = self.root.after(1000, self.run_countdown_step)
         else:
             # Countdown complete - start the actual game
             self.countdown_after_id = None
@@ -1638,6 +1684,7 @@ class PixelChallengeConsole:
     # =========================================================================
     def on_start_game(self):
         self.cancel_viewer_return()
+        self.stop_music()  # Stop splash background music before game starts
         self.rescan_controllers()
         game_name = self.selected_game.get()
         if game_name == "Splash":
@@ -1702,6 +1749,7 @@ class PixelChallengeConsole:
             # Enter GAME_SETUP state - show color selection screen
             self.set_state(HostState.GAME_SETUP, "Waiting for player color selection")
             self.viewer.show_select_colors()
+            self.play_sound("voice_select_two_colors")  # Voice prompt (v22.8.0)
         else:
             # Skip color selection - show "press a button to start" screen
             self.set_state(HostState.GAME_SETUP, "Press a button to start!")
@@ -1710,6 +1758,7 @@ class PixelChallengeConsole:
             if os.path.exists(press_button_image):
                 self.viewer.show_image(press_button_image)
                 self.log(f"[SETUP] Showing press_a_button_to_start.png")
+                self.play_sound("screen_press_button_start")  # Play press-button screen audio (v22.7.4)
             else:
                 # Fall back to game-specific ready image or splash
                 ready_image = f"{ASSETS_DIR}/{game_key}_ready.png"
@@ -1721,6 +1770,18 @@ class PixelChallengeConsole:
         # Start game in SETUP phase (game handles color selection)
         # Pass the selected mode to the game
         game_settings = {"mode": self.game_mode.get()}
+
+        # Load game config.json and pass as config_override so game module uses edited values
+        config_path = self.config_path_for_current_game()
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config_data = json.load(f)
+                game_settings["config_override"] = config_data
+                self.log(f"Loaded game config: {config_path}")
+            except Exception as e:
+                self.log(f"Failed to load game config: {e}")
+
         success = self.game_manager.start_game(game_key, players, settings=game_settings)
         if not success:
             self.log("Failed to start game!")
@@ -1910,12 +1971,15 @@ class PixelChallengeConsole:
                 self.auto_enabled.set(False)
                 self.update_auto_button()
             self.cancel_viewer_return()
+            self.stop_music()  # Stop splash music during check-in
             self.attract.stop(self)
             self.falcon.clear_all_lanes(self)
             self.checkin_open = True
             self.players_confirmed = False
             self.set_state(HostState.CHECKIN_OPEN, "Check-in opened. Press WHITE to join.")
             self.viewer.show_checkin()  # Show check-in screen
+            self.play_sound("screen_checkin")  # Play check-in screen audio (v22.7.4)
+
         self.refresh_player_status_panel()
 
     def on_confirm_players(self):

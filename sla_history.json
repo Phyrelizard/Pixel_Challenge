@@ -307,6 +307,40 @@
           ]
         }
       }
+    },
+    {
+      "session_id": "2026-04-01_02-32-04",
+      "timestamp": 1775036637.1415362,
+      "players": {
+        "1": {
+          "games_played": 2,
+          "final_sla": 10,
+          "samples": [
+            {
+              "game_key": "dot_dash",
+              "timestamp": 1775036321.0095325,
+              "metrics": {
+                "accuracy": 1.0,
+                "reaction_time_sec": 0.037,
+                "completion_time_sec": 19.547,
+                "score": 10350
+              },
+              "calculated_sla": 10
+            },
+            {
+              "game_key": "pixel_pop",
+              "timestamp": 1775036413.5584295,
+              "metrics": {
+                "accuracy": 0.875,
+                "reaction_time_sec": 0.0,
+                "completion_time_sec": null,
+                "score": 670
+              },
+              "calculated_sla": 10
+            }
+          ]
+        }
+      }
     }
   ]
 }

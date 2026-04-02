@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v22.6.2
+Pixel Challenge Host Console v22.9.0
 
 """
 
@@ -26,7 +26,7 @@ from games.base import PlayerConfig
 # SLA System (v21.8.0)
 from sla import SLAStore, SLACalibration
 
-VERSION_LABEL = "v22.6.2"
+VERSION_LABEL = "v22.9.0"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 DEFAULT_FALCON_IP = "192.168.2.113"
@@ -444,9 +444,9 @@ class PixelChallengeConsole:
         self.host_state = HostState.IDLE
         self.selected_game = tk.StringVar(value="Splash")
         self.players_joined = tk.IntVar(value=0)
-        self.auto_enabled = tk.BooleanVar(value=False)
-        self.animate_was_enabled_before_game = False  # Track animate state before game
-        self.cycle_enabled = tk.BooleanVar(value=False)
+        self.auto_enabled = tk.BooleanVar(value=True)
+        self.animate_was_enabled_before_game = False
+        self.cycle_enabled = tk.BooleanVar(value=True)
         self.cycle_seconds = tk.IntVar(value=60)
         self.per_theme_speed = {}
         self.selected_themes = set()
@@ -455,6 +455,9 @@ class PixelChallengeConsole:
 
         self.theme_brightness_percent = tk.IntVar(value=100)
         self.gameplay_brightness_percent = tk.IntVar(value=100)
+        self.music_volume = tk.IntVar(value=50)
+        self.sfx_volume = tk.IntVar(value=100)
+
 
         self.checkin_open = False
         self.players_confirmed = False
@@ -582,6 +585,17 @@ class PixelChallengeConsole:
         self.apply_brightness_for_state()
 
         self.build_ui()
+
+        # --- Apply loaded settings to UI widgets (must happen AFTER build_ui) ---
+        # Restore theme checkbox states from saved selected_themes
+        for theme_name, var in self.theme_vars.items():
+            var.set(theme_name in self.selected_themes)
+        # Restore per-theme speed slider values from saved per_theme_speed
+        for theme_name, speed_var in self.theme_speed_vars.items():
+            if theme_name in self.per_theme_speed:
+                speed_var.set(self.per_theme_speed[theme_name])
+        # --- End apply loaded settings ---
+
         self.refresh_player_status_panel()
         self.refresh_controller_panel()
         self.refresh_info_window()
@@ -686,8 +700,8 @@ class PixelChallengeConsole:
         try:
             with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            self.cycle_enabled.set(bool(data.get("auto_enabled", False)))
-            self.auto_enabled.set(bool(data.get("auto_enabled", False)))
+            self.auto_enabled.set(bool(data.get("auto_enabled", True)))
+            self.cycle_enabled.set(bool(data.get("cycle_enabled", True)))
             self.cycle_seconds.set(int(data.get("cycle_seconds", 60)))
             self.per_theme_speed = data.get("per_theme_speed", {})
             saved_selected = data.get("selected_themes", [])
@@ -698,6 +712,8 @@ class PixelChallengeConsole:
             self.sash_bottom_log = data.get("sash_bottom_log")
             self.theme_brightness_percent.set(int(data.get("falcon_brightness", 100)))
             self.gameplay_brightness_percent.set(int(data.get("gameplay_brightness", 100)))
+            self.music_volume.set(int(data.get("music_volume", 50)))
+            self.sfx_volume.set(int(data.get("sfx_volume", 100)))
             self.falcon_ip = data.get("falcon_ip", DEFAULT_FALCON_IP)
             self.wifi_ssid.set(data.get("wifi_ssid", ""))
             self.wifi_psk.set(data.get("wifi_psk", ""))
@@ -719,8 +735,8 @@ class PixelChallengeConsole:
 
     def save_settings(self):
         data = {
-            "auto_enabled": bool(self.cycle_enabled.get()),
             "auto_enabled": bool(self.auto_enabled.get()),
+            "cycle_enabled": bool(self.cycle_enabled.get()),
             "cycle_seconds": int(self.cycle_seconds.get()),
             "per_theme_speed": self.per_theme_speed,
             "selected_themes": list(self.selected_themes),
@@ -730,6 +746,8 @@ class PixelChallengeConsole:
             "sash_bottom_log": self.sash_bottom_log,
             "falcon_brightness": int(self.theme_brightness_percent.get()),
             "gameplay_brightness": int(self.gameplay_brightness_percent.get()),
+            "music_volume": int(self.music_volume.get()),
+            "sfx_volume": int(self.sfx_volume.get()),
             "falcon_ip": self.falcon_ip,
             "wifi_ssid": self.wifi_ssid.get(),
             "wifi_psk": self.wifi_psk.get(),
@@ -803,13 +821,58 @@ class PixelChallengeConsole:
             "su_bonus_end": "/home/ledgame/easter_game/assets/audio/surround/su_bonus_end.ogg",
             "su_music_gameplay": "/home/ledgame/easter_game/assets/audio/surround/su_music_gameplay.ogg",
 
-            # Dot Dash sounds (add if you have them)
-            # "dd_correct": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_correct.wav",
+            # Dot Dash sounds
+            "dd_shot_fire": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_shot_fire.wav",
+            "dd_shot_hit_correct": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_shot_hit_correct.wav",
+            "dd_shot_hit_wrong": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_shot_hit_wrong.wav",
+            "dd_lane_switch": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_lane_switch.wav",
+            "dd_lane_clear": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_lane_clear.wav",
+            "dd_snake_grow": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_snake_grow.wav",
+            "dd_snake_warning": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_snake_warning.wav",
+            "dd_snake_reached_end": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_snake_reached_end.wav",
+            "dd_round_start": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_round_start.ogg",
+            "dd_round_end": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_round_end.ogg",
+            "dd_bonus_start": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_bonus_start.ogg",
+            "dd_bonus_end": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_bonus_end.ogg",
+            "dd_music_gameplay": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_music_gameplay.ogg",
+
+            # Ascend sounds
+            "as_shot_fire": "/home/ledgame/easter_game/assets/audio/ascend/as_shot_fire.wav",
+            "as_shot_hit_correct": "/home/ledgame/easter_game/assets/audio/ascend/as_shot_hit_correct.wav",
+            "as_shot_hit_wrong": "/home/ledgame/easter_game/assets/audio/ascend/as_shot_hit_wrong.wav",
+            "as_lane_switch": "/home/ledgame/easter_game/assets/audio/ascend/as_lane_switch.wav",
+            "as_lane_clear": "/home/ledgame/easter_game/assets/audio/ascend/as_lane_clear.wav",
+            "as_snake_grow": "/home/ledgame/easter_game/assets/audio/ascend/as_snake_grow.wav",
+            "as_snake_warning": "/home/ledgame/easter_game/assets/audio/ascend/as_snake_warning.wav",
+            "as_snake_reached_end": "/home/ledgame/easter_game/assets/audio/ascend/as_snake_reached_end.wav",
+            "as_round_start": "/home/ledgame/easter_game/assets/audio/ascend/as_round_start.ogg",
+            "as_round_end": "/home/ledgame/easter_game/assets/audio/ascend/as_round_end.ogg",
+            "as_bonus_start": "/home/ledgame/easter_game/assets/audio/ascend/as_bonus_start.ogg",
+            "as_bonus_end": "/home/ledgame/easter_game/assets/audio/ascend/as_bonus_end.ogg",
+            "as_music_gameplay": "/home/ledgame/easter_game/assets/audio/ascend/as_music_gameplay.ogg",
 
             # Shared sounds
             "countdown_tick": "/home/ledgame/easter_game/assets/audio/shared/countdown_tick.wav",
             "countdown_go": "/home/ledgame/easter_game/assets/audio/shared/countdown_go.wav",
+
+            # Screen transition sounds (v22.7.4)
+            "screen_press_button_start": "/home/ledgame/easter_game/assets/audio/shared/screen_press_button_start.wav",
+            "screen_checkin": "/home/ledgame/easter_game/assets/audio/shared/screen_checkin.wav",
+
+            # Screen voice prompts (v22.8.0)
+            "voice_select_two_colors": "/home/ledgame/easter_game/assets/audio/shared/voice_select_two_colors.wav",
+            "voice_press_white_to_start": "/home/ledgame/easter_game/assets/audio/shared/voice_press_white_to_start.wav",
+
+            # Splash screen background music (per-game + main)
+            "splash_music_main": "/home/ledgame/easter_game/assets/audio/splash/splash_music_main.ogg",
+            "splash_music_dot_dash": "/home/ledgame/easter_game/assets/audio/splash/splash_music_dot_dash.ogg",
+            "splash_music_pixel_pop": "/home/ledgame/easter_game/assets/audio/splash/splash_music_pixel_pop.ogg",
+            "splash_music_surround": "/home/ledgame/easter_game/assets/audio/splash/splash_music_surround.ogg",
+            "splash_music_ascend": "/home/ledgame/easter_game/assets/audio/splash/splash_music_ascend.ogg",
+
         }
+
+      
         
         path = sound_paths.get(sound_key)
         if not path:
@@ -830,10 +893,11 @@ class PixelChallengeConsole:
             # Check if this is background music (should loop)
             if "music" in sound_key:
                 pygame.mixer.music.load(path)
-                pygame.mixer.music.set_volume(0.5)
+                pygame.mixer.music.set_volume(self.music_volume.get() / 100.0)
                 pygame.mixer.music.play(-1)  # -1 = loop forever
             else:
                 sound = pygame.mixer.Sound(path)
+                sound.set_volume(self.sfx_volume.get() / 100.0)
                 sound.play()
                 
         except Exception as e:
@@ -931,6 +995,23 @@ class PixelChallengeConsole:
                 self.viewer_show_splash()
         else:
             self.viewer_show_splash()
+        # Start splash background music for the selected game
+        self._play_splash_music()
+
+    def _play_splash_music(self):
+        """Play background music for the current splash screen."""
+        # Map game names to their splash music keys
+        splash_music_map = {
+            "Splash": "splash_music_main",
+            "Dot Dash": "splash_music_dot_dash",
+            "Pixel Pop": "splash_music_pixel_pop",
+            "Surround": "splash_music_surround",
+            "Ascend": "splash_music_ascend",
+        }
+        game_name = self.selected_game.get()
+        music_key = splash_music_map.get(game_name, "splash_music_main")
+        self.play_sound(music_key)
+
 
     # =========================================================================
     # SCOREBOARD METHODS
@@ -1183,6 +1264,20 @@ class PixelChallengeConsole:
             self.falcon.set_brightness(pct)
         self.save_settings()
 
+    def on_music_volume_changed(self, value):
+        vol = int(float(value))
+        self.music_volume.set(vol)
+        try:
+            if pygame.mixer.get_init() and pygame.mixer.music.get_busy():
+                pygame.mixer.music.set_volume(vol / 100.0)
+        except Exception:
+            pass
+        self.save_settings()
+
+    def on_sfx_volume_changed(self, value):
+        self.sfx_volume.set(int(float(value)))
+        self.save_settings()
+
     def on_theme_checked(self):
         self.selected_themes = {name for name, var in self.theme_vars.items() if var.get()}
         self.save_settings()
@@ -1428,17 +1523,14 @@ class PixelChallengeConsole:
             self.log(f"Player {player_id} CHECKED IN")
             self.refresh_player_status_panel()
             self.refresh_checkin_button()
-            
-            def update_player_status_display(self):        
-                """Update the player status display with current SLA values from sla_store."""
+
+    def update_player_status_display(self):
+        """Update the player status display with current SLA values from sla_store."""
         try:
             for pid in range(1, 5):
                 if pid in self.player_status:
-                    # Get SLA from store
                     sla = self.sla_store.get_player_sla(pid)
                     self.player_status[pid]['sla'] = sla
-            
-            # Refresh the UI panel
             self.refresh_player_status_panel()
         except Exception as e:
             self.log(f"update_player_status_display error: {e}")
@@ -1528,6 +1620,9 @@ class PixelChallengeConsole:
             self.viewer.show_countdown(self.countdown_value)
             self.log(f"COUNTDOWN: {self.countdown_value}")
             
+            # Play countdown tick tone
+            self.play_sound("countdown_tick")
+            
             # Flash lanes: 5=red, 4=red, 3=red, 2=yellow, 1=yellow (racing light style)
             countdown_colors = {5: "red", 4: "red", 3: "red", 2: "yellow", 1: "yellow"}
             color = countdown_colors.get(self.countdown_value, "red")
@@ -1536,16 +1631,19 @@ class PixelChallengeConsole:
             self.countdown_value -= 1
             self.countdown_after_id = self.root.after(1000, self.run_countdown_step)
         elif self.countdown_value == 0:
-            # Show GO! on screen but DON'T flash green on lanes
-            # The game module will show green when it enters "armed" state
+            # Show GO! on screen and flash lanes GREEN briefly
             self.viewer.show_countdown(0)  # 0 means "GO"
             self.log("COUNTDOWN: GO!")
-            # Clear lanes - game will immediately set them to green via armed state
-            self.falcon.clear_all_lanes(None)
+            
+            # Play GO tone (separate sound from the tick)
+            self.play_sound("countdown_go")
+            
+            # Flash all lanes green so players see the GO signal on the pixels too
+            self.falcon.flash_all_lanes("green")
             
             self.countdown_value = -1
-            # Short delay then start game (game will render green immediately)
-            self.countdown_after_id = self.root.after(50, self.run_countdown_step)
+            # Brief GO flash (1 second) then immediately start game - no delay
+            self.countdown_after_id = self.root.after(1000, self.run_countdown_step)
         else:
             # Countdown complete - start the actual game
             self.countdown_after_id = None
@@ -1608,6 +1706,7 @@ class PixelChallengeConsole:
     # =========================================================================
     def on_start_game(self):
         self.cancel_viewer_return()
+        self.stop_music()  # Stop splash background music before game starts
         self.rescan_controllers()
         game_name = self.selected_game.get()
         if game_name == "Splash":
@@ -1672,6 +1771,7 @@ class PixelChallengeConsole:
             # Enter GAME_SETUP state - show color selection screen
             self.set_state(HostState.GAME_SETUP, "Waiting for player color selection")
             self.viewer.show_select_colors()
+            self.play_sound("voice_select_two_colors")  # Voice prompt (v22.8.0)
         else:
             # Skip color selection - show "press a button to start" screen
             self.set_state(HostState.GAME_SETUP, "Press a button to start!")
@@ -1680,6 +1780,7 @@ class PixelChallengeConsole:
             if os.path.exists(press_button_image):
                 self.viewer.show_image(press_button_image)
                 self.log(f"[SETUP] Showing press_a_button_to_start.png")
+                self.play_sound("screen_press_button_start")  # Play press-button screen audio (v22.7.4)
             else:
                 # Fall back to game-specific ready image or splash
                 ready_image = f"{ASSETS_DIR}/{game_key}_ready.png"
@@ -1691,6 +1792,18 @@ class PixelChallengeConsole:
         # Start game in SETUP phase (game handles color selection)
         # Pass the selected mode to the game
         game_settings = {"mode": self.game_mode.get()}
+
+        # Load game config.json and pass as config_override so game module uses edited values
+        config_path = self.config_path_for_current_game()
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config_data = json.load(f)
+                game_settings["config_override"] = config_data
+                self.log(f"Loaded game config: {config_path}")
+            except Exception as e:
+                self.log(f"Failed to load game config: {e}")
+
         success = self.game_manager.start_game(game_key, players, settings=game_settings)
         if not success:
             self.log("Failed to start game!")
@@ -1880,12 +1993,15 @@ class PixelChallengeConsole:
                 self.auto_enabled.set(False)
                 self.update_auto_button()
             self.cancel_viewer_return()
+            self.stop_music()  # Stop splash music during check-in
             self.attract.stop(self)
             self.falcon.clear_all_lanes(self)
             self.checkin_open = True
             self.players_confirmed = False
             self.set_state(HostState.CHECKIN_OPEN, "Check-in opened. Press WHITE to join.")
             self.viewer.show_checkin()  # Show check-in screen
+            self.play_sound("screen_checkin")  # Play check-in screen audio (v22.7.4)
+
         self.refresh_player_status_panel()
 
     def on_confirm_players(self):
@@ -2285,9 +2401,16 @@ class PixelChallengeConsole:
         self.bottom_paned = tk.PanedWindow(parent, orient="horizontal", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
         self.bottom_paned.grid(row=0, column=0, sticky="nsew")
 
-        # Left side - empty/filler (adjustable width)
-        left_filler = tk.Frame(self.bottom_paned, bg="#12061f")
-        self.bottom_paned.add(left_filler, minsize=50)
+       # Left side - Audio Mixer panel
+        mixer_panel, mixer_body = self.panel(self.bottom_paned, "AUDIO MIXER")
+
+        tk.Label(mixer_body, text="MUSIC VOLUME (%)", bg="#17071f", fg="#cccccc", font=("Arial", 14, "bold")).pack(anchor="center", pady=(6, 2))
+        tk.Scale(mixer_body, from_=0, to=100, resolution=1, orient="horizontal", variable=self.music_volume, bg="#17071f", fg="white", troughcolor="#071a30", highlightthickness=0, font=("Arial", 12, "bold"), command=self.on_music_volume_changed).pack(fill="x", pady=(0, 8))
+
+        tk.Label(mixer_body, text="SFX VOLUME (%)", bg="#17071f", fg="#cccccc", font=("Arial", 14, "bold")).pack(anchor="center", pady=(4, 2))
+        tk.Scale(mixer_body, from_=0, to=100, resolution=1, orient="horizontal", variable=self.sfx_volume, bg="#17071f", fg="white", troughcolor="#071a30", highlightthickness=0, font=("Arial", 12, "bold"), command=self.on_sfx_volume_changed).pack(fill="x", pady=(0, 8))
+
+        self.bottom_paned.add(mixer_panel, minsize=50)
 
         # Right side - log panel
         info_panel = tk.Frame(self.bottom_paned, bg="#3a1b53", bd=2, relief="groove")
