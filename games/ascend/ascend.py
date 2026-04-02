@@ -569,10 +569,9 @@ class AscendSession(GameSession):
 
             # Update altitude
             if ap.physical_position > ap.manual_altitude:
+                gained = ap.physical_position - ap.manual_altitude
                 ap.manual_altitude = ap.physical_position
-                ap.add_score(
-                    int((ap.physical_position - ap.manual_altitude) * self.score_p2.get("altitude_per_pixel", 5))
-                )
+                ap.add_score(int(gained * self.score_p2.get("altitude_per_pixel", 5)))
             ap.max_altitude = ap.scroll_altitude + float(ap.manual_altitude)
 
             # Spawn chasers
@@ -882,7 +881,8 @@ class AscendSession(GameSession):
 
             elif isinstance(obs, BonusPickup):
                 if not obs.collected:
-                    ap.add_score(self.score_p2.get("gate_clear", 75))
+                    # bonus_collect is a Phase 1 mechanic; fall back to Phase 1 score if not in Phase 2 config
+                    ap.add_score(self.score_p2.get("bonus_collect", self.score_p1.get("bonus_collect", 100)))
                     obs.collected = True
                     obs.active    = False
                     try:
@@ -891,7 +891,7 @@ class AscendSession(GameSession):
                         pass
 
     def _apply_p2_collision(self, ap: AscendPlayer, now: float, source: str) -> None:
-        ap.add_score(self.score_p1.get("collision", -50))
+        ap.add_score(self.score_p2.get("collision", self.score_p1.get("collision", -50)))
         survived = ap.take_damage(now)
         self.host.log(f"[ASCEND] P{ap.player_id} hit by {source} in Phase 2, lives={ap.lives}")
         try:
@@ -1001,7 +1001,7 @@ class AscendSession(GameSession):
                             pass
                     else:
                         ap.wrong_presses += 1
-                        ap.add_score(self.score_p1.get("wrong_press", -15))
+                        ap.add_score(self.score_p2.get("wrong_press", self.score_p1.get("wrong_press", -15)))
                         hit_any = True
 
                 elif isinstance(obs, Chaser):
@@ -1016,14 +1016,15 @@ class AscendSession(GameSession):
                             pass
                     else:
                         ap.wrong_presses += 1
-                        ap.add_score(self.score_p1.get("wrong_press", -15))
+                        ap.add_score(self.score_p2.get("wrong_press", self.score_p1.get("wrong_press", -15)))
                         hit_any = True
 
                 elif isinstance(obs, BonusPickup):
                     if obs.try_collect(color):
                         obs.collected = True
                         obs.active    = False
-                        ap.add_score(self.score_p2.get("gate_clear", 75))
+                        # bonus_collect is a Phase 1 mechanic; fall back to Phase 1 score if not in Phase 2 config
+                        ap.add_score(self.score_p2.get("bonus_collect", self.score_p1.get("bonus_collect", 100)))
                         hit_any = True
                         try:
                             self.host.play_sound("as_bonus_collect")

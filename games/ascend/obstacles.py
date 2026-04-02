@@ -60,7 +60,7 @@ class Obstacle:
     # ------------------------------------------------------------------
 
     def get_physical_pos(self, scroll_offset: float) -> float:
-        """Return the physical pixel position (float) of the leading edge."""
+        """Return the physical pixel position (float) of the bottom edge (lowest pixel index)."""
         return self.virtual_pos - scroll_offset
 
     def is_off_screen(self, scroll_offset: float, lane_length: int = 100) -> bool:
@@ -359,13 +359,16 @@ def generate_phase2_field(config: dict, seed: Optional[int] = None) -> List[Obst
     blocker_size_max = blocker_cfg.get("size_max", 3)
     pulse_rate = bonus_cfg.get("pulse_rate_ms", 300)
 
+    # Safety margin (pixels) between an obstacle's far edge and the portal zone
+    _PORTAL_SAFETY_MARGIN = 3
+
     # Work through the field in 5-px steps
     px = 10
     prev_blocked_left = False
     prev_blocked_right = False
 
     while px <= portal_start - 10:
-        band_end = min(px + 5, portal_start - 3)
+        band_end = min(px + 5, portal_start - _PORTAL_SAFETY_MARGIN)
 
         # Choose obstacle type for this band
         roll = rng.random()
@@ -384,7 +387,9 @@ def generate_phase2_field(config: dict, seed: Optional[int] = None) -> List[Obst
 
         if roll < 0.40 or (roll < 0.55 and not other_blocked):
             # ColorGate
-            size = rng.randint(gate_size_min, min(gate_size_max, portal_start - pos - 3))
+            # Clamp size so the obstacle does not extend into the portal safety zone
+            size_max_safe = max(gate_size_min, min(gate_size_max, portal_start - pos - _PORTAL_SAFETY_MARGIN))
+            size = rng.randint(gate_size_min, size_max_safe)
             size = max(1, size)
             color_name = rng.choice(_COLOR_NAMES)
             obs = ColorGate(virtual_pos=0.0, lane=lane, size=size, color_name=color_name)
@@ -396,7 +401,9 @@ def generate_phase2_field(config: dict, seed: Optional[int] = None) -> List[Obst
                 prev_blocked_right = True
         elif roll < 0.70 and not other_blocked:
             # Blocker — only place if the other lane is clear in this area
-            size = rng.randint(blocker_size_min, min(blocker_size_max, portal_start - pos - 3))
+            # Clamp size so the obstacle does not extend into the portal safety zone
+            size_max_safe = max(blocker_size_min, min(blocker_size_max, portal_start - pos - _PORTAL_SAFETY_MARGIN))
+            size = rng.randint(blocker_size_min, size_max_safe)
             size = max(1, size)
             obs = Blocker(virtual_pos=0.0, lane=lane, size=size)
             obs.p2_pos = pos
