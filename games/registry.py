@@ -36,10 +36,10 @@ def build_game_registry() -> dict:
     except ImportError as e:
         print(f"[REGISTRY] Failed to load surround: {e}")
     
-    # try:
-    #     from games.ascend import AscendModule
-    #     registry["ascend"] = AscendModule()
-    # except ImportError as e:
-    #     print(f"[REGISTRY] Failed to load ascend: {e}")
+    try:
+        from games.ascend import AscendModule
+        registry["ascend"] = AscendModule()
+    except ImportError as e:
+        print(f"[REGISTRY] Failed to load ascend: {e}")
     
     return registry

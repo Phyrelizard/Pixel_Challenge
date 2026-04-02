@@ -1,6 +1,108 @@
 {
-  "difficulty": "normal",
-  "show_scoreboard": true,
-  "sound_pack": "default",
-  "notes": "auto-created by console v17.3.0; adjust as needed"
+  "game_info": {
+    "name": "Ascend",
+    "version": "1.0.0",
+    "description": "Vertical-climbing, lane-switching, color-reaction game"
+  },
+  "round": {
+    "duration_sec": 120,
+    "countdown_sec": 3,
+    "show_timer": true
+  },
+  "player": {
+    "start_lane": "left",
+    "marker_pixel": 5,
+    "marker_size": 3,
+    "marker_color": [255, 255, 255],
+    "lives": 3,
+    "invulnerability_ms": 1500,
+    "invulnerability_blink_rate_ms": 100,
+    "brake_uses": 3
+  },
+  "phase1": {
+    "field_length_px": 300,
+    "scroll_speed_start_ms": 80,
+    "scroll_speed_end_ms": 25,
+    "altitude_milestone_every_px": 75,
+    "boost_multiplier": 0.5,
+    "boost_duration_ms": 800,
+    "brake_multiplier": 2.5,
+    "brake_duration_ms": 600
+  },
+  "phase2": {
+    "field_length_px": 100,
+    "player_move_speed_ms": 80,
+    "portal_start_px": 97,
+    "chaser_spawn_interval_ms": 5000
+  },
+  "obstacles": {
+    "color_gate": {
+      "size_min": 2,
+      "size_max": 3,
+      "spawn_weight": 35
+    },
+    "blocker": {
+      "size_min": 2,
+      "size_max": 3,
+      "spawn_weight": 25
+    },
+    "chaser": {
+      "speed_multiplier": 1.8,
+      "spawn_weight": 20
+    },
+    "swapper": {
+      "cycle_ms": 600,
+      "spawn_weight": 10
+    },
+    "bonus_pickup": {
+      "pulse_rate_ms": 300,
+      "spawn_weight": 10
+    },
+    "spawn_interval_start_ms": 2500,
+    "spawn_interval_end_ms": 800,
+    "max_obstacles": 12
+  },
+  "scoring": {
+    "phase1": {
+      "gate_clear": 50,
+      "blocker_dodge": 25,
+      "chaser_destroy": 100,
+      "chaser_dodge": 40,
+      "swapper_clear": 75,
+      "bonus_collect": 100,
+      "wrong_press": -15,
+      "collision": -50,
+      "altitude_milestone": 200
+    },
+    "phase2": {
+      "gate_clear": 75,
+      "blocker_navigate": 30,
+      "chaser_destroy": 125,
+      "chaser_dodge": 50,
+      "altitude_per_pixel": 5,
+      "portal_reached": 1000
+    },
+    "end_bonus": {
+      "summit": 1000,
+      "survivor": 300,
+      "efficiency": 200,
+      "speed_per_sec": 100,
+      "no_retreat": 150
+    }
+  },
+  "animations": {
+    "milestone_wave_ms": 400,
+    "phase_transition_ms": 1200,
+    "portal_absorption_ms": 500,
+    "portal_flash_ms": 300,
+    "portal_explosion_ms": 1500,
+    "portal_shimmer_ms": 2000,
+    "portal_victory_ms": 1500,
+    "timer_freeze_ms": 300,
+    "timer_fade_ms": 1500,
+    "timer_altitude_flash_ms": 500
+  },
+  "transitions": {
+    "deceleration_ms": 1200
+  }
 }
