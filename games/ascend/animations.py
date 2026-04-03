@@ -170,7 +170,7 @@ class PortalAnimation:
 
     def update(self, delta_ms: float) -> None:
         self._stage_elapsed += delta_ms
-        while self._stage_elapsed >= self._stage_duration() and not self.is_complete():
+        while not self.is_complete() and self._stage_elapsed >= self._stage_duration():
             self._stage_elapsed -= self._stage_duration()
             self._stage += 1
             if self._stage == self.STAGE_SHIMMER:
@@ -284,7 +284,7 @@ class TimerExpiredAnimation:
 
     def update(self, delta_ms: float) -> None:
         self._stage_elapsed += delta_ms
-        while self._stage_elapsed >= self._stage_duration() and not self.is_complete():
+        while not self.is_complete() and self._stage_elapsed >= self._stage_duration():
             self._stage_elapsed -= self._stage_duration()
             self._stage += 1
 

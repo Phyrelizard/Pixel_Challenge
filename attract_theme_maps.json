@@ -1,7 +1,7 @@
 {
   "auto_enabled": true,
   "cycle_enabled": true,
-  "cycle_seconds": 40,
+  "cycle_seconds": 20,
   "per_theme_speed": {
     "Fire Burst": 6,
     "Bounce Chase": 7,
@@ -12,23 +12,23 @@
     "Lane Chase LR": 8,
     "Ice Burst": 8,
     "Galaxy Wave": 10,
-    "Lane Chase RL": 6
+    "Lane Chase RL": 7
   },
   "selected_themes": [
-    "Lane Chase RL",
-    "Ice Burst",
     "Bounce Chase",
-    "Lane Chase LR",
-    "Team Colors"
+    "Galaxy Wave",
+    "Fire Burst",
+    "Color Wash",
+    "Lane Chase RL"
   ],
   "sash_left_attract_bottom": 818,
   "sash_center_ctrl": 677,
   "sash_main_info": 508,
   "sash_bottom_log": 679,
-  "falcon_brightness": 14,
-  "gameplay_brightness": 38,
-  "music_volume": 4,
-  "sfx_volume": 21,
+  "falcon_brightness": 37,
+  "gameplay_brightness": 33,
+  "music_volume": 14,
+  "sfx_volume": 43,
   "falcon_ip": "192.168.2.113",
   "wifi_ssid": "skynet",
   "wifi_psk": "",

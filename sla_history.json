@@ -341,6 +341,63 @@
           ]
         }
       }
+    },
+    {
+      "session_id": "2026-04-02_00-02-00",
+      "timestamp": 1775121249.5448956,
+      "players": {
+        "1": {
+          "games_played": 2,
+          "final_sla": 8,
+          "samples": [
+            {
+              "game_key": "dot_dash",
+              "timestamp": 1775120681.9801419,
+              "metrics": {
+                "accuracy": 1.0,
+                "reaction_time_sec": 0.338,
+                "completion_time_sec": 20.022,
+                "score": 10350
+              },
+              "calculated_sla": 9
+            },
+            {
+              "game_key": "pixel_pop",
+              "timestamp": 1775120769.1326654,
+              "metrics": {
+                "accuracy": 0.614,
+                "reaction_time_sec": 0.0,
+                "completion_time_sec": null,
+                "score": 475
+              },
+              "calculated_sla": 8
+            }
+          ]
+        }
+      }
+    },
+    {
+      "session_id": "2026-04-02_02-20-42",
+      "timestamp": 1775159392.475752,
+      "players": {
+        "1": {
+          "games_played": 1,
+          "final_sla": 8,
+          "samples": [
+            {
+              "game_key": "dot_dash",
+              "timestamp": 1775158158.0553684,
+              "metrics": {
+                "accuracy": 0.98,
+                "reaction_time_sec": 0.436,
+                "completion_time_sec": 18.906,
+                "score": 10350
+              },
+              "calculated_sla": 8
+            }
+          ]
+        }
+      }
     }
   ]
 }

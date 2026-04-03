@@ -98,7 +98,7 @@
     "length_pixels": 1,
     "trail_length_pixels": 3,
     "trail_brightness": 0.15,
-    "dual_fire_on_matching_heads": true
+    "dual_fire_on_matching_heads": false
   },
   "eggs": {
     "enabled": true,
