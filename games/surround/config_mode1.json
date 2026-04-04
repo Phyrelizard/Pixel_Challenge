@@ -42,7 +42,7 @@
         "max_simultaneous_snakes": 3
       },
       "bottom_to_top": {
-        "enabled": false,
+        "enabled": true,
         "base_speed_ms": 400,
         "min_speed_ms": 300,
         "speedup_every_sec": 20,
