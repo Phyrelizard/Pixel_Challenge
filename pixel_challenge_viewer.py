@@ -332,10 +332,96 @@ class PixelChallengeViewer:
             return
 
         game = payload.get("game", "Unknown")
+        game_key = game.lower().replace(" ", "_")
         winner = payload.get("winner_player_id", None)
         show_ranking = bool(payload.get("show_ranking", False))
         rows = payload.get("rows", [])
+        is_final_tally = payload.get("is_final_tally", False)
 
+        # ---------- formatting helpers ----------
+        def fmt_pct(v):
+            """Format a decimal (0.306) or already-percentage value as '30.6%'."""
+            if v is None:
+                return "--"
+            try:
+                val = float(v)
+                if val <= 1.0:
+                    val = val * 100.0
+                return f"{val:.1f}%"
+            except Exception:
+                return str(v)
+
+        def fmt_sec(v):
+            """Format seconds with 's' suffix, 1 decimal."""
+            if v is None:
+                return "--"
+            try:
+                return f"{float(v):.1f}s"
+            except Exception:
+                return str(v)
+
+        def fmt_score(v):
+            if v is None:
+                return "--"
+            try:
+                return str(int(v))
+            except Exception:
+                return str(v)
+
+        # ---------- final tally has its own layout ----------
+        if is_final_tally:
+            self._draw_final_tally(c, payload, rows, winner)
+            return
+
+        # ---------- determine columns per game ----------
+        if game_key == "dot_dash":
+            headers = ["PLAYER", "SCORE", "ACCURACY", "REACTION (s)", "CONSISTENCY", "COMPLETE (s)"]
+            widths  = [200, 180, 200, 220, 220, 220]
+            def row_values(row, pid):
+                return [
+                    f"P{pid}",
+                    fmt_score(row.get("score")),
+                    fmt_pct(row.get("accuracy")),
+                    fmt_sec(row.get("reaction_time_sec")),
+                    fmt_pct(row.get("consistency")),
+                    fmt_sec(row.get("completion_time_sec")),
+                ]
+        elif game_key == "pixel_pop":
+            headers = ["PLAYER", "SCORE", "ACCURACY", "HITS", "SNAKES CLEARED"]
+            widths  = [240, 240, 260, 260, 300]
+            def row_values(row, pid):
+                return [
+                    f"P{pid}",
+                    fmt_score(row.get("score")),
+                    fmt_pct(row.get("accuracy")),
+                    str(row.get("correct_hits", "--")),
+                    str(row.get("lanes_cleared", "--")),
+                ]
+        elif game_key == "surround":
+            headers = ["PLAYER", "SCORE", "ACCURACY", "KILLS"]
+            widths  = [280, 280, 320, 320]
+            def row_values(row, pid):
+                return [
+                    f"P{pid}",
+                    fmt_score(row.get("score")),
+                    fmt_pct(row.get("accuracy")),
+                    str(row.get("kills", "--")),
+                ]
+        else:
+            headers = ["PLAYER", "SCORE", "ACCURACY"]
+            widths  = [360, 360, 360]
+            def row_values(row, pid):
+                return [
+                    f"P{pid}",
+                    fmt_score(row.get("score")),
+                    fmt_pct(row.get("accuracy")),
+                ]
+
+        if show_ranking:
+            headers.append("RANK")
+            widths.append(180)
+
+        # ---------- game subtitle ----------
         c.create_text(120, 165, text=f"GAME: {game}", anchor="w", fill="#7df9ff", font=("Arial", 26, "bold"))
 
         if winner is not None:
@@ -348,17 +434,11 @@ class PixelChallengeViewer:
                 font=("Arial", 28, "bold"),
             )
 
-        # ---------- table ----------
-        left = 80
+        # ---------- center the table ----------
+        total_w = sum(widths)
+        left = (self.screen_w - total_w) // 2
         top = 210
         row_h = 95
-
-        headers = ["PLAYER", "SCORE", "REACTION", "COMPLETE", "ACCURACY", "CONSISTENCY"]
-        widths = [220, 220, 220, 220, 220, 260]
-
-        if show_ranking:
-            headers.append("RANK")
-            widths.append(180)
 
         # header row
         x = left
@@ -368,15 +448,7 @@ class PixelChallengeViewer:
             c.create_text(x + w // 2, top + 30, text=h, fill="#f6f7ff", font=("Arial", 20, "bold"))
             x += w
 
-        def fmt_num(v, digits=3):
-            if v is None:
-                return "--"
-            try:
-                return f"{float(v):.{digits}f}"
-            except Exception:
-                return str(v)
-
-        # rows
+        # player colors
         player_colors = {
             1: "#ff6464",
             2: "#66b3ff",
@@ -384,33 +456,21 @@ class PixelChallengeViewer:
             4: "#d28cff",
         }
 
+        # data rows
         y = top + 70
         for idx, row in enumerate(rows[:8]):
             pid = int(row.get("player_id", idx + 1))
-            score = row.get("score", 0)
-            reaction = fmt_num(row.get("reaction_time_sec"), 3)
-            completion = fmt_num(row.get("completion_time_sec"), 3)
-            accuracy = fmt_num(row.get("accuracy"), 3)
-            consistency = fmt_num(row.get("consistency"), 3) if row.get("consistency") is not None else "--"
-            ranking = row.get("ranking", "--")
-
             is_winner = (winner is not None and pid == winner)
             bg = "#1b2c5b" if idx % 2 == 0 else "#16244a"
             if is_winner:
                 bg = "#1f4d2f"
 
-            x = left
-            values = [
-                f"P{pid}",
-                str(score),
-                reaction,
-                completion,
-                accuracy,
-                consistency,
-            ]
+            values = row_values(row, pid)
             if show_ranking:
+                ranking = row.get("ranking", "--")
                 values.append(str(ranking if ranking is not None else "--"))
 
+            x = left
             for col, val in enumerate(values):
                 w = widths[col]
                 c.create_rectangle(x, y, x + w, y + row_h, fill=bg, outline="#2f7cff", width=2)
@@ -421,7 +481,7 @@ class PixelChallengeViewer:
 
             if is_winner:
                 c.create_text(
-                    self.screen_w - 140,
+                    left + total_w + 60,
                     y + row_h // 2,
                     text="★",
                     fill="#ffd84d",
@@ -437,6 +497,120 @@ class PixelChallengeViewer:
             text="PIXEL CHALLENGE • READY FOR NEXT ROUND",
             fill="#95a8d8",
             font=("Arial", 20, "bold"),
+        )
+
+    def _draw_final_tally(self, c, payload, rows, winner):
+        """Draw the cumulative final tally scoreboard after the last game."""
+        player_colors = {
+            1: "#ff6464",
+            2: "#66b3ff",
+            3: "#8dff66",
+            4: "#d28cff",
+        }
+
+        # Title override
+        c.create_rectangle(40, 30, self.screen_w - 40, 130, fill="#0b1230", outline="#ffd84d", width=4)
+        c.create_text(self.screen_w // 2, 80, text="FINAL STANDINGS", fill="#ffd84d", font=("Arial", 44, "bold"))
+
+        # Gather per-game history from payload
+        game_history = payload.get("game_history", [])
+        game_names = [g.get("game_name", f"Game {i+1}") for i, g in enumerate(game_history)]
+
+        # Build headers: PLAYER | Game1 | Game2 | Game3 | TOTAL | AVG ACC
+        headers = ["PLAYER"] + game_names + ["TOTAL", "AVG ACC"]
+        num_games = len(game_names)
+        player_w = 200
+        game_w = 200
+        total_w_col = 200
+        acc_w = 200
+        widths = [player_w] + [game_w] * num_games + [total_w_col, acc_w]
+
+        total_table_w = sum(widths)
+        left = (self.screen_w - total_table_w) // 2
+        top = 180
+        row_h = 100
+
+        # header row
+        x = left
+        for i, h in enumerate(headers):
+            w = widths[i]
+            fill = "#142046" if i < len(headers) - 2 else "#1a3060"
+            c.create_rectangle(x, top, x + w, top + 60, fill=fill, outline="#ffd84d", width=2)
+            c.create_text(x + w // 2, top + 30, text=h, fill="#f6f7ff", font=("Arial", 18, "bold"))
+            x += w
+
+        # data rows — sorted by total_score descending
+        y = top + 70
+        for rank_idx, row in enumerate(rows[:8]):
+            pid = int(row.get("player_id", rank_idx + 1))
+            total_score = row.get("total_score", 0)
+            avg_acc = row.get("avg_accuracy", 0)
+            per_game_scores = row.get("per_game_scores", [])
+            is_winner = (rank_idx == 0)
+
+            bg = "#1f4d2f" if is_winner else ("#1b2c5b" if rank_idx % 2 == 0 else "#16244a")
+
+            values = [f"P{pid}"]
+            for gi in range(num_games):
+                if gi < len(per_game_scores):
+                    values.append(str(int(per_game_scores[gi])))
+                else:
+                    values.append("--")
+            values.append(str(int(total_score)))
+            try:
+                acc_val = float(avg_acc)
+                if acc_val <= 1.0:
+                    acc_val = acc_val * 100.0
+                values.append(f"{acc_val:.1f}%")
+            except Exception:
+                values.append("--")
+
+            x = left
+            for col, val in enumerate(values):
+                w = widths[col]
+                outline = "#ffd84d" if is_winner else "#2f7cff"
+                c.create_rectangle(x, y, x + w, y + row_h, fill=bg, outline=outline, width=2)
+                if col == 0:
+                    color = player_colors.get(pid, "#ffffff")
+                    font_choice = ("Arial", 30, "bold")
+                elif col == len(values) - 2:
+                    color = "#ffe66d"
+                    font_choice = ("Arial", 28, "bold")
+                else:
+                    color = "#ffffff"
+                    font_choice = ("Arial", 24, "bold")
+                c.create_text(x + w // 2, y + (row_h // 2), text=val, fill=color, font=font_choice)
+                x += w
+
+            if is_winner:
+                c.create_text(
+                    left + total_table_w + 60,
+                    y + row_h // 2,
+                    text="★",
+                    fill="#ffd84d",
+                    font=("Arial", 48, "bold"),
+                )
+
+            # Rank number on left
+            rank_text = ["1ST", "2ND", "3RD", "4TH"]
+            rank_label = rank_text[rank_idx] if rank_idx < 4 else f"{rank_idx+1}TH"
+            c.create_text(
+                left - 50,
+                y + row_h // 2,
+                text=rank_label,
+                fill="#ffd84d" if is_winner else "#95a8d8",
+                font=("Arial", 22, "bold"),
+            )
+
+            y += row_h + 14
+
+        # footer
+        c.create_text(
+            self.screen_w // 2,
+            self.screen_h - 35,
+            text="PIXEL CHALLENGE • THANKS FOR PLAYING!",
+            fill="#ffd84d",
+            font=("Arial", 22, "bold"),
         )
 
     # ---------- commands ----------

@@ -1,5 +1,5 @@
 {
-  "auto_enabled": true,
+  "auto_enabled": false,
   "cycle_enabled": true,
   "cycle_seconds": 20,
   "per_theme_speed": {
@@ -15,15 +15,15 @@
     "Lane Chase RL": 7
   },
   "selected_themes": [
-    "Galaxy Wave",
     "Ice Burst",
-    "Bounce Chase",
-    "Lane Chase RL",
+    "Galaxy Wave",
     "Team Colors",
     "Color Wash",
-    "Fire Burst"
+    "Fire Burst",
+    "Bounce Chase",
+    "Lane Chase RL"
   ],
-  "sash_left_attract_bottom": 818,
+  "sash_left_attract_bottom": 726,
   "sash_center_ctrl": 677,
   "sash_main_info": 508,
   "sash_bottom_log": 679,

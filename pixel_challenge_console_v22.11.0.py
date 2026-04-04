@@ -1053,6 +1053,7 @@ class PixelChallengeConsole:
             "generated_at": time.time(),
             "rows": [],
             "winner_player_id": None,
+            "is_final_tally": False,
         }
         if result is None:
             if self.last_scoreboard_payload is not None:
@@ -1084,6 +1085,59 @@ class PixelChallengeConsole:
                 payload["rows"].append(row)
         payload["rows"].sort(key=lambda r: r.get("score", 0), reverse=True)
         return payload
+
+    def build_final_tally_payload(self):
+        """Build a cumulative final tally payload from all rounds in score_history."""
+        rounds = self.score_history.get("rounds", [])
+        if not rounds:
+            return None
+
+        # Collect per-player totals
+        player_data = {}  # pid -> {"scores": [...], "accuracies": [...]}
+        game_history = []
+
+        for round_entry in rounds:
+            game_key = round_entry.get("game_key", "unknown")
+            game_name = game_key.replace("_", " ").title()
+            game_history.append({"game_name": game_name, "game_key": game_key})
+
+            for player_key, metrics in round_entry.get("player_results", {}).items():
+                try:
+                    pid = int(player_key)
+                except Exception:
+                    continue
+                if pid not in player_data:
+                    player_data[pid] = {"scores": [], "accuracies": []}
+                player_data[pid]["scores"].append(metrics.get("score", 0) or 0)
+                acc = metrics.get("accuracy", 0) or 0
+                player_data[pid]["accuracies"].append(acc)
+
+        # Build rows
+        rows = []
+        for pid, data in player_data.items():
+            total_score = sum(data["scores"])
+            avg_acc = sum(data["accuracies"]) / max(1, len(data["accuracies"]))
+            rows.append({
+                "player_id": pid,
+                "total_score": total_score,
+                "avg_accuracy": round(avg_acc, 3),
+                "per_game_scores": data["scores"],
+            })
+
+        # Sort by total score descending
+        rows.sort(key=lambda r: r.get("total_score", 0), reverse=True)
+        winner_pid = rows[0]["player_id"] if rows else None
+
+        return {
+            "title": "FINAL STANDINGS",
+            "game": "All Games",
+            "is_final_tally": True,
+            "show_ranking": False,
+            "generated_at": time.time(),
+            "rows": rows,
+            "winner_player_id": winner_pid,
+            "game_history": game_history,
+        }
 
     def record_score_history(self, result):
         round_entry = {
@@ -1734,8 +1788,27 @@ class PixelChallengeConsole:
                 if result:
                     self.log(f"Game complete! Winner: Player {result.winner_player_id}")
                     self.record_score_history(result)
-                    payload = self.build_scoreboard_payload(result, title="Final Results")
-                    self.show_scoreboard_temporarily(seconds=30, payload=payload, final=True)
+
+                    # Check if this is the 3rd game — show final tally instead
+                    num_rounds = len(self.score_history.get("rounds", []))
+                    if num_rounds >= 3:
+                        self.log("3 games completed — showing FINAL TALLY")
+                        tally_payload = self.build_final_tally_payload()
+                        if tally_payload:
+                            # Show the per-game scoreboard first for 15s, then final tally
+                            game_payload = self.build_scoreboard_payload(result, title="Game Results")
+                            self._write_scoreboard_data(game_payload)
+                            self.last_scoreboard_payload = game_payload
+                            self.viewer.show_scoreboard()
+                            # After 15 seconds, switch to the final tally
+                            self.root.after(15000, lambda: self._show_final_tally(tally_payload))
+                        else:
+                            payload = self.build_scoreboard_payload(result, title="Final Results")
+                            self.show_scoreboard_temporarily(seconds=30, payload=payload, final=True)
+                    else:
+                        payload = self.build_scoreboard_payload(result, title="Final Results")
+                        self.show_scoreboard_temporarily(seconds=30, payload=payload, final=True)
+
                 self.set_state(HostState.RESULTS_READY, "Game complete")
                 self.session_started = False
                 self.game_tick_active = False
@@ -1746,6 +1819,17 @@ class PixelChallengeConsole:
             self.log(f"Game tick error: {e}")
             self.log(traceback.format_exc())
         self.root.after(33, self.game_tick)
+
+    def _show_final_tally(self, tally_payload):
+        """Switch the viewer to the final tally scoreboard."""
+        self.cancel_viewer_return()
+        self.last_scoreboard_payload = tally_payload
+        self._write_scoreboard_data(tally_payload)
+        self.final_results_active = True
+        self.viewer.show_final_results()
+        self.log("Final tally displayed.")
+        # Auto-dismiss after 45 seconds
+        self.viewer_return_after_id = self.root.after(45000, self.finish_results_screen)
 
     # =========================================================================
     # ANIMATION TICK (ATTRACT MODE)
