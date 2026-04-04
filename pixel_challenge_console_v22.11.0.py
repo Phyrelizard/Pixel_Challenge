@@ -1028,120 +1028,74 @@ class PixelChallengeConsole:
         except Exception as e:
             self.log(f"Failed to write scoreboard data: {e}")
 
-def _compute_rankings(self):
-    rankings = {}
-    counts = {}
-    for round_entry in self.score_history.get("rounds", []):
-        for player_key, metrics in round_entry.get("player_results", {}).items():
-            try:
-                player_id = int(player_key)
-            except Exception:
-                continue
-            score = metrics.get("score", 0) or 0
-            rankings[player_id] = rankings.get(player_id, 0) + score
-            counts[player_id] = counts.get(player_id, 0) + 1
-    for player_id in list(rankings):
-        rankings[player_id] = int(rankings[player_id] / max(1, counts[player_id]))
-    return rankings
+    def _compute_rankings(self):
+        rankings = {}
+        counts = {}
+        for round_entry in self.score_history.get("rounds", []):
+            for player_key, metrics in round_entry.get("player_results", {}).items():
+                try:
+                    player_id = int(player_key)
+                except Exception:
+                    continue
+                score = metrics.get("score", 0) or 0
+                rankings[player_id] = rankings.get(player_id, 0) + score
+                counts[player_id] = counts.get(player_id, 0) + 1
+        for player_id in list(rankings):
+            rankings[player_id] = int(rankings[player_id] / max(1, counts[player_id]))
+        return rankings
 
+    def build_scoreboard_payload(self, result=None, title="Scoreboard"):
+        rankings = self._compute_rankings()
+        payload = {
+            "title": title,
+            "game": self.selected_game.get(),
+            "show_ranking": bool(self.show_ranking.get()),
+            "generated_at": time.time(),
+            "rows": [],
+            "winner_player_id": None,
+        }
+        if result is None:
+            if self.last_scoreboard_payload is not None:
+                payload.update(self.last_scoreboard_payload)
+                payload["title"] = title
+                return payload
+            rounds = self.score_history.get("rounds", [])
+            if not rounds:
+                return None
+            latest = rounds[-1]
+            result_rows = latest.get("player_results", {})
+            payload["game"] = latest.get("game_key", self.selected_game.get())
+            payload["winner_player_id"] = latest.get("winner_player_id")
+            for player_key, metrics in result_rows.items():
+                player_id = int(player_key) if str(player_key).isdigit() else 0
+                row = {"player_id": player_id}
+                row.update(metrics)
+                if payload["show_ranking"]:
+                    row["ranking"] = rankings.get(player_id)
+                payload["rows"].append(row)
+        else:
+            payload["game"] = result.game_key
+            payload["winner_player_id"] = result.winner_player_id
+            for player_id, metrics in result.player_results.items():
+                row = {"player_id": int(player_id)}
+                row.update(metrics)
+                if payload["show_ranking"]:
+                    row["ranking"] = rankings.get(int(player_id))
+                payload["rows"].append(row)
+        payload["rows"].sort(key=lambda r: r.get("score", 0), reverse=True)
+        return payload
 
-def _normalize_result_metrics(self, metrics: dict) -> dict:
-    """
-    Normalize per-player result metrics so old/new game modules produce a
-    consistent scoreboard schema.
-
-    Rules:
-    - pr -> hits
-    - keep existing hits if already present
-    - remove pr after mapping
-    """
-    normalized = dict(metrics or {})
-
-    if "hits" not in normalized and "pr" in normalized:
-        normalized["hits"] = normalized.get("pr", 0)
-
-    normalized.pop("pr", None)
-    return normalized
-
-def build_scoreboard_payload(self, result=None, title="Scoreboard"):
-    rankings = self._compute_rankings()
-    payload = {
-        "title": title,
-        "game": self.selected_game.get(),
-        "show_ranking": bool(self.show_ranking.get()),
-        "generated_at": time.time(),
-        "rows": [],
-        "winner_player_id": None,
-    }
-
-    if result is None:
-        if self.last_scoreboard_payload is not None:
-            payload.update(self.last_scoreboard_payload)
-            payload["title"] = title
-
-            # Normalize cached payload rows too
-            fixed_rows = []
-            for row in payload.get("rows", []):
-                fixed_row = dict(row)
-                fixed_row = self._normalize_result_metrics(fixed_row)
-                fixed_rows.append(fixed_row)
-            payload["rows"] = fixed_rows
-
-            return payload
-
-        rounds = self.score_history.get("rounds", [])
-        if not rounds:
-            return None
-
-        latest = rounds[-1]
-        result_rows = latest.get("player_results", {})
-        payload["game"] = latest.get("game_key", self.selected_game.get())
-        payload["winner_player_id"] = latest.get("winner_player_id")
-
-        for player_key, metrics in result_rows.items():
-            player_id = int(player_key) if str(player_key).isdigit() else 0
-            row = {"player_id": player_id}
-            row.update(self._normalize_result_metrics(metrics))
-            if payload["show_ranking"]:
-                row["ranking"] = rankings.get(player_id)
-            payload["rows"].append(row)
-
-    else:
-        payload["game"] = result.game_key
-        payload["winner_player_id"] = result.winner_player_id
-
-        for player_id, metrics in result.player_results.items():
-            row = {"player_id": int(player_id)}
-            row.update(self._normalize_result_metrics(metrics))
-            if payload["show_ranking"]:
-                row["ranking"] = rankings.get(int(player_id))
-            payload["rows"].append(row)
-
-    payload["rows"].sort(key=lambda r: r.get("score", 0), reverse=True)
-    return payload
-
-def record_score_history(self, result):
-    normalized_player_results = {
-        str(pid): self._normalize_result_metrics(metrics)
-        for pid, metrics in result.player_results.items()
-    }
-
-    round_entry = {
-        "timestamp": time.time(),
-        "game_key": result.game_key,
-        "winner_player_id": result.winner_player_id,
-        "player_results": normalized_player_results,
-    }
-
-    self.score_history.setdefault("rounds", []).append(round_entry)
-    self.save_score_history()
-    self.last_scoreboard_payload = self.build_scoreboard_payload(result)
-    self._write_scoreboard_data(self.last_scoreboard_payload)
-        
-    self.score_history.setdefault("rounds", []).append(round_entry)
-    self.save_score_history()
-    self.last_scoreboard_payload = self.build_scoreboard_payload(result)
-    self._write_scoreboard_data(self.last_scoreboard_payload)
+    def record_score_history(self, result):
+        round_entry = {
+            "timestamp": time.time(),
+            "game_key": result.game_key,
+            "winner_player_id": result.winner_player_id,
+            "player_results": {str(pid): metrics for pid, metrics in result.player_results.items()},
+        }
+        self.score_history.setdefault("rounds", []).append(round_entry)
+        self.save_score_history()
+        self.last_scoreboard_payload = self.build_scoreboard_payload(result)
+        self._write_scoreboard_data(self.last_scoreboard_payload)
 
     def show_scoreboard_temporarily(self, seconds: int = 30, payload=None, final=False):
         self.cancel_viewer_return()
