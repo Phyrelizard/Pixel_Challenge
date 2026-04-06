@@ -336,11 +336,10 @@ class PixelChallengeViewer:
         winner = payload.get("winner_player_id", None)
         show_ranking = bool(payload.get("show_ranking", False))
         rows = payload.get("rows", [])
-        is_final_tally = payload.get("is_final_tally", False)
 
         # ---------- formatting helpers ----------
         def fmt_pct(v):
-            """Format a decimal (0.306) or already-percentage value as '30.6%'."""
+            """Format a 0-1 decimal as percentage with 1 decimal place."""
             if v is None:
                 return "--"
             try:
@@ -352,11 +351,11 @@ class PixelChallengeViewer:
                 return str(v)
 
         def fmt_sec(v):
-            """Format seconds with 's' suffix, 1 decimal."""
+            """Format seconds with 's' suffix, 3 decimal places."""
             if v is None:
                 return "--"
             try:
-                return f"{float(v):.1f}s"
+                return f"{float(v):.3f}s"
             except Exception:
                 return str(v)
 
@@ -368,48 +367,44 @@ class PixelChallengeViewer:
             except Exception:
                 return str(v)
 
-        # ---------- final tally has its own layout ----------
-        if is_final_tally:
-            self._draw_final_tally(c, payload, rows, winner)
-            return
-
-        # ---------- determine columns per game ----------
+        # ---------- columns per game ----------
         if game_key == "dot_dash":
-            headers = ["PLAYER", "SCORE", "ACCURACY", "REACTION (s)", "CONSISTENCY", "COMPLETE (s)"]
-            widths  = [200, 180, 200, 220, 220, 220]
+            # Dot Dash keeps ALL columns
+            headers = ["PLAYER", "SCORE", "REACTION (s)", "COMPLETE (s)", "ACCURACY", "CONSISTENCY"]
+            widths  = [220, 220, 220, 220, 220, 260]
             def row_values(row, pid):
                 return [
                     f"P{pid}",
                     fmt_score(row.get("score")),
-                    fmt_pct(row.get("accuracy")),
                     fmt_sec(row.get("reaction_time_sec")),
-                    fmt_pct(row.get("consistency")),
                     fmt_sec(row.get("completion_time_sec")),
+                    fmt_pct(row.get("accuracy")),
+                    fmt_pct(row.get("consistency")),
                 ]
         elif game_key == "pixel_pop":
-            headers = ["PLAYER", "SCORE", "ACCURACY", "HITS", "SNAKES CLEARED"]
-            widths  = [240, 240, 260, 260, 300]
+            # Pixel Pop: only PLAYER, SCORE, ACCURACY
+            headers = ["PLAYER", "SCORE", "ACCURACY"]
+            widths  = [400, 400, 400]
             def row_values(row, pid):
                 return [
                     f"P{pid}",
                     fmt_score(row.get("score")),
                     fmt_pct(row.get("accuracy")),
-                    str(row.get("correct_hits", "--")),
-                    str(row.get("lanes_cleared", "--")),
                 ]
         elif game_key == "surround":
-            headers = ["PLAYER", "SCORE", "ACCURACY", "KILLS"]
-            widths  = [280, 280, 320, 320]
+            # Surround: only PLAYER, SCORE, ACCURACY
+            headers = ["PLAYER", "SCORE", "ACCURACY"]
+            widths  = [400, 400, 400]
             def row_values(row, pid):
                 return [
                     f"P{pid}",
                     fmt_score(row.get("score")),
                     fmt_pct(row.get("accuracy")),
-                    str(row.get("kills", "--")),
                 ]
         else:
+            # Any other game: PLAYER, SCORE, ACCURACY
             headers = ["PLAYER", "SCORE", "ACCURACY"]
-            widths  = [360, 360, 360]
+            widths  = [400, 400, 400]
             def row_values(row, pid):
                 return [
                     f"P{pid}",

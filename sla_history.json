@@ -398,6 +398,131 @@
           ]
         }
       }
+    },
+    {
+      "session_id": "2026-04-04_15-52-48",
+      "timestamp": 1775344217.0401187,
+      "players": {
+        "2": {
+          "games_played": 1,
+          "final_sla": 4,
+          "samples": [
+            {
+              "game_key": "dot_dash",
+              "timestamp": 1775343879.9786935,
+              "metrics": {
+                "accuracy": 0.81,
+                "reaction_time_sec": 0.227,
+                "completion_time_sec": 19.2,
+                "score": 10350
+              },
+              "calculated_sla": 4
+            }
+          ]
+        },
+        "1": {
+          "games_played": 2,
+          "final_sla": 8,
+          "samples": [
+            {
+              "game_key": "dot_dash",
+              "timestamp": 1775343964.096873,
+              "metrics": {
+                "accuracy": 0.98,
+                "reaction_time_sec": 0.234,
+                "completion_time_sec": 21.705,
+                "score": 10350
+              },
+              "calculated_sla": 8
+            },
+            {
+              "game_key": "pixel_pop",
+              "timestamp": 1775344058.1199894,
+              "metrics": {
+                "accuracy": 0.682,
+                "reaction_time_sec": 0.0,
+                "completion_time_sec": null,
+                "score": 435
+              },
+              "calculated_sla": 9
+            }
+          ]
+        }
+      }
+    },
+    {
+      "session_id": "2026-04-04_17-18-18",
+      "timestamp": 1775349049.8323367,
+      "players": {
+        "1": {
+          "games_played": 1,
+          "final_sla": 7,
+          "samples": [
+            {
+              "game_key": "dot_dash",
+              "timestamp": 1775352652.4011822,
+              "metrics": {
+                "accuracy": 0.92,
+                "reaction_time_sec": 0.116,
+                "completion_time_sec": 17.604,
+                "score": 10150
+              },
+              "calculated_sla": 7
+            }
+          ]
+        },
+        "2": {
+          "games_played": 1,
+          "final_sla": 1,
+          "samples": [
+            {
+              "game_key": "dot_dash",
+              "timestamp": 1775354207.4377534,
+              "metrics": {
+                "accuracy": 0.93,
+                "reaction_time_sec": 13.754,
+                "completion_time_sec": 50.0,
+                "score": 0
+              },
+              "calculated_sla": 1
+            }
+          ]
+        },
+        "3": {
+          "games_played": 1,
+          "final_sla": 8,
+          "samples": [
+            {
+              "game_key": "dot_dash",
+              "timestamp": 1775352533.5827975,
+              "metrics": {
+                "accuracy": 0.95,
+                "reaction_time_sec": 0.127,
+                "completion_time_sec": 20.39,
+                "score": 10150
+              },
+              "calculated_sla": 8
+            }
+          ]
+        },
+        "4": {
+          "games_played": 1,
+          "final_sla": 8,
+          "samples": [
+            {
+              "game_key": "dot_dash",
+              "timestamp": 1775352533.5976589,
+              "metrics": {
+                "accuracy": 0.97,
+                "reaction_time_sec": 0.196,
+                "completion_time_sec": 21.532,
+                "score": 10150
+              },
+              "calculated_sla": 8
+            }
+          ]
+        }
+      }
     }
   ]
 }
