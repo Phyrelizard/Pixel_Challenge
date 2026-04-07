@@ -459,6 +459,7 @@ class PixelChallengeConsole:
         self.music_volume = tk.IntVar(value=50)
         self.sfx_volume = tk.IntVar(value=100)
         self.voice_volume = tk.IntVar(value=100)
+        self.master_volume = tk.IntVar(value=100)
         self.music_muted = False
         self.music_volume_before_mute = 50
         self.sfx_muted = False
@@ -731,6 +732,7 @@ class PixelChallengeConsole:
             self.music_volume.set(int(data.get("music_volume", 50)))
             self.sfx_volume.set(int(data.get("sfx_volume", 100)))
             self.voice_volume.set(int(data.get("voice_volume", 100)))
+            self.master_volume.set(int(data.get("master_volume", 100)))
             self.falcon_ip = data.get("falcon_ip", DEFAULT_FALCON_IP)
             self.wifi_dhcp.set(bool(data.get("wifi_dhcp", True)))
             self.wifi_ssid.set(data.get("wifi_ssid", ""))
@@ -772,6 +774,7 @@ class PixelChallengeConsole:
             "music_volume": int(self.music_volume.get()),
             "sfx_volume": int(self.sfx_volume.get()),
             "voice_volume": int(self.voice_volume.get()),
+            "master_volume": int(self.master_volume.get()),
             "falcon_ip": self.falcon_ip,
             "wifi_dhcp": bool(self.wifi_dhcp.get()),
             "wifi_ssid": self.wifi_ssid.get(),
@@ -916,20 +919,23 @@ class PixelChallengeConsole:
             # Use pygame mixer for sound playback
             if not pygame.mixer.get_init():
                 pygame.mixer.init()
+                pygame.mixer.set_num_channels(16)
+            
+            master = max(0, min(100, self.master_volume.get())) / 100.0
             
             # Check if this is background music (should loop)
             if "music" in sound_key:
                 pygame.mixer.music.load(path)
-                pygame.mixer.music.set_volume(self.music_volume.get() / 100.0)
+                pygame.mixer.music.set_volume((self.music_volume.get() / 100.0) * master)
                 pygame.mixer.music.play(-1)  # -1 = loop forever
             elif "voice" in sound_key or "screen_" in sound_key:
                 # Voice prompts & screen transition audio use VOICE volume (v22.14.0)
                 sound = pygame.mixer.Sound(path)
-                sound.set_volume(self.voice_volume.get() / 100.0)
+                sound.set_volume((self.voice_volume.get() / 100.0) * master)
                 sound.play()
             else:
                 sound = pygame.mixer.Sound(path)
-                sound.set_volume(self.sfx_volume.get() / 100.0)
+                sound.set_volume((self.sfx_volume.get() / 100.0) * master)
                 sound.play()
                 
         except Exception as e:
@@ -1303,9 +1309,10 @@ class PixelChallengeConsole:
             self.music_muted = False
             self.music_volume_before_mute = vol
             self.update_music_mute_button()
+        master = max(0, min(100, self.master_volume.get())) / 100.0
         try:
             if pygame.mixer.get_init() and pygame.mixer.music.get_busy():
-                pygame.mixer.music.set_volume(vol / 100.0)
+                pygame.mixer.music.set_volume((vol / 100.0) * master)
         except Exception:
             pass
         self.save_settings()
@@ -1319,14 +1326,28 @@ class PixelChallengeConsole:
             self.update_sfx_mute_button()
         self.save_settings()
 
+    def on_master_volume_changed(self, value):
+        """Master volume scales all three channels (MUSIC, SFX, VOICE) together."""
+        master_vol = int(float(value))
+        self.master_volume.set(master_vol)
+        master = master_vol / 100.0
+        # Apply to currently-playing music immediately
+        try:
+            if pygame.mixer.get_init() and pygame.mixer.music.get_busy():
+                pygame.mixer.music.set_volume((self.music_volume.get() / 100.0) * master)
+        except Exception:
+            pass
+        self.save_settings()
+
     def toggle_music_mute(self):
         if self.music_muted:
             # Unmute — restore remembered volume
             self.music_muted = False
             self.music_volume.set(self.music_volume_before_mute)
+            master = max(0, min(100, self.master_volume.get())) / 100.0
             try:
                 if pygame.mixer.get_init() and pygame.mixer.music.get_busy():
-                    pygame.mixer.music.set_volume(self.music_volume_before_mute / 100.0)
+                    pygame.mixer.music.set_volume((self.music_volume_before_mute / 100.0) * master)
             except Exception:
                 pass
         else:
@@ -1362,14 +1383,14 @@ class PixelChallengeConsole:
             if self.music_muted:
                 self.music_mute_btn.configure(text="MUTED", bg="#c93b1e", activebackground="#c93b1e")
             else:
-                self.music_mute_btn.configure(text="MUSIC", bg="#27a844", activebackground="#27a844")
+                self.music_mute_btn.configure(text="MUTE", bg="#27a844", activebackground="#27a844")
 
     def update_sfx_mute_button(self):
         if hasattr(self, 'sfx_mute_btn'):
             if self.sfx_muted:
                 self.sfx_mute_btn.configure(text="MUTED", bg="#c93b1e", activebackground="#c93b1e")
             else:
-                self.sfx_mute_btn.configure(text="SFX", bg="#27a844", activebackground="#27a844")
+                self.sfx_mute_btn.configure(text="MUTE", bg="#27a844", activebackground="#27a844")
 
     def on_voice_volume_changed(self, value):
         vol = int(float(value))
@@ -1397,7 +1418,7 @@ class PixelChallengeConsole:
             if self.voice_muted:
                 self.voice_mute_btn.configure(text="MUTED", bg="#c93b1e", activebackground="#c93b1e")
             else:
-                self.voice_mute_btn.configure(text="VOICE", bg="#27a844", activebackground="#27a844")
+                self.voice_mute_btn.configure(text="MUTE", bg="#27a844", activebackground="#27a844")
 
     def on_theme_checked(self):
         self.selected_themes = {name for name, var in self.theme_vars.items() if var.get()}
@@ -1440,6 +1461,7 @@ class PixelChallengeConsole:
             pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=4096)
             pygame.init()
             pygame.joystick.init()
+            pygame.mixer.set_num_channels(16)
         except Exception as e:
             self.log(f"pygame init failed: {e}")
             return
@@ -2496,29 +2518,37 @@ class PixelChallengeConsole:
         self.theme_select_box.bind("<<ListboxSelect>>", self.on_theme_selected)
 
     def build_center_area(self, parent):
-        parent.grid_rowconfigure(2, weight=1)
+        parent.grid_rowconfigure(3, weight=1)
         parent.grid_columnconfigure(0, weight=1)
+
+        # Row 0: PLAYER STATUS (2×2 grid) — on top
+        status_panel, status_body = self.panel(parent, "PLAYER STATUS")
+        status_panel.grid(row=0, column=0, sticky="ew", pady=(0, 6))
+        status_body.grid_columnconfigure((0, 1), weight=1)
+        status_body.grid_rowconfigure((0, 1), weight=1)
+        self.status_body = status_body
+
+        # Row 1: CHECK-IN | CONFIRM buttons
         enroll_panel, enroll_body = self.panel(parent, "")
-        enroll_panel.grid(row=0, column=0, sticky="ew", pady=(0, 10))
-        # Single row: CHECK-IN | joined count | CONFIRM (v22.16.0)
+        enroll_panel.grid(row=1, column=0, sticky="ew", pady=(0, 4))
         checkin_row = tk.Frame(enroll_body, bg="#17071f")
         checkin_row.pack(fill="x", pady=(4, 4))
         checkin_row.grid_columnconfigure(1, weight=1)
         self.checkin_button = self.neon_button(checkin_row, "CHECK-IN", self.on_player_checkin, bg="#1b63ff", width=12)
         self.checkin_button.grid(row=0, column=0, sticky="w", padx=(0, 6))
-        joined_frame = tk.Frame(checkin_row, bg="#17071f")
-        joined_frame.grid(row=0, column=1, sticky="")
-        tk.Label(joined_frame, text="JOINED:", bg="#17071f", fg="#ffd74f", font=("Arial", 16, "bold")).pack(side="left", padx=(0, 4))
-        tk.Label(joined_frame, textvariable=self.players_joined, bg="#24101f", fg="#ffd74f", font=("Arial", 20, "bold"), width=2).pack(side="left")
         self.confirm_button = self.neon_button(checkin_row, "CONFIRM", self.on_confirm_players, bg="#1b63ff", width=12)
-        self.confirm_button.grid(row=0, column=2, sticky="e", padx=(6, 0))
-        status_panel, status_body = self.panel(parent, "PLAYER STATUS")
-        status_panel.grid(row=1, column=0, sticky="ew")
-        status_body.grid_columnconfigure((0, 1), weight=1)
-        status_body.grid_rowconfigure((0, 1), weight=1)
-        self.status_body = status_body
+        self.confirm_button.grid(row=0, column=1, sticky="e", padx=(6, 0))
+
+        # Row 2: JOINED count — centered below buttons
+        joined_frame = tk.Frame(enroll_body, bg="#17071f")
+        joined_frame.pack(fill="x", pady=(0, 4))
+        inner = tk.Frame(joined_frame, bg="#17071f")
+        inner.pack(anchor="center")
+        tk.Label(inner, text="JOINED:", bg="#17071f", fg="#ffd74f", font=("Arial", 16, "bold")).pack(side="left", padx=(0, 4))
+        tk.Label(inner, textvariable=self.players_joined, bg="#24101f", fg="#ffd74f", font=("Arial", 20, "bold"), width=2).pack(side="left")
+
         filler = tk.Frame(parent, bg="#12061f")
-        filler.grid(row=2, column=0, sticky="nsew")
+        filler.grid(row=3, column=0, sticky="nsew")
 
     def build_controllers_area(self, parent):
         parent.grid_rowconfigure(0, weight=1)
@@ -2530,7 +2560,7 @@ class PixelChallengeConsole:
 
     def build_dmx_audio_area(self, parent):
         """Build the DMX CONTROL panel (8 vertical placeholder sliders) and
-        AUDIO MIXER panel (3 vertical faders) stacked vertically. (v23.0.0)"""
+        AUDIO MIXER panel (4 vertical faders: MUSIC, SFX, VOICE, MASTER) stacked vertically. (v23.0.0)"""
         parent.grid_rowconfigure(0, weight=0)
         parent.grid_rowconfigure(1, weight=1)
         parent.grid_columnconfigure(0, weight=1)
@@ -2572,7 +2602,7 @@ class PixelChallengeConsole:
         mixer_panel, mixer_body = self.panel(parent, "AUDIO MIXER")
         mixer_panel.grid(row=1, column=0, sticky="nsew", pady=(4, 0))
 
-        # 3 vertical faders side-by-side: MUSIC, SFX, VOICE
+        # 4 vertical faders side-by-side: MUSIC, SFX, VOICE, MASTER
         faders_row = tk.Frame(mixer_body, bg="#17071f")
         faders_row.pack(fill="both", expand=True, pady=(4, 4))
 
@@ -2629,6 +2659,17 @@ class PixelChallengeConsole:
                                         relief="raised", bd=2, font=("Arial", 9, "bold"),
                                         padx=4, pady=1, cursor="hand2")
         self.voice_mute_btn.pack(pady=(2, 0))
+
+        # MASTER fader — scales all three channels together
+        master_col = tk.Frame(faders_row, bg="#17071f")
+        master_col.pack(side="left", fill="y", padx=6, expand=True)
+        tk.Scale(master_col, from_=100, to=0, resolution=1, orient="vertical",
+                 variable=self.master_volume,
+                 bg="#17071f", fg="white", troughcolor="#071a30",
+                 highlightthickness=0, font=("Arial", 9, "bold"),
+                 length=130, command=self.on_master_volume_changed).pack()
+        tk.Label(master_col, text="MASTER", bg="#17071f", fg="#ffd74f",
+                 font=("Arial", 11, "bold")).pack()
 
         self.update_music_mute_button()
         self.update_sfx_mute_button()
