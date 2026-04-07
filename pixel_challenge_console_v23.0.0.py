@@ -1457,10 +1457,11 @@ class PixelChallengeConsole:
     # =========================================================================
     def init_joysticks(self):
         try:
+            # buffer=2048 (was 4096) – halves audio latency (~46 ms at 44.1 kHz)
             pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=2048)
             pygame.init()
             pygame.joystick.init()
-            # v23.0.0 – allocate enough mixer channels for concurrent SFX
+            # 16 channels lets multiple SFX overlap during fast gameplay
             pygame.mixer.set_num_channels(16)
         except Exception as e:
             self.log(f"pygame init failed: {e}")
