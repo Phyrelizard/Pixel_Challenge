@@ -45,7 +45,7 @@
     ]
   },
   "projectile": {
-    "speed_base_ms_per_pixel": 8,
+    "speed_base_ms_per_pixel": 20,
     "sla_speed_adjustment_enabled": true,
     "sla_speed_factor": 0.5
   },
