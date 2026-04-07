@@ -1150,17 +1150,20 @@ class PixelChallengeConsole:
         self.viewer_return_after_id = self.root.after(int(seconds * 1000), self.finish_results_screen)
 
     def finish_results_screen(self):
-        # Restore AUTO state saved before game started
+        self._restore_attract_if_needed()
+        self.final_results_active = False
+        self.show_selected_game_splash()
+        # Re-kick attract if AUTO is on
+        if self.auto_enabled.get():
+            self.attract.start_theme(self, self.current_theme_name())
+
+    def _restore_attract_if_needed(self):
+        """Restore AUTO attract state that was saved before game started."""
         if self.animate_was_enabled_before_game:
             self.animate_was_enabled_before_game = False
             self.auto_enabled.set(True)
             self.update_auto_button()
             self.log("Animate restored after game.")
-        self.final_results_active = False
-        self.show_selected_game_splash()
-        # Always re-kick attract if AUTO is on - do not gate on the flag
-        if self.auto_enabled.get():
-            self.attract.start_theme(self, self.current_theme_name())
 
     # =========================================================================
     # THEME HELPERS
@@ -1859,17 +1862,14 @@ class PixelChallengeConsole:
                 else:
                     # No result — restore auto_enabled now since finish_results_screen
                     # will never fire (show_scoreboard_temporarily was not called).
-                    if self.animate_was_enabled_before_game:
-                        self.animate_was_enabled_before_game = False
-                        self.auto_enabled.set(True)
-                        self.update_auto_button()
-                        self.log("Animate restored (no result scoreboard).")
+                    self._restore_attract_if_needed()
                     self.show_selected_game_splash()
                 self.set_state(HostState.RESULTS_READY, "Game complete")
                 self.session_started = False
                 self.game_tick_active = False
-                # Start animation immediately - it will persist until new game selected
-                self.root.after(500, lambda: self.attract.start_theme(self, self.current_theme_name()))
+                # Re-kick attract if AUTO is on (or was just restored)
+                if self.auto_enabled.get() or self.final_results_active:
+                    self.root.after(500, lambda: self.attract.start_theme(self, self.current_theme_name()))
                 return
         except Exception as e:
             self.log(f"Game tick error: {e}")
@@ -2004,9 +2004,7 @@ class PixelChallengeConsole:
             self.log("Failed to start game!")
             self.set_state(HostState.IDLE, "Failed to start game")
             self.attract.start_theme(self, self.current_theme_name())
-            if self.animate_was_enabled_before_game:
-                self.auto_enabled.set(True)
-                self.update_auto_button()
+            self._restore_attract_if_needed()
             self.pending_players = []
             return
         
@@ -2111,10 +2109,7 @@ class PixelChallengeConsole:
         self.show_selected_game_splash()
         
         # Restore animate if it was on before
-        if self.animate_was_enabled_before_game:
-            self.auto_enabled.set(True)
-            self.update_auto_button()
-            self.log("Animate restored.")
+        self._restore_attract_if_needed()
         
         self.refresh_player_status_panel()
         self.refresh_controller_panel()
