@@ -466,6 +466,8 @@ class PixelChallengeConsole:
         self.sfx_volume_before_mute = 100
         self.voice_muted = False
         self.voice_volume_before_mute = 100
+        self.master_muted = False
+        self.master_volume_before_mute = 100
 
         # DMX placeholder channels (v23.0.0)
         self.dmx_channels = [tk.IntVar(value=0) for _ in range(8)]
@@ -1330,6 +1332,10 @@ class PixelChallengeConsole:
         """Master volume scales all three channels (MUSIC, SFX, VOICE) together."""
         master_vol = int(float(value))
         self.master_volume.set(master_vol)
+        if master_vol > 0:
+            self.master_muted = False
+            self.master_volume_before_mute = master_vol
+            self.update_master_mute_button()
         master = master_vol / 100.0
         # Apply to currently-playing music immediately
         try:
@@ -1419,6 +1425,37 @@ class PixelChallengeConsole:
                 self.voice_mute_btn.configure(text="MUTED", bg="#c93b1e", activebackground="#c93b1e")
             else:
                 self.voice_mute_btn.configure(text="MUTE", bg="#27a844", activebackground="#27a844")
+
+    def toggle_master_mute(self):
+        if self.master_muted:
+            self.master_muted = False
+            self.master_volume.set(self.master_volume_before_mute)
+            # Immediately apply restored master volume to playing music
+            master = self.master_volume_before_mute / 100.0
+            try:
+                if pygame.mixer.get_init() and pygame.mixer.music.get_busy():
+                    pygame.mixer.music.set_volume((self.music_volume.get() / 100.0) * master)
+            except Exception:
+                pass
+        else:
+            if self.master_volume.get() > 0:
+                self.master_volume_before_mute = self.master_volume.get()
+            self.master_muted = True
+            self.master_volume.set(0)
+            try:
+                if pygame.mixer.get_init() and pygame.mixer.music.get_busy():
+                    pygame.mixer.music.set_volume(0.0)
+            except Exception:
+                pass
+        self.update_master_mute_button()
+        self.save_settings()
+
+    def update_master_mute_button(self):
+        if hasattr(self, 'master_mute_btn'):
+            if self.master_muted:
+                self.master_mute_btn.configure(text="MUTED", bg="#c93b1e", activebackground="#c93b1e")
+            else:
+                self.master_mute_btn.configure(text="MUTE", bg="#27a844", activebackground="#27a844")
 
     def on_theme_checked(self):
         self.selected_themes = {name for name, var in self.theme_vars.items() if var.get()}
@@ -1819,6 +1856,15 @@ class PixelChallengeConsole:
                     self.record_score_history(result)
                     payload = self.build_scoreboard_payload(result, title="Final Results")
                     self.show_scoreboard_temporarily(seconds=30, payload=payload, final=True)
+                else:
+                    # No result — restore auto_enabled now since finish_results_screen
+                    # will never fire (show_scoreboard_temporarily was not called).
+                    if self.animate_was_enabled_before_game:
+                        self.animate_was_enabled_before_game = False
+                        self.auto_enabled.set(True)
+                        self.update_auto_button()
+                        self.log("Animate restored (no result scoreboard).")
+                    self.show_selected_game_splash()
                 self.set_state(HostState.RESULTS_READY, "Game complete")
                 self.session_started = False
                 self.game_tick_active = False
@@ -2670,10 +2716,18 @@ class PixelChallengeConsole:
                  length=130, command=self.on_master_volume_changed).pack()
         tk.Label(master_col, text="MASTER", bg="#17071f", fg="#ffd74f",
                  font=("Arial", 11, "bold")).pack()
+        self.master_mute_btn = tk.Button(master_col, text="MUTE",
+                                         command=self.toggle_master_mute,
+                                         bg="#27a844", fg="white",
+                                         activebackground="#27a844", activeforeground="white",
+                                         relief="raised", bd=2, font=("Arial", 9, "bold"),
+                                         padx=4, pady=1, cursor="hand2")
+        self.master_mute_btn.pack(pady=(2, 0))
 
         self.update_music_mute_button()
         self.update_sfx_mute_button()
         self.update_voice_mute_button()
+        self.update_master_mute_button()
 
     def build_log_area(self, parent):
         """Build the log/info window spanning the full width below content. (v23.0.0)"""
