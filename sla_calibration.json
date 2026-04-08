@@ -1,8 +1,8 @@
 {
   "version": 1,
   "dot_dash": {
-    "sample_count": 128,
-    "last_calibrated": 1775352533.579187,
+    "sample_count": 130,
+    "last_calibrated": 1775595849.4357386,
     "reaction_times_ms": [
       556.0,
       494.0,
@@ -130,7 +130,9 @@
       160.0,
       1271.0,
       129.0,
-      500.0
+      500.0,
+      749.0,
+      425.0
     ],
     "accuracies": [
       0.93,
@@ -260,13 +262,15 @@
       0.91,
       0.93,
       0.98,
-      0.99
+      0.99,
+      1.0,
+      1.0
     ],
     "thresholds": {
       "reaction_expert_ms": 50.6,
       "reaction_beginner_ms": 904.8000000000003,
       "accuracy_expert": 1.0,
-      "accuracy_beginner": 0.84
+      "accuracy_beginner": 0.849
     },
     "defaults": {
       "reaction_expert_ms": 150,
@@ -276,8 +280,8 @@
     }
   },
   "pixel_pop": {
-    "sample_count": 137,
-    "last_calibrated": 1775352343.7999854,
+    "sample_count": 142,
+    "last_calibrated": 1775608374.1140919,
     "reaction_times_ms": [],
     "accuracies": [
       0.211,
@@ -416,13 +420,18 @@
       0.095,
       0.923,
       0.333,
-      0.111
+      0.111,
+      0.167,
+      0.667,
+      0.526,
+      1.0,
+      0.0
     ],
     "thresholds": {
       "reaction_expert_ms": 300,
       "reaction_beginner_ms": 1000,
-      "accuracy_expert": 0.9236000000000001,
-      "accuracy_beginner": 0.02
+      "accuracy_expert": 0.9233000000000001,
+      "accuracy_beginner": 0.023600000000000003
     },
     "defaults": {
       "reaction_expert_ms": 300,

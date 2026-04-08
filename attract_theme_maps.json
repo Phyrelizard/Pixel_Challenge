@@ -12,31 +12,23 @@
     "Lane Chase LR": 8,
     "Ice Burst": 8,
     "Galaxy Wave": 10,
-    "Lane Chase RL": 7
+    "Lane Chase RL": 3
   },
   "selected_themes": [
-    "Color Wash",
-    "Rainbow Pulse",
-    "Lane Chase LR",
-    "Bounce Chase",
-    "Galaxy Wave",
-    "Calm Mode",
-    "Lane Chase RL",
-    "Team Colors",
-    "Ice Burst"
+    "Lane Chase RL"
   ],
-  "sash_left_attract_bottom": 809,
+  "sash_left_attract_bottom": 818,
   "sash_center_ctrl": 997,
   "sash_main_info": 504,
-  "sash_bottom_log": 590,
-  "sash_center_mixer": 549,
+  "sash_bottom_log": 565,
+  "sash_center_mixer": 552,
   "sash_mixer_height": null,
-  "falcon_brightness": 8,
+  "falcon_brightness": 32,
   "gameplay_brightness": 22,
-  "music_volume": 9,
-  "sfx_volume": 56,
-  "voice_volume": 63,
-  "master_volume": 44,
+  "music_volume": 0,
+  "sfx_volume": 35,
+  "voice_volume": 39,
+  "master_volume": 30,
   "falcon_ip": "192.168.2.25",
   "wifi_dhcp": true,
   "wifi_ssid": "skynet",
@@ -54,5 +46,6 @@
   "apply_reboot": true,
   "debug_logging": false,
   "setup_geometry": "1920x998+1920+52",
-  "game_mode": 1
+  "game_mode": 1,
+  "window_geometry": "1920x992+1920+52"
 }
