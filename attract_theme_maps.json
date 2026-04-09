@@ -15,20 +15,22 @@
     "Lane Chase RL": 3
   },
   "selected_themes": [
-    "Lane Chase RL"
+    "Calm Mode",
+    "Rainbow Pulse",
+    "Ice Burst"
   ],
   "sash_left_attract_bottom": 818,
   "sash_center_ctrl": 997,
   "sash_main_info": 504,
-  "sash_bottom_log": 565,
-  "sash_center_mixer": 552,
+  "sash_bottom_log": 544,
+  "sash_center_mixer": 589,
   "sash_mixer_height": null,
-  "falcon_brightness": 32,
+  "falcon_brightness": 13,
   "gameplay_brightness": 22,
-  "music_volume": 0,
+  "music_volume": 9,
   "sfx_volume": 35,
   "voice_volume": 39,
-  "master_volume": 30,
+  "master_volume": 16,
   "falcon_ip": "192.168.2.25",
   "wifi_dhcp": true,
   "wifi_ssid": "skynet",

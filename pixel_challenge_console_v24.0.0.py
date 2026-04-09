@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v22.8.3
+Pixel Challenge Host Console v24.0.0
 
 """
 
@@ -26,7 +26,7 @@ from games.base import PlayerConfig
 # SLA System (v21.8.0)
 from sla import SLAStore, SLACalibration
 
-VERSION_LABEL = "v22.8.3"
+VERSION_LABEL = "v24.0.0"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 DEFAULT_FALCON_IP = "192.168.2.113"
@@ -431,10 +431,12 @@ class PixelChallengeConsole:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title(f"Pixel Challenge Host Console {VERSION_LABEL}")
-        self.root.geometry("1600x900+2020+80")
-        self.root.minsize(1280, 720)
         self.root.configure(bg="#12061f")
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+
+        self.window_geometry = None
+        self.root.geometry("1600x900+2020+80")
+        self.root.minsize(1280, 720)
 
         self.root.grid_rowconfigure(0, weight=0)
         self.root.grid_rowconfigure(1, weight=1)
@@ -455,6 +457,29 @@ class PixelChallengeConsole:
 
         self.theme_brightness_percent = tk.IntVar(value=100)
         self.gameplay_brightness_percent = tk.IntVar(value=100)
+        self.music_volume = tk.IntVar(value=50)
+        self.sfx_volume = tk.IntVar(value=100)
+        self.voice_volume = tk.IntVar(value=100)
+        self.master_volume = tk.IntVar(value=100)
+        self.music_muted = False
+        self.music_volume_before_mute = 50
+        self.sfx_muted = False
+        self.sfx_volume_before_mute = 100
+        self.voice_muted = False
+        self.voice_volume_before_mute = 100
+        self.master_muted = False
+        self.master_volume_before_mute = 100
+
+        # DMX placeholder channels (v23.0.0)
+        self.dmx_channels = [tk.IntVar(value=0) for _ in range(8)]
+
+        # DMX placeholder state (v24.0.0)
+        self.dmx_bank = tk.IntVar(value=1)
+        self.dmx_link_all = tk.BooleanVar(value=True)
+        self.dmx_scene = tk.StringVar(value="Cool Blue Static")
+        self.dmx_speed = tk.IntVar(value=50)
+        self.dmx_brightness = tk.IntVar(value=80)
+        self.dmx_mode = tk.StringVar(value="auto")  # blackout, gameplay, results, wash, test, manual
 
         self.checkin_open = False
         self.players_confirmed = False
@@ -532,10 +557,12 @@ class PixelChallengeConsole:
         self.info_lines = ["P1 | U1/U2", "P2 | U3/U4", "P3 | U5/U6", "P4 | U7/U8", "Host boot complete."]
 
         self.falcon_ip = DEFAULT_FALCON_IP
+        self.wifi_dhcp = tk.BooleanVar(value=True)
         self.wifi_ssid = tk.StringVar(value="")
         self.wifi_psk = tk.StringVar(value="")
         self.wifi_static_ip = tk.StringVar(value="")
         self.wifi_gateway = tk.StringVar(value="")
+        self.eth_dhcp = tk.BooleanVar(value=False)
         self.eth_static_ip = tk.StringVar(value="")
         self.eth_gateway = tk.StringVar(value="")
         self.dns_server = tk.StringVar(value="8.8.8.8")
@@ -562,6 +589,8 @@ class PixelChallengeConsole:
         self.sash_center_ctrl = None
         self.sash_main_info = None
         self.sash_bottom_log = None
+        self.sash_center_mixer = None
+        self.sash_mixer_height = None
 
         self.load_settings()
         self.write_startup_log()
@@ -581,7 +610,14 @@ class PixelChallengeConsole:
 
         self.apply_brightness_for_state()
 
+        # Restore saved window geometry (must happen before build_ui)
+        if self.window_geometry:
+            self.root.geometry(self.window_geometry)
+
         self.build_ui()
+
+        # Save window geometry when moved/resized
+        self.root.bind("<Configure>", self._on_window_configure)
 
         # --- Apply loaded settings to UI widgets (must happen AFTER build_ui) ---
         # Restore theme checkbox states from saved selected_themes
@@ -707,13 +743,23 @@ class PixelChallengeConsole:
             self.sash_center_ctrl = data.get("sash_center_ctrl")
             self.sash_main_info = data.get("sash_main_info")
             self.sash_bottom_log = data.get("sash_bottom_log")
+            self.sash_center_mixer = data.get("sash_center_mixer")
+            self.sash_mixer_height = data.get("sash_mixer_height")
             self.theme_brightness_percent.set(int(data.get("falcon_brightness", 100)))
             self.gameplay_brightness_percent.set(int(data.get("gameplay_brightness", 100)))
+            self.music_volume.set(int(data.get("music_volume", 50)))
+            self.sfx_volume.set(int(data.get("sfx_volume", 100)))
+            self.voice_volume.set(int(data.get("voice_volume", 100)))
+            self.master_volume.set(int(data.get("master_volume", 100)))
             self.falcon_ip = data.get("falcon_ip", DEFAULT_FALCON_IP)
+            self.wifi_dhcp.set(bool(data.get("wifi_dhcp", True)))
             self.wifi_ssid.set(data.get("wifi_ssid", ""))
             self.wifi_psk.set(data.get("wifi_psk", ""))
             self.wifi_static_ip.set(data.get("wifi_static_ip", ""))
             self.wifi_gateway.set(data.get("wifi_gateway", ""))
+            self.eth_dhcp.set(bool(data.get("eth_dhcp", False)))
+            self.eth_static_ip.set(data.get("eth_static_ip", ""))
+            self.eth_gateway.set(data.get("eth_gateway", ""))
             self.eth_static_ip.set(data.get("eth_static_ip", ""))
             self.eth_gateway.set(data.get("eth_gateway", ""))
             self.dns_server.set(data.get("dns_server", "8.8.8.8"))
@@ -725,6 +771,7 @@ class PixelChallengeConsole:
             self.debug_logging.set(bool(data.get("debug_logging", False)))
             self.setup_geometry = data.get("setup_geometry")
             self.game_mode.set(int(data.get("game_mode", 1)))
+            self.window_geometry = data.get("window_geometry")
         except Exception:
             pass
 
@@ -739,13 +786,21 @@ class PixelChallengeConsole:
             "sash_center_ctrl": self.sash_center_ctrl,
             "sash_main_info": self.sash_main_info,
             "sash_bottom_log": self.sash_bottom_log,
+            "sash_center_mixer": self.sash_center_mixer,
+            "sash_mixer_height": self.sash_mixer_height,
             "falcon_brightness": int(self.theme_brightness_percent.get()),
             "gameplay_brightness": int(self.gameplay_brightness_percent.get()),
+            "music_volume": int(self.music_volume.get()),
+            "sfx_volume": int(self.sfx_volume.get()),
+            "voice_volume": int(self.voice_volume.get()),
+            "master_volume": int(self.master_volume.get()),
             "falcon_ip": self.falcon_ip,
+            "wifi_dhcp": bool(self.wifi_dhcp.get()),
             "wifi_ssid": self.wifi_ssid.get(),
             "wifi_psk": self.wifi_psk.get(),
             "wifi_static_ip": self.wifi_static_ip.get(),
             "wifi_gateway": self.wifi_gateway.get(),
+            "eth_dhcp": bool(self.eth_dhcp.get()),
             "eth_static_ip": self.eth_static_ip.get(),
             "eth_gateway": self.eth_gateway.get(),
             "dns_server": self.dns_server.get(),
@@ -757,6 +812,7 @@ class PixelChallengeConsole:
             "debug_logging": bool(self.debug_logging.get()),
             "setup_geometry": self.setup_geometry,
             "game_mode": int(self.game_mode.get()),
+            "window_geometry": self.root.geometry(),
         }
         try:
             with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
@@ -878,18 +934,28 @@ class PixelChallengeConsole:
                 self.log(f"[AUDIO] File not found: {path}")
             return
         
+
         try:
             # Use pygame mixer for sound playback
             if not pygame.mixer.get_init():
                 pygame.mixer.init()
+                pygame.mixer.set_num_channels(16)
+            
+            master = max(0, min(100, self.master_volume.get())) / 100.0
             
             # Check if this is background music (should loop)
             if "music" in sound_key:
                 pygame.mixer.music.load(path)
-                pygame.mixer.music.set_volume(0.5)
+                pygame.mixer.music.set_volume((self.music_volume.get() / 100.0) * master)
                 pygame.mixer.music.play(-1)  # -1 = loop forever
+            elif "voice" in sound_key or "screen_" in sound_key:
+                # Voice prompts & screen transition audio use VOICE volume (v22.14.0)
+                sound = pygame.mixer.Sound(path)
+                sound.set_volume((self.voice_volume.get() / 100.0) * master)
+                sound.play()
             else:
                 sound = pygame.mixer.Sound(path)
+                sound.set_volume((self.sfx_volume.get() / 100.0) * master)
                 sound.play()
                 
         except Exception as e:
@@ -1102,17 +1168,20 @@ class PixelChallengeConsole:
         self.viewer_return_after_id = self.root.after(int(seconds * 1000), self.finish_results_screen)
 
     def finish_results_screen(self):
-        # Restore AUTO state saved before game started
+        self._restore_attract_if_needed()
+        self.final_results_active = False
+        self.show_selected_game_splash()
+        # Re-kick attract if AUTO is on
+        if self.auto_enabled.get():
+            self.attract.start_theme(self, self.current_theme_name())
+
+    def _restore_attract_if_needed(self):
+        """Restore AUTO attract state that was saved before game started."""
         if self.animate_was_enabled_before_game:
             self.animate_was_enabled_before_game = False
             self.auto_enabled.set(True)
             self.update_auto_button()
             self.log("Animate restored after game.")
-        self.final_results_active = False
-        self.show_selected_game_splash()
-        # Always re-kick attract if AUTO is on - do not gate on the flag
-        if self.auto_enabled.get():
-            self.attract.start_theme(self, self.current_theme_name())
 
     # =========================================================================
     # THEME HELPERS
@@ -1256,6 +1325,159 @@ class PixelChallengeConsole:
             self.falcon.set_brightness(pct)
         self.save_settings()
 
+    def on_music_volume_changed(self, value):
+        vol = int(float(value))
+        self.music_volume.set(vol)
+        if vol > 0:
+            self.music_muted = False
+            self.music_volume_before_mute = vol
+            self.update_music_mute_button()
+        master = max(0, min(100, self.master_volume.get())) / 100.0
+        try:
+            if pygame.mixer.get_init() and pygame.mixer.music.get_busy():
+                pygame.mixer.music.set_volume((vol / 100.0) * master)
+        except Exception:
+            pass
+        self.save_settings()
+
+    def on_sfx_volume_changed(self, value):
+        vol = int(float(value))
+        self.sfx_volume.set(vol)
+        if vol > 0:
+            self.sfx_muted = False
+            self.sfx_volume_before_mute = vol
+            self.update_sfx_mute_button()
+        self.save_settings()
+
+    def on_master_volume_changed(self, value):
+        """Master volume scales all three channels (MUSIC, SFX, VOICE) together."""
+        master_vol = int(float(value))
+        self.master_volume.set(master_vol)
+        if master_vol > 0:
+            self.master_muted = False
+            self.master_volume_before_mute = master_vol
+            self.update_master_mute_button()
+        master = master_vol / 100.0
+        # Apply to currently-playing music immediately
+        try:
+            if pygame.mixer.get_init() and pygame.mixer.music.get_busy():
+                pygame.mixer.music.set_volume((self.music_volume.get() / 100.0) * master)
+        except Exception:
+            pass
+        self.save_settings()
+
+    def toggle_music_mute(self):
+        if self.music_muted:
+            # Unmute — restore remembered volume
+            self.music_muted = False
+            self.music_volume.set(self.music_volume_before_mute)
+            master = max(0, min(100, self.master_volume.get())) / 100.0
+            try:
+                if pygame.mixer.get_init() and pygame.mixer.music.get_busy():
+                    pygame.mixer.music.set_volume((self.music_volume_before_mute / 100.0) * master)
+            except Exception:
+                pass
+        else:
+            # Mute — remember current volume, set to 0
+            if self.music_volume.get() > 0:
+                self.music_volume_before_mute = self.music_volume.get()
+            self.music_muted = True
+            self.music_volume.set(0)
+            try:
+                if pygame.mixer.get_init() and pygame.mixer.music.get_busy():
+                    pygame.mixer.music.set_volume(0.0)
+            except Exception:
+                pass
+        self.update_music_mute_button()
+        self.save_settings()
+
+    def toggle_sfx_mute(self):
+        if self.sfx_muted:
+            # Unmute — restore remembered volume
+            self.sfx_muted = False
+            self.sfx_volume.set(self.sfx_volume_before_mute)
+        else:
+            # Mute — remember current volume, set to 0
+            if self.sfx_volume.get() > 0:
+                self.sfx_volume_before_mute = self.sfx_volume.get()
+            self.sfx_muted = True
+            self.sfx_volume.set(0)
+        self.update_sfx_mute_button()
+        self.save_settings()
+
+    def update_music_mute_button(self):
+        if hasattr(self, 'music_mute_btn'):
+            if self.music_muted:
+                self.music_mute_btn.configure(text="MUTED", bg="#c93b1e", activebackground="#c93b1e")
+            else:
+                self.music_mute_btn.configure(text="MUTE", bg="#27a844", activebackground="#27a844")
+
+    def update_sfx_mute_button(self):
+        if hasattr(self, 'sfx_mute_btn'):
+            if self.sfx_muted:
+                self.sfx_mute_btn.configure(text="MUTED", bg="#c93b1e", activebackground="#c93b1e")
+            else:
+                self.sfx_mute_btn.configure(text="MUTE", bg="#27a844", activebackground="#27a844")
+
+    def on_voice_volume_changed(self, value):
+        vol = int(float(value))
+        self.voice_volume.set(vol)
+        if vol > 0:
+            self.voice_muted = False
+            self.voice_volume_before_mute = vol
+            self.update_voice_mute_button()
+        self.save_settings()
+
+    def toggle_voice_mute(self):
+        if self.voice_muted:
+            self.voice_muted = False
+            self.voice_volume.set(self.voice_volume_before_mute)
+        else:
+            if self.voice_volume.get() > 0:
+                self.voice_volume_before_mute = self.voice_volume.get()
+            self.voice_muted = True
+            self.voice_volume.set(0)
+        self.update_voice_mute_button()
+        self.save_settings()
+
+    def update_voice_mute_button(self):
+        if hasattr(self, 'voice_mute_btn'):
+            if self.voice_muted:
+                self.voice_mute_btn.configure(text="MUTED", bg="#c93b1e", activebackground="#c93b1e")
+            else:
+                self.voice_mute_btn.configure(text="MUTE", bg="#27a844", activebackground="#27a844")
+
+    def toggle_master_mute(self):
+        if self.master_muted:
+            self.master_muted = False
+            self.master_volume.set(self.master_volume_before_mute)
+            # Immediately apply restored master volume to playing music
+            master = self.master_volume_before_mute / 100.0
+            try:
+                if pygame.mixer.get_init() and pygame.mixer.music.get_busy():
+                    pygame.mixer.music.set_volume((self.music_volume.get() / 100.0) * master)
+            except Exception:
+                pass
+        else:
+            if self.master_volume.get() > 0:
+                self.master_volume_before_mute = self.master_volume.get()
+            self.master_muted = True
+            self.master_volume.set(0)
+            try:
+                if pygame.mixer.get_init() and pygame.mixer.music.get_busy():
+                    pygame.mixer.music.set_volume(0.0)
+            except Exception:
+                pass
+        self.update_master_mute_button()
+        self.save_settings()
+
+    def update_master_mute_button(self):
+        if hasattr(self, 'master_mute_btn'):
+            if self.master_muted:
+                self.master_mute_btn.configure(text="MUTED", bg="#c93b1e", activebackground="#c93b1e")
+            else:
+                self.master_mute_btn.configure(text="MUTE", bg="#27a844", activebackground="#27a844")
+
     def on_theme_checked(self):
         self.selected_themes = {name for name, var in self.theme_vars.items() if var.get()}
         self.save_settings()
@@ -1286,11 +1508,18 @@ class PixelChallengeConsole:
 
     # =========================================================================
     # JOYSTICK / CONTROLLER METHODS
+    #
+    #. Make sure your audio files are 44100 Hz / 16-bit. If your WAV/OGG files
+    # are at a different sample rate (like 48000), pygame has to resample on-the-fly,
+    #  which adds CPU load and can cause glitches.
+    #
     # =========================================================================
     def init_joysticks(self):
         try:
+            pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=4096)
             pygame.init()
             pygame.joystick.init()
+            pygame.mixer.set_num_channels(16)
         except Exception as e:
             self.log(f"pygame init failed: {e}")
             return
@@ -1648,11 +1877,17 @@ class PixelChallengeConsole:
                     self.record_score_history(result)
                     payload = self.build_scoreboard_payload(result, title="Final Results")
                     self.show_scoreboard_temporarily(seconds=30, payload=payload, final=True)
+                else:
+                    # No result — restore auto_enabled now since finish_results_screen
+                    # will never fire (show_scoreboard_temporarily was not called).
+                    self._restore_attract_if_needed()
+                    self.show_selected_game_splash()
                 self.set_state(HostState.RESULTS_READY, "Game complete")
                 self.session_started = False
                 self.game_tick_active = False
-                # Start animation immediately - it will persist until new game selected
-                self.root.after(500, lambda: self.attract.start_theme(self, self.current_theme_name()))
+                # Re-kick attract if AUTO is on (or was just restored)
+                if self.auto_enabled.get() or self.final_results_active:
+                    self.root.after(500, lambda: self.attract.start_theme(self, self.current_theme_name()))
                 return
         except Exception as e:
             self.log(f"Game tick error: {e}")
@@ -1787,9 +2022,7 @@ class PixelChallengeConsole:
             self.log("Failed to start game!")
             self.set_state(HostState.IDLE, "Failed to start game")
             self.attract.start_theme(self, self.current_theme_name())
-            if self.animate_was_enabled_before_game:
-                self.auto_enabled.set(True)
-                self.update_auto_button()
+            self._restore_attract_if_needed()
             self.pending_players = []
             return
         
@@ -1894,10 +2127,7 @@ class PixelChallengeConsole:
         self.show_selected_game_splash()
         
         # Restore animate if it was on before
-        if self.animate_was_enabled_before_game:
-            self.auto_enabled.set(True)
-            self.update_auto_button()
-            self.log("Animate restored.")
+        self._restore_attract_if_needed()
         
         self.refresh_player_status_panel()
         self.refresh_controller_panel()
@@ -2101,7 +2331,7 @@ class PixelChallengeConsole:
     # REDEEM POINTS
     # =========================================================================
     def on_redeem_points(self):
-        if not messagebox.askyesno("Redeem Points", "Clear session?"):
+        if not messagebox.askyesno("Redeem / Reset", "Redeem and clear session?"):
             return
         self.cancel_viewer_return()
         self.players_joined.set(0)
@@ -2135,74 +2365,87 @@ class PixelChallengeConsole:
 
     def build_ui(self):
         self.build_top_bar()
-        
+
         # Main container below top bar
         main_container = tk.Frame(self.root, bg="#12061f")
         main_container.grid(row=1, column=0, sticky="nsew")
         main_container.grid_rowconfigure(0, weight=1)
-        main_container.grid_columnconfigure(0, weight=0)  # Left column (attract) - fixed width initially
-        main_container.grid_columnconfigure(1, weight=1)  # Right column (center + controllers + info)
-        
-        # LEFT SIDE: Attract mode with its own vertical paned window
+        main_container.grid_columnconfigure(0, weight=0)
+        main_container.grid_columnconfigure(1, weight=1)
+
+        # LEFT SIDE: Attract mode with its own vertical paned window (unchanged)
         self.left_vertical = tk.PanedWindow(main_container, orient="vertical", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
         self.left_vertical.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
-        
-        # Attract container (top of left side)
+
         self.attract_container = tk.Frame(self.left_vertical, bg="#12061f")
         self.left_vertical.add(self.attract_container, minsize=300)
-        
-        # Left bottom filler (below attract, can be empty or used later)
+
         left_bottom_filler = tk.Frame(self.left_vertical, bg="#12061f")
         self.left_vertical.add(left_bottom_filler, minsize=50)
-        
-        # RIGHT SIDE: Everything else in a horizontal+vertical structure
-        right_container = tk.Frame(main_container, bg="#12061f")
-        right_container.grid(row=0, column=1, sticky="nsew")
-        right_container.grid_rowconfigure(0, weight=1)
-        right_container.grid_columnconfigure(0, weight=1)
-        
-        # Right side vertical split (top: center+controllers, bottom: info)
-        self.right_vertical = tk.PanedWindow(right_container, orient="vertical", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
-        self.right_vertical.pack(fill="both", expand=True)
-        
-        # Top part of right side: center + controllers (horizontal split)
-        right_top_frame = tk.Frame(self.right_vertical, bg="#12061f")
-        self.right_vertical.add(right_top_frame, minsize=MIN_MAIN_HEIGHT)
-        
-        self.right_horizontal = tk.PanedWindow(right_top_frame, orient="horizontal", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
-        self.right_horizontal.pack(fill="both", expand=True)
-        
-        self.center_container = tk.Frame(self.right_horizontal, bg="#12061f")
-        self.right_horizontal.add(self.center_container, minsize=MIN_CENTER)
-        
-        self.controllers_container = tk.Frame(self.right_horizontal, bg="#12061f")
-        self.right_horizontal.add(self.controllers_container, minsize=MIN_CONTROLLERS)
-        
-        # Bottom part of right side: info panel
-        self.bottom_container = tk.Frame(self.right_vertical, bg="#12061f")
-        self.right_vertical.add(self.bottom_container, minsize=MIN_INFO_HEIGHT)
-        
-        # Horizontal paned window between left and right (for adjusting attract width)
-        # We need to restructure to allow this - let me use a different approach
-        
+
+        # RIGHT SIDE: vertical paned — upper row (top) | lower row (bottom) | buttons (fixed)
+        right_outer = tk.Frame(main_container, bg="#12061f")
+        right_outer.grid(row=0, column=1, sticky="nsew")
+        right_outer.grid_rowconfigure(0, weight=1)
+        right_outer.grid_rowconfigure(1, weight=0)
+        right_outer.grid_columnconfigure(0, weight=1)
+
+        # Vertical paned window: upper content row | lower row
+        self.main_vertical = tk.PanedWindow(right_outer, orient="vertical", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
+        self.main_vertical.grid(row=0, column=0, sticky="nsew")
+
+        # UPPER ROW: horizontal PanedWindow — DMX | Player Status | Controllers
+        self.content_paned = tk.PanedWindow(self.main_vertical, orient="horizontal", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
+        self.main_vertical.add(self.content_paned, minsize=300)
+
+        # Pane 1: DMX CONTROL
+        self.dmx_container = tk.Frame(self.content_paned, bg="#12061f")
+        self.content_paned.add(self.dmx_container, minsize=300)
+
+        # Pane 2: PLAYER STATUS
+        self.center_container = tk.Frame(self.content_paned, bg="#12061f")
+        self.content_paned.add(self.center_container, minsize=400)
+
+        # Pane 3: CONTROLLERS
+        self.controllers_container = tk.Frame(self.content_paned, bg="#12061f")
+        self.content_paned.add(self.controllers_container, minsize=MIN_CONTROLLERS)
+
+        # LOWER ROW: horizontal PanedWindow — Audio Mixer (left) | Info/Log (right)
+        self.lower_paned = tk.PanedWindow(self.main_vertical, orient="horizontal", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
+        self.main_vertical.add(self.lower_paned, minsize=MIN_INFO_HEIGHT)
+
+        self.audio_container = tk.Frame(self.lower_paned, bg="#12061f")
+        self.lower_paned.add(self.audio_container, minsize=200)
+
+        self.log_container = tk.Frame(self.lower_paned, bg="#12061f")
+        self.lower_paned.add(self.log_container, minsize=MIN_LOG_WIDTH)
+
+        # Button row (fixed at bottom below main_vertical, not in paned window)
+        self.bottom_container = tk.Frame(right_outer, bg="#12061f")
+        self.bottom_container.grid(row=1, column=0, sticky="ew")
+
         # Build all the areas
         self.build_attract_area(self.attract_container)
         self.build_center_area(self.center_container)
+        self.build_dmx_area(self.dmx_container)
         self.build_controllers_area(self.controllers_container)
-        self.build_bottom_area(self.bottom_container)
-        
+        self.build_audio_area(self.audio_container)
+        self.build_log_area(self.log_container)
+        self.build_button_row(self.bottom_container)
+
         self.restore_sashes()
-        
+
         # Bind sash movements
         self.left_vertical.bind("<ButtonRelease-1>", self.save_sash_positions)
-        self.right_vertical.bind("<ButtonRelease-1>", self.save_sash_positions)
-        self.right_horizontal.bind("<ButtonRelease-1>", self.save_sash_positions)
-
+        self.main_vertical.bind("<ButtonRelease-1>", self.save_sash_positions)
+        self.content_paned.bind("<ButtonRelease-1>", self.save_sash_positions)
+        self.lower_paned.bind("<ButtonRelease-1>", self.save_sash_positions)
 
     def restore_sashes(self):
         self.root.update_idletasks()
         total_h = max(1, self.root.winfo_height())
-        
+        total_w = max(1, self.root.winfo_width())
+
         # Left vertical (attract mode bottom edge)
         try:
             if self.sash_left_attract_bottom:
@@ -2211,29 +2454,38 @@ class PixelChallengeConsole:
                 self.left_vertical.sash_place(0, 0, total_h - 200)
         except Exception:
             pass
-        
-        # Right vertical (info panel top edge)
+
+        # Main vertical (upper content | lower row split)
         try:
-            if self.sash_main_info:
-                self.right_vertical.sash_place(0, 0, int(self.sash_main_info))
-            else:
-                self.right_vertical.sash_place(0, 0, total_h - MIN_INFO_HEIGHT - 100)
+            if self.sash_bottom_log and hasattr(self, 'main_vertical'):
+                self.main_vertical.sash_place(0, 0, int(self.sash_bottom_log))
+            elif hasattr(self, 'main_vertical'):
+                self.main_vertical.sash_place(0, 0, max(300, total_h - MIN_INFO_HEIGHT - 80))
         except Exception:
             pass
-        
-        # Right horizontal (center vs controllers)
+
+        # Content paned sash 0: DMX | PLAYER
         try:
-            if self.sash_center_ctrl:
-                self.right_horizontal.sash_place(0, int(self.sash_center_ctrl), 0)
-            else:
-                self.right_horizontal.sash_place(0, MIN_CENTER, 0)
+            if self.sash_center_mixer and hasattr(self, 'content_paned'):
+                self.content_paned.sash_place(0, int(self.sash_center_mixer), 0)
+            elif hasattr(self, 'content_paned'):
+                self.content_paned.sash_place(0, 320, 0)
         except Exception:
             pass
-        
-        # Bottom log panel left edge
+
+        # Content paned sash 1: PLAYER | CONTROLLERS
         try:
-            if self.sash_bottom_log and hasattr(self, 'bottom_paned'):
-                self.bottom_paned.sash_place(0, int(self.sash_bottom_log), 0)
+            if self.sash_center_ctrl and hasattr(self, 'content_paned'):
+                self.content_paned.sash_place(1, int(self.sash_center_ctrl), 0)
+            elif hasattr(self, 'content_paned'):
+                self.content_paned.sash_place(1, max(720, total_w - MIN_CONTROLLERS - 100), 0)
+        except Exception:
+            pass
+
+        # Lower paned sash: AUDIO | LOG (50/50 split)
+        try:
+            if hasattr(self, 'lower_paned'):
+                self.lower_paned.sash_place(0, max(200, (total_w - 340) // 2), 0)
         except Exception:
             pass
 
@@ -2244,18 +2496,14 @@ class PixelChallengeConsole:
         except Exception:
             pass
         try:
-            if hasattr(self, 'right_vertical'):
-                self.sash_main_info = self.right_vertical.sash_coord(0)[1]
+            if hasattr(self, 'main_vertical'):
+                self.sash_bottom_log = self.main_vertical.sash_coord(0)[1]
         except Exception:
             pass
         try:
-            if hasattr(self, 'right_horizontal'):
-                self.sash_center_ctrl = self.right_horizontal.sash_coord(0)[0]
-        except Exception:
-            pass
-        try:
-            if hasattr(self, 'bottom_paned'):
-                self.sash_bottom_log = self.bottom_paned.sash_coord(0)[0]
+            if hasattr(self, 'content_paned'):
+                self.sash_center_mixer = self.content_paned.sash_coord(0)[0]
+                self.sash_center_ctrl = self.content_paned.sash_coord(1)[0]
         except Exception:
             pass
         self.save_settings()
@@ -2344,23 +2592,37 @@ class PixelChallengeConsole:
         self.theme_select_box.bind("<<ListboxSelect>>", self.on_theme_selected)
 
     def build_center_area(self, parent):
-        parent.grid_rowconfigure(2, weight=1)
+        parent.grid_rowconfigure(3, weight=1)
         parent.grid_columnconfigure(0, weight=1)
-        enroll_panel, enroll_body = self.panel(parent, "")
-        enroll_panel.grid(row=0, column=0, sticky="ew", pady=(0, 10))
-        self.checkin_button = self.neon_button(enroll_body, "PLAYER CHECK-IN", self.on_player_checkin, bg="#1b63ff")
-        self.checkin_button.pack(fill="x", pady=(4, 16))
-        joined_row = tk.Frame(enroll_body, bg="#17071f")
-        joined_row.pack(fill="x", pady=(0, 10))
-        tk.Label(joined_row, text="PLAYERS JOINED:", bg="#17071f", fg="#ffd74f", font=("Arial", 26, "bold")).pack(side="left")
-        tk.Label(joined_row, textvariable=self.players_joined, bg="#24101f", fg="#ffd74f", font=("Arial", 28, "bold"), width=3).pack(side="right")
-        self.neon_button(enroll_body, "CONFIRM PLAYERS", self.on_confirm_players, bg="#1b63ff").pack(fill="x")
+
+        # Row 0: PLAYER STATUS (2×2 grid) — on top
         status_panel, status_body = self.panel(parent, "PLAYER STATUS")
-        status_panel.grid(row=1, column=0, sticky="ew")
-        status_body.grid_columnconfigure((0, 1, 2, 3), weight=1)
+        status_panel.grid(row=0, column=0, sticky="ew", pady=(0, 6))
+        status_body.grid_columnconfigure((0, 1), weight=1)
+        status_body.grid_rowconfigure((0, 1), weight=1)
         self.status_body = status_body
+
+        # Row 1: CHECK-IN | CONFIRM buttons
+        enroll_panel, enroll_body = self.panel(parent, "")
+        enroll_panel.grid(row=1, column=0, sticky="ew", pady=(0, 4))
+        checkin_row = tk.Frame(enroll_body, bg="#17071f")
+        checkin_row.pack(fill="x", pady=(4, 4))
+        checkin_row.grid_columnconfigure(1, weight=1)
+        self.checkin_button = self.neon_button(checkin_row, "CHECK-IN", self.on_player_checkin, bg="#1b63ff", width=12)
+        self.checkin_button.grid(row=0, column=0, sticky="w", padx=(0, 6))
+        self.confirm_button = self.neon_button(checkin_row, "CONFIRM", self.on_confirm_players, bg="#1b63ff", width=12)
+        self.confirm_button.grid(row=0, column=1, sticky="e", padx=(6, 0))
+
+        # Row 2: JOINED count — centered below buttons
+        joined_frame = tk.Frame(enroll_body, bg="#17071f")
+        joined_frame.pack(fill="x", pady=(0, 4))
+        inner = tk.Frame(joined_frame, bg="#17071f")
+        inner.pack(anchor="center")
+        tk.Label(inner, text="JOINED:", bg="#17071f", fg="#ffd74f", font=("Arial", 16, "bold")).pack(side="left", padx=(0, 4))
+        tk.Label(inner, textvariable=self.players_joined, bg="#24101f", fg="#ffd74f", font=("Arial", 20, "bold"), width=2).pack(side="left")
+
         filler = tk.Frame(parent, bg="#12061f")
-        filler.grid(row=2, column=0, sticky="nsew")
+        filler.grid(row=3, column=0, sticky="nsew")
 
     def build_controllers_area(self, parent):
         parent.grid_rowconfigure(0, weight=1)
@@ -2370,32 +2632,296 @@ class PixelChallengeConsole:
         ctrl_body.grid_columnconfigure((0, 1), weight=1)
         self.ctrl_body = ctrl_body
 
-    def build_bottom_area(self, parent):
-        parent.grid_columnconfigure(0, weight=1)
+    def build_dmx_area(self, parent):
+        """Build the new DMX CONTROL panel (v24.0.0) — all elements are placeholders."""
         parent.grid_rowconfigure(0, weight=1)
-        parent.grid_rowconfigure(1, weight=0)  # Button row doesn't expand
+        parent.grid_columnconfigure(0, weight=1)
 
-        # Top section: PanedWindow for adjustable log panel
-        self.bottom_paned = tk.PanedWindow(parent, orient="horizontal", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
-        self.bottom_paned.grid(row=0, column=0, sticky="nsew")
+        dmx_panel, dmx_body = self.panel(parent, "DMX CONTROL")
+        dmx_panel.grid(row=0, column=0, sticky="nsew")
 
-        # Left side - empty/filler (adjustable width)
-        left_filler = tk.Frame(self.bottom_paned, bg="#12061f")
-        self.bottom_paned.add(left_filler, minsize=50)
+        # --- (a) Top row of quick-action buttons ---
+        quick_row = tk.Frame(dmx_body, bg="#17071f")
+        quick_row.pack(fill="x", pady=(4, 4))
+        quick_btns = [
+            ("BLACKOUT", "#444444"),
+            ("GAMEPLAY", "#3b2d8b"),
+            ("RESULTS",  "#2ea62e"),
+            ("WASH",     "#1a8a6a"),
+            ("TEST",     "#cccc00"),
+            ("EDIT...",  "#555555"),
+        ]
+        for label, color in quick_btns:
+            fg = "black" if label == "TEST" else "white"
+            tk.Button(quick_row, text=label,
+                      command=lambda l=label: self.log(f"DMX {l} (placeholder)"),
+                      bg=color, fg=fg, activebackground=color, activeforeground=fg,
+                      relief="raised", bd=2, font=("Arial", 10, "bold"),
+                      padx=6, pady=3, cursor="hand2").pack(side="left", padx=2)
 
-        # Right side - log panel
-        info_panel = tk.Frame(self.bottom_paned, bg="#3a1b53", bd=2, relief="groove")
-        info_panel.grid_rowconfigure(0, weight=1)
-        info_panel.grid_columnconfigure(0, weight=1)
+        # --- (b) Bank navigation row ---
+        bank_row = tk.Frame(dmx_body, bg="#17071f")
+        bank_row.pack(fill="x", pady=(2, 4))
+        tk.Label(bank_row, text="BANK:", bg="#17071f", fg="#cccccc",
+                 font=("Arial", 11, "bold")).pack(side="left", padx=(0, 4))
+        bank_labels = ["1-4", "5-8", "9-12", "13-16"]
+        for i, bl in enumerate(bank_labels):
+            active = (i == 0)
+            bg = "#5544cc" if active else "#2a1a4a"
+            fg = "white"
+            tk.Button(bank_row, text=bl, bg=bg, fg=fg,
+                      activebackground=bg, activeforeground=fg,
+                      relief="raised", bd=2, font=("Arial", 10, "bold"),
+                      padx=6, pady=2, cursor="hand2",
+                      command=lambda b=bl: self.log(f"DMX Bank {b} (placeholder)")
+                      ).pack(side="left", padx=2)
+        tk.Checkbutton(bank_row, text="\u2611 LINK ALL", variable=self.dmx_link_all,
+                       bg="#17071f", fg="white", activebackground="#17071f",
+                       activeforeground="white", selectcolor="#071a30",
+                       font=("Arial", 10, "bold")).pack(side="left", padx=(10, 4))
+        tk.Label(bank_row, text="4 Fixtures Detected \u24d8",
+                 bg="#17071f", fg="#aaaaaa", font=("Arial", 10)).pack(side="left", padx=(8, 0))
 
-        info_body = tk.Frame(info_panel, bg="#17071f")
-        info_body.pack(fill="both", expand=True, padx=6, pady=8)
-        info_body.grid_columnconfigure(0, weight=1)
-        info_body.grid_rowconfigure(0, weight=1)
+        # --- (c) Four Fixture Cards ---
+        cards_frame = tk.Frame(dmx_body, bg="#17071f")
+        cards_frame.pack(fill="x", pady=(2, 4))
+        fixtures = [
+            ("L1", "#cc0000"),
+            ("L2", "#0044cc"),
+            ("L3", "#0044cc"),
+            ("L4", "#996600"),
+        ]
+        for label, swatch_color in fixtures:
+            card = tk.Frame(cards_frame, bg="#1a0a2e", bd=1, relief="groove")
+            card.pack(side="left", padx=4, pady=2, fill="y")
+            tk.Label(card, text=label, bg="#1a0a2e", fg="white",
+                     font=("Arial", 12, "bold")).pack(pady=(4, 2))
+            swatch = tk.Canvas(card, width=50, height=30, bg=swatch_color,
+                               highlightthickness=0)
+            swatch.pack(padx=4, pady=2)
+            tk.Label(card, text="Mode: Auto", bg="#1a0a2e", fg="#aaaaaa",
+                     font=("Arial", 9)).pack()
+            tk.Label(card, text="Strobe: On", bg="#1a0a2e", fg="#aaaaaa",
+                     font=("Arial", 9)).pack()
+            tk.Label(card, text="Dim: 80%", bg="#1a0a2e", fg="#aaaaaa",
+                     font=("Arial", 9)).pack()
+            tk.Button(card, text="OVERRIDE", bg="#2ea62e", fg="white",
+                      activebackground="#2ea62e", activeforeground="white",
+                      relief="raised", bd=1, font=("Arial", 9, "bold"),
+                      padx=4, pady=2, cursor="hand2",
+                      command=lambda l=label: self.log(f"DMX Override {l} (placeholder)")
+                      ).pack(pady=(4, 6), padx=4)
 
-        self.info_text = tk.Text(info_body, height=5, width=68, font=("Arial", 16), bg="#12061f", fg="white", wrap="word", bd=0, relief="flat")
+        # --- (d) Scene / Speed / Brightness row ---
+        scene_row = tk.Frame(dmx_body, bg="#17071f")
+        scene_row.pack(fill="x", pady=(2, 4))
+        tk.Label(scene_row, text="Scene:", bg="#17071f", fg="#cccccc",
+                 font=("Arial", 11, "bold")).pack(side="left", padx=(0, 4))
+        scene_combo = ttk.Combobox(scene_row, textvariable=self.dmx_scene,
+                                   values=["Cool Blue Static", "Warm Amber", "Rainbow Rotate",
+                                           "Color Strobe", "Chase Random"],
+                                   font=("Arial", 10), state="readonly", width=16)
+        scene_combo.pack(side="left", padx=(0, 12))
+        tk.Label(scene_row, text="Speed:", bg="#17071f", fg="#cccccc",
+                 font=("Arial", 11, "bold")).pack(side="left", padx=(0, 4))
+        tk.Scale(scene_row, from_=0, to=100, resolution=1, orient="horizontal",
+                 variable=self.dmx_speed, bg="#17071f", fg="white",
+                 troughcolor="#071a30", highlightthickness=0,
+                 font=("Arial", 9, "bold"), length=80).pack(side="left", padx=(0, 8))
+        tk.Label(scene_row, textvariable=self.dmx_speed, bg="#17071f", fg="white",
+                 font=("Arial", 10, "bold")).pack(side="left", padx=(0, 2))
+        tk.Label(scene_row, text="%", bg="#17071f", fg="white",
+                 font=("Arial", 10)).pack(side="left", padx=(0, 12))
+        tk.Label(scene_row, text="Brightness:", bg="#17071f", fg="#ffd74f",
+                 font=("Arial", 11, "bold")).pack(side="left", padx=(0, 4))
+        tk.Scale(scene_row, from_=0, to=100, resolution=1, orient="horizontal",
+                 variable=self.dmx_brightness, bg="#17071f", fg="white",
+                 troughcolor="#071a30", highlightthickness=0,
+                 font=("Arial", 9, "bold"), length=80).pack(side="left", padx=(0, 8))
+        tk.Label(scene_row, textvariable=self.dmx_brightness, bg="#17071f", fg="#ffd74f",
+                 font=("Arial", 10, "bold")).pack(side="left", padx=(0, 2))
+        tk.Label(scene_row, text="%", bg="#17071f", fg="#ffd74f",
+                 font=("Arial", 10)).pack(side="left")
+
+        # --- (e) Three preset groups ---
+        presets_frame = tk.Frame(dmx_body, bg="#17071f")
+        presets_frame.pack(fill="x", pady=(2, 4))
+
+        # GAMEPLAY PRESETS
+        gp_frame = tk.Frame(presets_frame, bg="#1a0a2e", bd=1, relief="groove")
+        gp_frame.pack(side="left", padx=(0, 6), fill="y")
+        tk.Label(gp_frame, text="GAMEPLAY PRESETS", bg="#1a0a2e", fg="white",
+                 font=("Arial", 10, "bold")).grid(row=0, column=0, columnspan=3, pady=(4, 2), padx=4)
+        gp_buttons = [
+            ("RED",     "#cc0000", "white", 0, 0),
+            ("GREEN",   "#00aa00", "white", 0, 1),
+            ("BLUE",    "#0044cc", "white", 0, 2),
+            ("CYAN",    "#00aaaa", "white", 1, 0),
+            ("MAGENTA", "#aa0088", "white", 1, 1),
+            ("WHITE",   "#dddddd", "black", 1, 2),
+        ]
+        for text, bg, fg, r, c in gp_buttons:
+            tk.Button(gp_frame, text=text, bg=bg, fg=fg,
+                      activebackground=bg, activeforeground=fg,
+                      relief="raised", bd=1, font=("Arial", 9, "bold"),
+                      padx=6, pady=3, cursor="hand2",
+                      command=lambda t=text: self.log(f"DMX Gameplay {t} (placeholder)")
+                      ).grid(row=r+1, column=c, padx=3, pady=2)
+        # spacer row in gameplay frame
+        tk.Frame(gp_frame, bg="#1a0a2e", height=4).grid(row=3, column=0, columnspan=3)
+
+        # RESULTS PRESETS
+        rp_frame = tk.Frame(presets_frame, bg="#1a0a2e", bd=1, relief="groove")
+        rp_frame.pack(side="left", padx=(0, 6), fill="y")
+        tk.Label(rp_frame, text="RESULTS PRESETS", bg="#1a0a2e", fg="white",
+                 font=("Arial", 10, "bold")).pack(pady=(4, 2), padx=8)
+        for rp_label in ["Rainbow Rotate", "Color Strobe", "Chase Random"]:
+            tk.Button(rp_frame, text=rp_label, bg="#3b2d8b", fg="white",
+                      activebackground="#3b2d8b", activeforeground="white",
+                      relief="raised", bd=1, font=("Arial", 9, "bold"),
+                      padx=8, pady=3, cursor="hand2",
+                      command=lambda l=rp_label: self.log(f"DMX Results {l} (placeholder)")
+                      ).pack(fill="x", padx=4, pady=2)
+        tk.Frame(rp_frame, bg="#1a0a2e", height=4).pack()
+
+        # IDLE WASH
+        iw_frame = tk.Frame(presets_frame, bg="#1a0a2e", bd=1, relief="groove")
+        iw_frame.pack(side="left", fill="y")
+        tk.Label(iw_frame, text="IDLE WASH", bg="#1a0a2e", fg="white",
+                 font=("Arial", 10, "bold")).pack(pady=(4, 2), padx=8)
+        iw_swatch = tk.Canvas(iw_frame, width=30, height=20, bg="#003366",
+                              highlightthickness=0)
+        iw_swatch.pack(pady=2)
+        tk.Label(iw_frame, text="Warm Amber", bg="#1a0a2e", fg="#cccccc",
+                 font=("Arial", 9)).pack()
+        tk.Button(iw_frame, text="APPLY WASH", bg="#2ea62e", fg="white",
+                  activebackground="#2ea62e", activeforeground="white",
+                  relief="raised", bd=1, font=("Arial", 9, "bold"),
+                  padx=6, pady=3, cursor="hand2",
+                  command=lambda: self.log("DMX Apply Wash (placeholder)")
+                  ).pack(pady=(4, 6), padx=4, fill="x")
+
+        # --- (f) DMX status line ---
+        status_row = tk.Frame(dmx_body, bg="#17071f")
+        status_row.pack(fill="x", pady=(4, 2))
+        # Build the status label with colored "ON"
+        status_left = tk.Frame(status_row, bg="#17071f")
+        status_left.pack(side="left", fill="x", expand=True)
+        tk.Label(status_left, text="DMX OUTPUT: ", bg="#17071f", fg="#cccccc",
+                 font=("Arial", 10, "bold")).pack(side="left")
+        tk.Label(status_left, text="ON", bg="#17071f", fg="#00cc00",
+                 font=("Arial", 10, "bold")).pack(side="left")
+        tk.Label(status_left, text=" | UNIVERSE: 9 | FIXTURES: 4 x 8CH",
+                 bg="#17071f", fg="#cccccc", font=("Arial", 10, "bold")).pack(side="left")
+        tk.Button(status_row, text="PREVIEW...",
+                  command=lambda: self.log("DMX Preview (placeholder)"),
+                  bg="#555555", fg="white", activebackground="#555555", activeforeground="white",
+                  relief="raised", bd=1, font=("Arial", 10, "bold"),
+                  padx=6, pady=2, cursor="hand2").pack(side="right", padx=(8, 0))
+
+    def build_audio_area(self, parent):
+        """Build the AUDIO MIXER panel — extracted from build_dmx_audio_area (v24.0.0)."""
+        parent.grid_rowconfigure(0, weight=1)
+        parent.grid_columnconfigure(0, weight=1)
+
+        mixer_panel, mixer_body = self.panel(parent, "AUDIO MIXER")
+        mixer_panel.grid(row=0, column=0, sticky="nsew")
+
+        # 4 vertical faders side-by-side: MUSIC, SFX, VOICE, MASTER
+        faders_row = tk.Frame(mixer_body, bg="#17071f")
+        faders_row.pack(fill="both", expand=True, pady=(4, 4))
+
+        # MUSIC fader
+        music_col = tk.Frame(faders_row, bg="#17071f")
+        music_col.pack(side="left", fill="y", padx=6, expand=True)
+        tk.Scale(music_col, from_=100, to=0, resolution=1, orient="vertical",
+                 variable=self.music_volume,
+                 bg="#17071f", fg="white", troughcolor="#071a30",
+                 highlightthickness=0, font=("Arial", 9, "bold"),
+                 length=130, command=self.on_music_volume_changed).pack()
+        tk.Label(music_col, text="MUSIC", bg="#17071f", fg="#cccccc",
+                 font=("Arial", 11, "bold")).pack()
+        self.music_mute_btn = tk.Button(music_col, text="MUTE",
+                                        command=self.toggle_music_mute,
+                                        bg="#27a844", fg="white",
+                                        activebackground="#27a844", activeforeground="white",
+                                        relief="raised", bd=2, font=("Arial", 9, "bold"),
+                                        padx=4, pady=1, cursor="hand2")
+        self.music_mute_btn.pack(pady=(2, 0))
+
+        # SFX fader
+        sfx_col = tk.Frame(faders_row, bg="#17071f")
+        sfx_col.pack(side="left", fill="y", padx=6, expand=True)
+        tk.Scale(sfx_col, from_=100, to=0, resolution=1, orient="vertical",
+                 variable=self.sfx_volume,
+                 bg="#17071f", fg="white", troughcolor="#071a30",
+                 highlightthickness=0, font=("Arial", 9, "bold"),
+                 length=130, command=self.on_sfx_volume_changed).pack()
+        tk.Label(sfx_col, text="SFX", bg="#17071f", fg="#cccccc",
+                 font=("Arial", 11, "bold")).pack()
+        self.sfx_mute_btn = tk.Button(sfx_col, text="MUTE",
+                                      command=self.toggle_sfx_mute,
+                                      bg="#27a844", fg="white",
+                                      activebackground="#27a844", activeforeground="white",
+                                      relief="raised", bd=2, font=("Arial", 9, "bold"),
+                                      padx=4, pady=1, cursor="hand2")
+        self.sfx_mute_btn.pack(pady=(2, 0))
+
+        # VOICE fader
+        voice_col = tk.Frame(faders_row, bg="#17071f")
+        voice_col.pack(side="left", fill="y", padx=6, expand=True)
+        tk.Scale(voice_col, from_=100, to=0, resolution=1, orient="vertical",
+                 variable=self.voice_volume,
+                 bg="#17071f", fg="white", troughcolor="#071a30",
+                 highlightthickness=0, font=("Arial", 9, "bold"),
+                 length=130, command=self.on_voice_volume_changed).pack()
+        tk.Label(voice_col, text="VOICE", bg="#17071f", fg="#cccccc",
+                 font=("Arial", 11, "bold")).pack()
+        self.voice_mute_btn = tk.Button(voice_col, text="MUTE",
+                                        command=self.toggle_voice_mute,
+                                        bg="#27a844", fg="white",
+                                        activebackground="#27a844", activeforeground="white",
+                                        relief="raised", bd=2, font=("Arial", 9, "bold"),
+                                        padx=4, pady=1, cursor="hand2")
+        self.voice_mute_btn.pack(pady=(2, 0))
+
+        # MASTER fader — scales all three channels together
+        master_col = tk.Frame(faders_row, bg="#17071f")
+        master_col.pack(side="left", fill="y", padx=6, expand=True)
+        tk.Scale(master_col, from_=100, to=0, resolution=1, orient="vertical",
+                 variable=self.master_volume,
+                 bg="#17071f", fg="white", troughcolor="#071a30",
+                 highlightthickness=0, font=("Arial", 9, "bold"),
+                 length=130, command=self.on_master_volume_changed).pack()
+        tk.Label(master_col, text="MASTER", bg="#17071f", fg="#ffd74f",
+                 font=("Arial", 11, "bold")).pack()
+        self.master_mute_btn = tk.Button(master_col, text="MUTE",
+                                         command=self.toggle_master_mute,
+                                         bg="#27a844", fg="white",
+                                         activebackground="#27a844", activeforeground="white",
+                                         relief="raised", bd=2, font=("Arial", 9, "bold"),
+                                         padx=4, pady=1, cursor="hand2")
+        self.master_mute_btn.pack(pady=(2, 0))
+
+        self.update_music_mute_button()
+        self.update_sfx_mute_button()
+        self.update_voice_mute_button()
+        self.update_master_mute_button()
+
+    def build_log_area(self, parent):
+        """Build the INFORMATION / LOG panel (v24.0.0)."""
+        parent.grid_rowconfigure(0, weight=1)
+        parent.grid_columnconfigure(0, weight=1)
+
+        log_panel, log_body = self.panel(parent, "INFORMATION / LOG")
+        log_panel.grid(row=0, column=0, sticky="nsew", padx=4, pady=(4, 0))
+        log_body.grid_columnconfigure(0, weight=1)
+        log_body.grid_rowconfigure(0, weight=1)
+
+        self.info_text = tk.Text(log_body, height=8, width=80, font=("Arial", 13),
+                                 bg="#12061f", fg="white", wrap="word", bd=0, relief="flat")
         self.info_text.grid(row=0, column=0, sticky="nsew")
-        scroll = tk.Scrollbar(info_body, command=self.info_text.yview)
+        scroll = tk.Scrollbar(log_body, command=self.info_text.yview)
         scroll.grid(row=0, column=1, sticky="ns")
         self.info_text.configure(yscrollcommand=scroll.set)
         self.info_text.tag_configure("p1", foreground="#ff6a5a")
@@ -2403,27 +2929,18 @@ class PixelChallengeConsole:
         self.info_text.tag_configure("p3", foreground="#88ff66")
         self.info_text.tag_configure("p4", foreground="#dd88ff")
 
-        self.bottom_paned.add(info_panel, minsize=MIN_LOG_WIDTH)
-
-        # Bind sash movement to save
-        self.bottom_paned.bind("<ButtonRelease-1>", self.save_sash_positions)
-
-        # Bottom row: Buttons (fixed at bottom, not in paned window)
+    def build_button_row(self, parent):
+        """Build the bottom button row: SETUP | FALCON | REDEEM/RESET | version. (v23.0.0)"""
         button_row = tk.Frame(parent, bg="#12061f")
-        button_row.grid(row=1, column=0, sticky="ew", pady=(6, 4), padx=8)
+        button_row.pack(fill="x", pady=(6, 4), padx=8)
         button_row.grid_columnconfigure(0, weight=1)
         button_row.grid_columnconfigure(1, weight=1)
         button_row.grid_columnconfigure(2, weight=1)
         button_row.grid_columnconfigure(3, weight=0)
 
-        # Left buttons
         self.neon_button(button_row, "SETUP", self.open_setup_window, bg="#1b63ff", width=10).grid(row=0, column=0, sticky="w", padx=(0, 8))
-        self.neon_button(button_row, "FALCON CONSOLE", self.toggle_falcon_console, bg="#1b63ff", width=14).grid(row=0, column=1, sticky="w", padx=8)
-        
-        # Right button
-        self.neon_button(button_row, "REDEEM POINTS", self.on_redeem_points, bg="#d48a10", width=14).grid(row=0, column=2, sticky="e", padx=8)
-        
-        # Version label far right
+        self.neon_button(button_row, "FALCON", self.toggle_falcon_console, bg="#1b63ff", width=14).grid(row=0, column=1, sticky="w", padx=8)
+        self.neon_button(button_row, "REDEEM / RESET", self.on_redeem_points, bg="#d48a10", width=14).grid(row=0, column=2, sticky="e", padx=8)
         tk.Label(button_row, text=VERSION_LABEL, bg="#12061f", fg="#9a9a9a", font=("Arial", 12, "bold")).grid(row=0, column=3, sticky="e", padx=(16, 0))
 
     # =========================================================================
@@ -2445,13 +2962,13 @@ class PixelChallengeConsole:
         if not hasattr(self, 'checkin_button'):
             return
         if self.host_state in (HostState.GAME_RUNNING, HostState.COUNTDOWN, HostState.GAME_SETUP):
-            text, bg = "SESSION ACTIVE", "#666666"
+            text, bg = "ACTIVE", "#666666"
         elif self.host_state == HostState.CHECKIN_OPEN:
-            text, bg = "CHECK-IN OPEN", "#2ea62e"
+            text, bg = "OPEN", "#2ea62e"
         elif self.host_state == HostState.PLAYERS_CONFIRMED:
             text, bg = "CONFIRMED", "#666666"
         else:
-            text, bg = "PLAYER CHECK-IN", "#1b63ff"
+            text, bg = "CHECK-IN", "#1b63ff"
         self.checkin_button.configure(text=text, bg=bg, activebackground=bg)
 
     def refresh_player_status_panel(self):
@@ -2464,7 +2981,9 @@ class PixelChallengeConsole:
         ctrl_colors = {"ONLINE": "#6cff66", "MISSING": "#ffaa55", "LOCKED": "#bbbbbb"}
         for idx in range(1, 5):
             frame = tk.Frame(self.status_body, bg="#0f0617", bd=2, relief="groove")
-            frame.grid(row=0, column=idx - 1, padx=6, pady=4, sticky="nsew")
+            r = 0 if idx <= 2 else 1
+            c = (idx - 1) % 2
+            frame.grid(row=r, column=c, padx=6, pady=4, sticky="nsew")
             
             # Player button with color
             btn = tk.Button(frame, text=f"P{idx}", bg=colors[idx], fg="white", font=("Arial", 20, "bold"), relief="raised", bd=2, command=lambda i=idx: self.on_player_tile_click(i), cursor="hand2")
@@ -2663,16 +3182,50 @@ class PixelChallengeConsole:
         wifi_inner = tk.Frame(wifi_frame, bg="#1a1a2e")
         wifi_inner.pack(fill="x", padx=10, pady=8)
         
-        wifi_labels = ["SSID", "Password (PSK)", "Static IP (optional)", "Gateway", "DNS Server"]
-        wifi_vars = [self.wifi_ssid, self.wifi_psk, self.wifi_static_ip, self.wifi_gateway, self.dns_server]
+        # DHCP / Static toggle (v22.14.0)
+        wifi_mode_row = tk.Frame(wifi_inner, bg="#1a1a2e")
+        wifi_mode_row.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
+        tk.Radiobutton(wifi_mode_row, text="DHCP", variable=self.wifi_dhcp, value=True,
+                       command=self._update_wifi_fields_state,
+                       bg="#1a1a2e", fg="#6cff66", activebackground="#1a1a2e", activeforeground="#6cff66",
+                       selectcolor="#3a3a5c", font=("Arial", 10, "bold")).pack(side="left", padx=(0, 12))
+        tk.Radiobutton(wifi_mode_row, text="Static", variable=self.wifi_dhcp, value=False,
+                       command=self._update_wifi_fields_state,
+                       bg="#1a1a2e", fg="#ffd74f", activebackground="#1a1a2e", activeforeground="#ffd74f",
+                       selectcolor="#3a3a5c", font=("Arial", 10, "bold")).pack(side="left")
+
+        # SSID and PSK always editable
+        tk.Label(wifi_inner, text="SSID", bg="#1a1a2e", fg="white",
+                 font=("Arial", 10)).grid(row=1, column=0, sticky="e", padx=(0, 8), pady=3)
+        tk.Entry(wifi_inner, textvariable=self.wifi_ssid, font=("Arial", 10), width=22,
+                 bg="#3a3a5c", fg="white", insertbackground="white").grid(row=1, column=1, sticky="w", pady=3)
         
-        for i, (label, var) in enumerate(zip(wifi_labels, wifi_vars)):
-            tk.Label(wifi_inner, text=label, bg="#1a1a2e", fg="white", 
-                     font=("Arial", 10)).grid(row=i, column=0, sticky="e", padx=(0, 8), pady=3)
-            entry = tk.Entry(wifi_inner, textvariable=var, font=("Arial", 10), width=22, bg="#3a3a5c", fg="white", insertbackground="white")
-            if label == "Password (PSK)":
-                entry.config(show="*")
-            entry.grid(row=i, column=1, sticky="w", pady=3)
+        tk.Label(wifi_inner, text="Password (PSK)", bg="#1a1a2e", fg="white",
+                 font=("Arial", 10)).grid(row=2, column=0, sticky="e", padx=(0, 8), pady=3)
+        wifi_psk_entry = tk.Entry(wifi_inner, textvariable=self.wifi_psk, font=("Arial", 10), width=22,
+                                   bg="#3a3a5c", fg="white", insertbackground="white", show="*")
+        wifi_psk_entry.grid(row=2, column=1, sticky="w", pady=3)
+
+        # Static IP fields — will be enabled/disabled by toggle
+        tk.Label(wifi_inner, text="Static IP", bg="#1a1a2e", fg="white",
+                 font=("Arial", 10)).grid(row=3, column=0, sticky="e", padx=(0, 8), pady=3)
+        self.wifi_ip_entry = tk.Entry(wifi_inner, textvariable=self.wifi_static_ip, font=("Arial", 10), width=22,
+                                       bg="#3a3a5c", fg="white", insertbackground="white")
+        self.wifi_ip_entry.grid(row=3, column=1, sticky="w", pady=3)
+        
+        tk.Label(wifi_inner, text="Gateway", bg="#1a1a2e", fg="white",
+                 font=("Arial", 10)).grid(row=4, column=0, sticky="e", padx=(0, 8), pady=3)
+        self.wifi_gw_entry = tk.Entry(wifi_inner, textvariable=self.wifi_gateway, font=("Arial", 10), width=22,
+                                       bg="#3a3a5c", fg="white", insertbackground="white")
+        self.wifi_gw_entry.grid(row=4, column=1, sticky="w", pady=3)
+        
+        tk.Label(wifi_inner, text="DNS Server", bg="#1a1a2e", fg="white",
+                 font=("Arial", 10)).grid(row=5, column=0, sticky="e", padx=(0, 8), pady=3)
+        self.wifi_dns_entry = tk.Entry(wifi_inner, textvariable=self.dns_server, font=("Arial", 10), width=22,
+                                        bg="#3a3a5c", fg="white", insertbackground="white")
+        self.wifi_dns_entry.grid(row=5, column=1, sticky="w", pady=3)
+
+        self._update_wifi_fields_state()
 
         # --- Ethernet Section (right) ---
         eth_frame = tk.LabelFrame(network_frame, text="Raspberry Pi Ethernet", 
@@ -2682,17 +3235,37 @@ class PixelChallengeConsole:
         eth_inner = tk.Frame(eth_frame, bg="#1a1a2e")
         eth_inner.pack(fill="x", padx=10, pady=8)
         
+        # DHCP / Static toggle (v22.14.0)
+        eth_mode_row = tk.Frame(eth_inner, bg="#1a1a2e")
+        eth_mode_row.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
+        tk.Radiobutton(eth_mode_row, text="DHCP", variable=self.eth_dhcp, value=True,
+                       command=self._update_eth_fields_state,
+                       bg="#1a1a2e", fg="#6cff66", activebackground="#1a1a2e", activeforeground="#6cff66",
+                       selectcolor="#3a3a5c", font=("Arial", 10, "bold")).pack(side="left", padx=(0, 12))
+        tk.Radiobutton(eth_mode_row, text="Static", variable=self.eth_dhcp, value=False,
+                       command=self._update_eth_fields_state,
+                       bg="#1a1a2e", fg="#ffd74f", activebackground="#1a1a2e", activeforeground="#ffd74f",
+                       selectcolor="#3a3a5c", font=("Arial", 10, "bold")).pack(side="left")
+        
         tk.Label(eth_inner, text="Static IP", bg="#1a1a2e", fg="white", 
-                 font=("Arial", 10)).grid(row=0, column=0, sticky="e", padx=(0, 8), pady=3)
-        tk.Entry(eth_inner, textvariable=self.eth_static_ip, font=("Arial", 10), width=22, bg="#3a3a5c", fg="white", insertbackground="white").grid(row=0, column=1, sticky="w", pady=3)
+                 font=("Arial", 10)).grid(row=1, column=0, sticky="e", padx=(0, 8), pady=3)
+        self.eth_ip_entry = tk.Entry(eth_inner, textvariable=self.eth_static_ip, font=("Arial", 10), width=22,
+                                      bg="#3a3a5c", fg="white", insertbackground="white")
+        self.eth_ip_entry.grid(row=1, column=1, sticky="w", pady=3)
         
         tk.Label(eth_inner, text="Gateway", bg="#1a1a2e", fg="white", 
-                 font=("Arial", 10)).grid(row=1, column=0, sticky="e", padx=(0, 8), pady=3)
-        tk.Entry(eth_inner, textvariable=self.eth_gateway, font=("Arial", 10), width=22, bg="#3a3a5c", fg="white", insertbackground="white").grid(row=1, column=1, sticky="w", pady=3)
+                 font=("Arial", 10)).grid(row=2, column=0, sticky="e", padx=(0, 8), pady=3)
+        self.eth_gw_entry = tk.Entry(eth_inner, textvariable=self.eth_gateway, font=("Arial", 10), width=22,
+                                      bg="#3a3a5c", fg="white", insertbackground="white")
+        self.eth_gw_entry.grid(row=2, column=1, sticky="w", pady=3)
         
         tk.Label(eth_inner, text="DNS Server", bg="#1a1a2e", fg="white", 
-                 font=("Arial", 10)).grid(row=2, column=0, sticky="e", padx=(0, 8), pady=3)
-        tk.Entry(eth_inner, textvariable=self.dns_server, font=("Arial", 10), width=22, bg="#3a3a5c", fg="white", insertbackground="white").grid(row=2, column=1, sticky="w", pady=3)
+                 font=("Arial", 10)).grid(row=3, column=0, sticky="e", padx=(0, 8), pady=3)
+        self.eth_dns_entry = tk.Entry(eth_inner, textvariable=self.dns_server, font=("Arial", 10), width=22,
+                                       bg="#3a3a5c", fg="white", insertbackground="white")
+        self.eth_dns_entry.grid(row=3, column=1, sticky="w", pady=3)
+
+        self._update_eth_fields_state()
 
         # === General Section ===
         general_frame = tk.LabelFrame(self.setup_window, text="General", 
@@ -2753,10 +3326,38 @@ class PixelChallengeConsole:
         # Bottom spacer (buttons moved to header)
         tk.Frame(self.setup_window, bg="#1a1a2e", height=20).pack(fill="x", pady=(10, 20))
 
+    def _update_wifi_fields_state(self):
+        """Enable/disable Wi-Fi static IP fields based on DHCP toggle (v22.14.0)"""
+        state = "disabled" if self.wifi_dhcp.get() else "normal"
+        for entry in (self.wifi_ip_entry, self.wifi_gw_entry, self.wifi_dns_entry):
+            try:
+                entry.configure(state=state)
+            except Exception:
+                pass
+
+    def _update_eth_fields_state(self):
+        """Enable/disable Ethernet static IP fields based on DHCP toggle (v22.14.0)"""
+        if self.eth_dhcp.get():
+            state = "disabled"
+        else:
+            state = "normal"
+        for entry in (self.eth_ip_entry, self.eth_gw_entry, self.eth_dns_entry):
+            try:
+                entry.configure(state=state)
+            except Exception:
+                pass
+
     def on_setup_window_configure(self, event):
         """Save setup window geometry when moved/resized"""
         if self.setup_window and event.widget == self.setup_window:
             self.setup_geometry = self.setup_window.geometry()
+
+    def _on_window_configure(self, event):
+        """Save main window geometry when moved/resized"""
+        if event.widget == self.root:
+            current = self.root.geometry()
+            if current != self.window_geometry:
+                self.window_geometry = current
 
     def close_setup_window(self):
         if self.setup_window and tk.Toplevel.winfo_exists(self.setup_window):
