@@ -1538,7 +1538,7 @@ class PixelChallengeConsole:
             scroll_region = self.theme_canvas.bbox("all")
             if scroll_region:
                 total_h = scroll_region[3]
-                if total_h > canvas_h:
+                if total_h > canvas_h and total_h > 0:
                     frac = max(0.0, min(1.0, row_y / total_h))
                     self.theme_canvas.yview_moveto(frac)
         except Exception:
@@ -3075,7 +3075,7 @@ class PixelChallengeConsole:
             # SLA display - get from sla_store for accuracy
             sla_value = self.sla_store.get_player_sla(idx)
             sla_valid = self.sla_store.is_sla_valid(idx)
-            sla_text = f"SLA-{sla_value}" if sla_valid else f"SLA-{sla_value}*"
+            sla_text = f"SLA-{sla_value}{'*' if not sla_valid else ''}"
             sla_color = "#ffd74f" if sla_valid else "#888888"
             tk.Label(frame, text=sla_text, bg=colors[idx], fg="white", font=("Arial", 14, "bold")).pack(fill="x", padx=8, pady=(0, 4))
             
