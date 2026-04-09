@@ -2380,47 +2380,46 @@ class PixelChallengeConsole:
         self.attract_container = tk.Frame(self.left_vertical, bg="#12061f")
         self.left_vertical.add(self.attract_container, minsize=300)
 
-        left_bottom_filler = tk.Frame(self.left_vertical, bg="#12061f")
-        self.left_vertical.add(left_bottom_filler, minsize=50)
+        self.audio_container = tk.Frame(self.left_vertical, bg="#12061f")
+        self.left_vertical.add(self.audio_container, minsize=150)
 
-        # RIGHT SIDE: vertical paned — upper row (top) | lower row (bottom) | buttons (fixed)
+        # RIGHT SIDE: content_paned (DMX | right_section) + footer buttons (fixed)
         right_outer = tk.Frame(main_container, bg="#12061f")
         right_outer.grid(row=0, column=1, sticky="nsew")
         right_outer.grid_rowconfigure(0, weight=1)
         right_outer.grid_rowconfigure(1, weight=0)
         right_outer.grid_columnconfigure(0, weight=1)
 
-        # Vertical paned window: upper content row | lower row
-        self.main_vertical = tk.PanedWindow(right_outer, orient="vertical", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
-        self.main_vertical.grid(row=0, column=0, sticky="nsew")
+        # Horizontal paned window: DMX CONTROL (full height) | right section
+        self.content_paned = tk.PanedWindow(right_outer, orient="horizontal", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
+        self.content_paned.grid(row=0, column=0, sticky="nsew")
 
-        # UPPER ROW: horizontal PanedWindow — DMX | Player Status | Controllers
-        self.content_paned = tk.PanedWindow(self.main_vertical, orient="horizontal", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
-        self.main_vertical.add(self.content_paned, minsize=300)
-
-        # Pane 1: DMX CONTROL
+        # Pane 1: DMX CONTROL (extends full height)
         self.dmx_container = tk.Frame(self.content_paned, bg="#12061f")
         self.content_paned.add(self.dmx_container, minsize=300)
 
-        # Pane 2: PLAYER STATUS
-        self.center_container = tk.Frame(self.content_paned, bg="#12061f")
-        self.content_paned.add(self.center_container, minsize=400)
+        # Pane 2: right section — Player+Controllers (top) | Log (bottom, compact)
+        right_section = tk.Frame(self.content_paned, bg="#12061f")
+        self.content_paned.add(right_section, minsize=700)
+        right_section.grid_rowconfigure(0, weight=1)
+        right_section.grid_rowconfigure(1, weight=0)
+        right_section.grid_columnconfigure(0, weight=1)
 
-        # Pane 3: CONTROLLERS
-        self.controllers_container = tk.Frame(self.content_paned, bg="#12061f")
-        self.content_paned.add(self.controllers_container, minsize=MIN_CONTROLLERS)
+        # Top of right section: horizontal split — Player Status | Controllers
+        self.center_ctrl_paned = tk.PanedWindow(right_section, orient="horizontal", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
+        self.center_ctrl_paned.grid(row=0, column=0, sticky="nsew")
 
-        # LOWER ROW: horizontal PanedWindow — Audio Mixer (left) | Info/Log (right)
-        self.lower_paned = tk.PanedWindow(self.main_vertical, orient="horizontal", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
-        self.main_vertical.add(self.lower_paned, minsize=MIN_INFO_HEIGHT)
+        self.center_container = tk.Frame(self.center_ctrl_paned, bg="#12061f")
+        self.center_ctrl_paned.add(self.center_container, minsize=400)
 
-        self.audio_container = tk.Frame(self.lower_paned, bg="#12061f")
-        self.lower_paned.add(self.audio_container, minsize=200)
+        self.controllers_container = tk.Frame(self.center_ctrl_paned, bg="#12061f")
+        self.center_ctrl_paned.add(self.controllers_container, minsize=MIN_CONTROLLERS)
 
-        self.log_container = tk.Frame(self.lower_paned, bg="#12061f")
-        self.lower_paned.add(self.log_container, minsize=MIN_LOG_WIDTH)
+        # Bottom of right section: compact Log panel
+        self.log_container = tk.Frame(right_section, bg="#12061f")
+        self.log_container.grid(row=1, column=0, sticky="ew")
 
-        # Button row (fixed at bottom below main_vertical, not in paned window)
+        # Button row (fixed at bottom below content area)
         self.bottom_container = tk.Frame(right_outer, bg="#12061f")
         self.bottom_container.grid(row=1, column=0, sticky="ew")
 
@@ -2437,55 +2436,38 @@ class PixelChallengeConsole:
 
         # Bind sash movements
         self.left_vertical.bind("<ButtonRelease-1>", self.save_sash_positions)
-        self.main_vertical.bind("<ButtonRelease-1>", self.save_sash_positions)
         self.content_paned.bind("<ButtonRelease-1>", self.save_sash_positions)
-        self.lower_paned.bind("<ButtonRelease-1>", self.save_sash_positions)
+        self.center_ctrl_paned.bind("<ButtonRelease-1>", self.save_sash_positions)
 
     def restore_sashes(self):
         self.root.update_idletasks()
         total_h = max(1, self.root.winfo_height())
         total_w = max(1, self.root.winfo_width())
 
-        # Left vertical (attract mode bottom edge)
+        # Left vertical (attract mode | audio mixer split)
         try:
             if self.sash_left_attract_bottom:
                 self.left_vertical.sash_place(0, 0, int(self.sash_left_attract_bottom))
             else:
-                self.left_vertical.sash_place(0, 0, total_h - 200)
+                self.left_vertical.sash_place(0, 0, total_h - 220)
         except Exception:
             pass
 
-        # Main vertical (upper content | lower row split)
-        try:
-            if self.sash_bottom_log and hasattr(self, 'main_vertical'):
-                self.main_vertical.sash_place(0, 0, int(self.sash_bottom_log))
-            elif hasattr(self, 'main_vertical'):
-                self.main_vertical.sash_place(0, 0, max(300, total_h - MIN_INFO_HEIGHT - 80))
-        except Exception:
-            pass
-
-        # Content paned sash 0: DMX | PLAYER
+        # Content paned sash 0: DMX | right section
         try:
             if self.sash_center_mixer and hasattr(self, 'content_paned'):
                 self.content_paned.sash_place(0, int(self.sash_center_mixer), 0)
             elif hasattr(self, 'content_paned'):
-                self.content_paned.sash_place(0, 320, 0)
+                self.content_paned.sash_place(0, 420, 0)
         except Exception:
             pass
 
-        # Content paned sash 1: PLAYER | CONTROLLERS
+        # Center/ctrl paned sash 0: PLAYER STATUS | CONTROLLERS
         try:
-            if self.sash_center_ctrl and hasattr(self, 'content_paned'):
-                self.content_paned.sash_place(1, int(self.sash_center_ctrl), 0)
-            elif hasattr(self, 'content_paned'):
-                self.content_paned.sash_place(1, max(720, total_w - MIN_CONTROLLERS - 100), 0)
-        except Exception:
-            pass
-
-        # Lower paned sash: AUDIO | LOG (50/50 split)
-        try:
-            if hasattr(self, 'lower_paned'):
-                self.lower_paned.sash_place(0, max(200, (total_w - 340) // 2), 0)
+            if self.sash_center_ctrl and hasattr(self, 'center_ctrl_paned'):
+                self.center_ctrl_paned.sash_place(0, int(self.sash_center_ctrl), 0)
+            elif hasattr(self, 'center_ctrl_paned'):
+                self.center_ctrl_paned.sash_place(0, max(400, total_w - 340 - MIN_CONTROLLERS - 100), 0)
         except Exception:
             pass
 
@@ -2496,14 +2478,13 @@ class PixelChallengeConsole:
         except Exception:
             pass
         try:
-            if hasattr(self, 'main_vertical'):
-                self.sash_bottom_log = self.main_vertical.sash_coord(0)[1]
+            if hasattr(self, 'content_paned'):
+                self.sash_center_mixer = self.content_paned.sash_coord(0)[0]
         except Exception:
             pass
         try:
-            if hasattr(self, 'content_paned'):
-                self.sash_center_mixer = self.content_paned.sash_coord(0)[0]
-                self.sash_center_ctrl = self.content_paned.sash_coord(1)[0]
+            if hasattr(self, 'center_ctrl_paned'):
+                self.sash_center_ctrl = self.center_ctrl_paned.sash_coord(0)[0]
         except Exception:
             pass
         self.save_settings()
@@ -2592,37 +2573,36 @@ class PixelChallengeConsole:
         self.theme_select_box.bind("<<ListboxSelect>>", self.on_theme_selected)
 
     def build_center_area(self, parent):
-        parent.grid_rowconfigure(3, weight=1)
+        parent.grid_rowconfigure(1, weight=1)
         parent.grid_columnconfigure(0, weight=1)
 
-        # Row 0: PLAYER STATUS (2×2 grid) — on top
+        # Row 0: PLAYER STATUS panel — contains 2×2 grid + check-in/confirm + joined
         status_panel, status_body = self.panel(parent, "PLAYER STATUS")
-        status_panel.grid(row=0, column=0, sticky="ew", pady=(0, 6))
+        status_panel.grid(row=0, column=0, sticky="ew", pady=(0, 4))
         status_body.grid_columnconfigure((0, 1), weight=1)
         status_body.grid_rowconfigure((0, 1), weight=1)
         self.status_body = status_body
 
-        # Row 1: CHECK-IN | CONFIRM buttons
-        enroll_panel, enroll_body = self.panel(parent, "")
-        enroll_panel.grid(row=1, column=0, sticky="ew", pady=(0, 4))
-        checkin_row = tk.Frame(enroll_body, bg="#17071f")
-        checkin_row.pack(fill="x", pady=(4, 4))
+        # CHECK-IN and CONFIRM buttons directly under player tiles (row 2 of status_body)
+        checkin_row = tk.Frame(status_body, bg="#17071f")
+        checkin_row.grid(row=2, column=0, columnspan=2, sticky="ew", padx=4, pady=(6, 2))
+        checkin_row.grid_columnconfigure(0, weight=1)
         checkin_row.grid_columnconfigure(1, weight=1)
-        self.checkin_button = self.neon_button(checkin_row, "CHECK-IN", self.on_player_checkin, bg="#1b63ff", width=12)
-        self.checkin_button.grid(row=0, column=0, sticky="w", padx=(0, 6))
-        self.confirm_button = self.neon_button(checkin_row, "CONFIRM", self.on_confirm_players, bg="#1b63ff", width=12)
-        self.confirm_button.grid(row=0, column=1, sticky="e", padx=(6, 0))
+        self.checkin_button = self.neon_button(checkin_row, "CHECK-IN", self.on_player_checkin, bg="#1b63ff")
+        self.checkin_button.grid(row=0, column=0, sticky="ew", padx=(0, 3))
+        self.confirm_button = self.neon_button(checkin_row, "CONFIRM", self.on_confirm_players, bg="#1b63ff")
+        self.confirm_button.grid(row=0, column=1, sticky="ew", padx=(3, 0))
 
-        # Row 2: JOINED count — centered below buttons
-        joined_frame = tk.Frame(enroll_body, bg="#17071f")
-        joined_frame.pack(fill="x", pady=(0, 4))
+        # JOINED count — centered below buttons (row 3 of status_body)
+        joined_frame = tk.Frame(status_body, bg="#17071f")
+        joined_frame.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(0, 4))
         inner = tk.Frame(joined_frame, bg="#17071f")
         inner.pack(anchor="center")
         tk.Label(inner, text="JOINED:", bg="#17071f", fg="#ffd74f", font=("Arial", 16, "bold")).pack(side="left", padx=(0, 4))
         tk.Label(inner, textvariable=self.players_joined, bg="#24101f", fg="#ffd74f", font=("Arial", 20, "bold"), width=2).pack(side="left")
 
         filler = tk.Frame(parent, bg="#12061f")
-        filler.grid(row=3, column=0, sticky="nsew")
+        filler.grid(row=1, column=0, sticky="nsew")
 
     def build_controllers_area(self, parent):
         parent.grid_rowconfigure(0, weight=1)
@@ -2642,28 +2622,38 @@ class PixelChallengeConsole:
 
         # --- (a) Top row of quick-action buttons ---
         quick_row = tk.Frame(dmx_body, bg="#17071f")
-        quick_row.pack(fill="x", pady=(4, 4))
+        quick_row.pack(fill="x", pady=(4, 2))
         quick_btns = [
             ("BLACKOUT", "#444444"),
             ("GAMEPLAY", "#3b2d8b"),
             ("RESULTS",  "#2ea62e"),
             ("WASH",     "#1a8a6a"),
             ("TEST",     "#cccc00"),
-            ("EDIT...",  "#555555"),
+            ("EDIT",     "#b07d10"),
         ]
         for label, color in quick_btns:
             fg = "black" if label == "TEST" else "white"
             tk.Button(quick_row, text=label,
                       command=lambda l=label: self.log(f"DMX {l} (placeholder)"),
                       bg=color, fg=fg, activebackground=color, activeforeground=fg,
-                      relief="raised", bd=2, font=("Arial", 10, "bold"),
-                      padx=6, pady=3, cursor="hand2").pack(side="left", padx=2)
+                      relief="raised", bd=2, font=("Arial", 12, "bold"),
+                      padx=8, pady=5, cursor="hand2").pack(side="left", padx=2, fill="x", expand=True)
+
+        # --- (a2) Second row of blank placeholder slot buttons ---
+        slot_row = tk.Frame(dmx_body, bg="#17071f")
+        slot_row.pack(fill="x", pady=(2, 4))
+        slot_colors = ["#990000", "#660066", "#220066", "#006666", "#664400", "#880000"]
+        for sc in slot_colors:
+            tk.Button(slot_row, text="", bg=sc, activebackground=sc,
+                      relief="raised", bd=2, cursor="hand2",
+                      command=lambda c=sc: self.log(f"DMX slot (placeholder)"),
+                      padx=8, pady=6).pack(side="left", padx=2, fill="x", expand=True)
 
         # --- (b) Bank navigation row ---
         bank_row = tk.Frame(dmx_body, bg="#17071f")
         bank_row.pack(fill="x", pady=(2, 4))
         tk.Label(bank_row, text="BANK:", bg="#17071f", fg="#cccccc",
-                 font=("Arial", 11, "bold")).pack(side="left", padx=(0, 4))
+                 font=("Arial", 12, "bold")).pack(side="left", padx=(0, 4))
         bank_labels = ["1-4", "5-8", "9-12", "13-16"]
         for i, bl in enumerate(bank_labels):
             active = (i == 0)
@@ -2671,20 +2661,20 @@ class PixelChallengeConsole:
             fg = "white"
             tk.Button(bank_row, text=bl, bg=bg, fg=fg,
                       activebackground=bg, activeforeground=fg,
-                      relief="raised", bd=2, font=("Arial", 10, "bold"),
-                      padx=6, pady=2, cursor="hand2",
+                      relief="raised", bd=2, font=("Arial", 11, "bold"),
+                      padx=8, pady=3, cursor="hand2",
                       command=lambda b=bl: self.log(f"DMX Bank {b} (placeholder)")
                       ).pack(side="left", padx=2)
         tk.Checkbutton(bank_row, text="\u2611 LINK ALL", variable=self.dmx_link_all,
                        bg="#17071f", fg="white", activebackground="#17071f",
                        activeforeground="white", selectcolor="#071a30",
-                       font=("Arial", 10, "bold")).pack(side="left", padx=(10, 4))
+                       font=("Arial", 11, "bold")).pack(side="left", padx=(10, 4))
         tk.Label(bank_row, text="4 Fixtures Detected \u24d8",
                  bg="#17071f", fg="#aaaaaa", font=("Arial", 10)).pack(side="left", padx=(8, 0))
 
         # --- (c) Four Fixture Cards ---
         cards_frame = tk.Frame(dmx_body, bg="#17071f")
-        cards_frame.pack(fill="x", pady=(2, 4))
+        cards_frame.pack(fill="both", expand=True, pady=(2, 4))
         fixtures = [
             ("L1", "#cc0000"),
             ("L2", "#0044cc"),
@@ -2693,65 +2683,65 @@ class PixelChallengeConsole:
         ]
         for label, swatch_color in fixtures:
             card = tk.Frame(cards_frame, bg="#1a0a2e", bd=1, relief="groove")
-            card.pack(side="left", padx=4, pady=2, fill="y")
+            card.pack(side="left", padx=4, pady=2, fill="both", expand=True)
             tk.Label(card, text=label, bg="#1a0a2e", fg="white",
-                     font=("Arial", 12, "bold")).pack(pady=(4, 2))
-            swatch = tk.Canvas(card, width=50, height=30, bg=swatch_color,
+                     font=("Arial", 14, "bold")).pack(pady=(6, 2))
+            swatch = tk.Canvas(card, width=80, height=50, bg=swatch_color,
                                highlightthickness=0)
             swatch.pack(padx=4, pady=2)
             tk.Label(card, text="Mode: Auto", bg="#1a0a2e", fg="#aaaaaa",
-                     font=("Arial", 9)).pack()
+                     font=("Arial", 11)).pack()
             tk.Label(card, text="Strobe: On", bg="#1a0a2e", fg="#aaaaaa",
-                     font=("Arial", 9)).pack()
+                     font=("Arial", 11)).pack()
             tk.Label(card, text="Dim: 80%", bg="#1a0a2e", fg="#aaaaaa",
-                     font=("Arial", 9)).pack()
+                     font=("Arial", 11)).pack()
             tk.Button(card, text="OVERRIDE", bg="#2ea62e", fg="white",
                       activebackground="#2ea62e", activeforeground="white",
-                      relief="raised", bd=1, font=("Arial", 9, "bold"),
-                      padx=4, pady=2, cursor="hand2",
+                      relief="raised", bd=1, font=("Arial", 11, "bold"),
+                      padx=6, pady=3, cursor="hand2",
                       command=lambda l=label: self.log(f"DMX Override {l} (placeholder)")
-                      ).pack(pady=(4, 6), padx=4)
+                      ).pack(pady=(6, 8), padx=4, fill="x")
 
         # --- (d) Scene / Speed / Brightness row ---
         scene_row = tk.Frame(dmx_body, bg="#17071f")
         scene_row.pack(fill="x", pady=(2, 4))
         tk.Label(scene_row, text="Scene:", bg="#17071f", fg="#cccccc",
-                 font=("Arial", 11, "bold")).pack(side="left", padx=(0, 4))
+                 font=("Arial", 12, "bold")).pack(side="left", padx=(0, 4))
         scene_combo = ttk.Combobox(scene_row, textvariable=self.dmx_scene,
                                    values=["Cool Blue Static", "Warm Amber", "Rainbow Rotate",
                                            "Color Strobe", "Chase Random"],
-                                   font=("Arial", 10), state="readonly", width=16)
+                                   font=("Arial", 11), state="readonly", width=16)
         scene_combo.pack(side="left", padx=(0, 12))
         tk.Label(scene_row, text="Speed:", bg="#17071f", fg="#cccccc",
-                 font=("Arial", 11, "bold")).pack(side="left", padx=(0, 4))
+                 font=("Arial", 12, "bold")).pack(side="left", padx=(0, 4))
         tk.Scale(scene_row, from_=0, to=100, resolution=1, orient="horizontal",
                  variable=self.dmx_speed, bg="#17071f", fg="white",
                  troughcolor="#071a30", highlightthickness=0,
-                 font=("Arial", 9, "bold"), length=80).pack(side="left", padx=(0, 8))
+                 font=("Arial", 10, "bold"), length=120).pack(side="left", padx=(0, 8))
         tk.Label(scene_row, textvariable=self.dmx_speed, bg="#17071f", fg="white",
-                 font=("Arial", 10, "bold")).pack(side="left", padx=(0, 2))
+                 font=("Arial", 11, "bold")).pack(side="left", padx=(0, 2))
         tk.Label(scene_row, text="%", bg="#17071f", fg="white",
-                 font=("Arial", 10)).pack(side="left", padx=(0, 12))
+                 font=("Arial", 11)).pack(side="left", padx=(0, 12))
         tk.Label(scene_row, text="Brightness:", bg="#17071f", fg="#ffd74f",
-                 font=("Arial", 11, "bold")).pack(side="left", padx=(0, 4))
+                 font=("Arial", 12, "bold")).pack(side="left", padx=(0, 4))
         tk.Scale(scene_row, from_=0, to=100, resolution=1, orient="horizontal",
                  variable=self.dmx_brightness, bg="#17071f", fg="white",
                  troughcolor="#071a30", highlightthickness=0,
-                 font=("Arial", 9, "bold"), length=80).pack(side="left", padx=(0, 8))
+                 font=("Arial", 10, "bold"), length=120).pack(side="left", padx=(0, 8))
         tk.Label(scene_row, textvariable=self.dmx_brightness, bg="#17071f", fg="#ffd74f",
-                 font=("Arial", 10, "bold")).pack(side="left", padx=(0, 2))
+                 font=("Arial", 11, "bold")).pack(side="left", padx=(0, 2))
         tk.Label(scene_row, text="%", bg="#17071f", fg="#ffd74f",
-                 font=("Arial", 10)).pack(side="left")
+                 font=("Arial", 11)).pack(side="left")
 
         # --- (e) Three preset groups ---
         presets_frame = tk.Frame(dmx_body, bg="#17071f")
-        presets_frame.pack(fill="x", pady=(2, 4))
+        presets_frame.pack(fill="both", expand=True, pady=(2, 4))
 
         # GAMEPLAY PRESETS
         gp_frame = tk.Frame(presets_frame, bg="#1a0a2e", bd=1, relief="groove")
-        gp_frame.pack(side="left", padx=(0, 6), fill="y")
+        gp_frame.pack(side="left", padx=(0, 6), fill="both", expand=True)
         tk.Label(gp_frame, text="GAMEPLAY PRESETS", bg="#1a0a2e", fg="white",
-                 font=("Arial", 10, "bold")).grid(row=0, column=0, columnspan=3, pady=(4, 2), padx=4)
+                 font=("Arial", 12, "bold")).grid(row=0, column=0, columnspan=3, pady=(6, 4), padx=4)
         gp_buttons = [
             ("RED",     "#cc0000", "white", 0, 0),
             ("GREEN",   "#00aa00", "white", 0, 1),
@@ -2760,63 +2750,65 @@ class PixelChallengeConsole:
             ("MAGENTA", "#aa0088", "white", 1, 1),
             ("WHITE",   "#dddddd", "black", 1, 2),
         ]
+        for c in range(3):
+            gp_frame.grid_columnconfigure(c, weight=1)
+        gp_frame.grid_rowconfigure(1, weight=1)
+        gp_frame.grid_rowconfigure(2, weight=1)
         for text, bg, fg, r, c in gp_buttons:
             tk.Button(gp_frame, text=text, bg=bg, fg=fg,
                       activebackground=bg, activeforeground=fg,
-                      relief="raised", bd=1, font=("Arial", 9, "bold"),
-                      padx=6, pady=3, cursor="hand2",
+                      relief="raised", bd=1, font=("Arial", 12, "bold"),
+                      padx=8, pady=5, cursor="hand2",
                       command=lambda t=text: self.log(f"DMX Gameplay {t} (placeholder)")
-                      ).grid(row=r+1, column=c, padx=3, pady=2)
-        # spacer row in gameplay frame
+                      ).grid(row=r+1, column=c, padx=4, pady=3, sticky="nsew")
         tk.Frame(gp_frame, bg="#1a0a2e", height=4).grid(row=3, column=0, columnspan=3)
 
         # RESULTS PRESETS
         rp_frame = tk.Frame(presets_frame, bg="#1a0a2e", bd=1, relief="groove")
-        rp_frame.pack(side="left", padx=(0, 6), fill="y")
+        rp_frame.pack(side="left", padx=(0, 6), fill="both", expand=True)
         tk.Label(rp_frame, text="RESULTS PRESETS", bg="#1a0a2e", fg="white",
-                 font=("Arial", 10, "bold")).pack(pady=(4, 2), padx=8)
+                 font=("Arial", 12, "bold")).pack(pady=(6, 4), padx=8)
         for rp_label in ["Rainbow Rotate", "Color Strobe", "Chase Random"]:
             tk.Button(rp_frame, text=rp_label, bg="#3b2d8b", fg="white",
                       activebackground="#3b2d8b", activeforeground="white",
-                      relief="raised", bd=1, font=("Arial", 9, "bold"),
-                      padx=8, pady=3, cursor="hand2",
+                      relief="raised", bd=1, font=("Arial", 12, "bold"),
+                      padx=10, pady=5, cursor="hand2",
                       command=lambda l=rp_label: self.log(f"DMX Results {l} (placeholder)")
-                      ).pack(fill="x", padx=4, pady=2)
+                      ).pack(fill="x", padx=6, pady=3)
         tk.Frame(rp_frame, bg="#1a0a2e", height=4).pack()
 
         # IDLE WASH
         iw_frame = tk.Frame(presets_frame, bg="#1a0a2e", bd=1, relief="groove")
-        iw_frame.pack(side="left", fill="y")
+        iw_frame.pack(side="left", fill="both", expand=True)
         tk.Label(iw_frame, text="IDLE WASH", bg="#1a0a2e", fg="white",
-                 font=("Arial", 10, "bold")).pack(pady=(4, 2), padx=8)
-        iw_swatch = tk.Canvas(iw_frame, width=30, height=20, bg="#003366",
+                 font=("Arial", 12, "bold")).pack(pady=(6, 4), padx=8)
+        iw_swatch = tk.Canvas(iw_frame, width=60, height=36, bg="#003366",
                               highlightthickness=0)
-        iw_swatch.pack(pady=2)
+        iw_swatch.pack(pady=4)
         tk.Label(iw_frame, text="Warm Amber", bg="#1a0a2e", fg="#cccccc",
-                 font=("Arial", 9)).pack()
+                 font=("Arial", 11)).pack()
         tk.Button(iw_frame, text="APPLY WASH", bg="#2ea62e", fg="white",
                   activebackground="#2ea62e", activeforeground="white",
-                  relief="raised", bd=1, font=("Arial", 9, "bold"),
-                  padx=6, pady=3, cursor="hand2",
+                  relief="raised", bd=1, font=("Arial", 12, "bold"),
+                  padx=8, pady=5, cursor="hand2",
                   command=lambda: self.log("DMX Apply Wash (placeholder)")
-                  ).pack(pady=(4, 6), padx=4, fill="x")
+                  ).pack(pady=(6, 8), padx=6, fill="x")
 
         # --- (f) DMX status line ---
         status_row = tk.Frame(dmx_body, bg="#17071f")
         status_row.pack(fill="x", pady=(4, 2))
-        # Build the status label with colored "ON"
         status_left = tk.Frame(status_row, bg="#17071f")
         status_left.pack(side="left", fill="x", expand=True)
         tk.Label(status_left, text="DMX OUTPUT: ", bg="#17071f", fg="#cccccc",
-                 font=("Arial", 10, "bold")).pack(side="left")
+                 font=("Arial", 11, "bold")).pack(side="left")
         tk.Label(status_left, text="ON", bg="#17071f", fg="#00cc00",
-                 font=("Arial", 10, "bold")).pack(side="left")
+                 font=("Arial", 11, "bold")).pack(side="left")
         tk.Label(status_left, text=" | UNIVERSE: 9 | FIXTURES: 4 x 8CH",
-                 bg="#17071f", fg="#cccccc", font=("Arial", 10, "bold")).pack(side="left")
+                 bg="#17071f", fg="#cccccc", font=("Arial", 11, "bold")).pack(side="left")
         tk.Button(status_row, text="PREVIEW...",
                   command=lambda: self.log("DMX Preview (placeholder)"),
                   bg="#555555", fg="white", activebackground="#555555", activeforeground="white",
-                  relief="raised", bd=1, font=("Arial", 10, "bold"),
+                  relief="raised", bd=1, font=("Arial", 11, "bold"),
                   padx=6, pady=2, cursor="hand2").pack(side="right", padx=(8, 0))
 
     def build_audio_area(self, parent):
@@ -2909,7 +2901,7 @@ class PixelChallengeConsole:
         self.update_master_mute_button()
 
     def build_log_area(self, parent):
-        """Build the INFORMATION / LOG panel (v24.0.0)."""
+        """Build the INFORMATION / LOG panel (v24.0.0) — compact, lower-right."""
         parent.grid_rowconfigure(0, weight=1)
         parent.grid_columnconfigure(0, weight=1)
 
@@ -2918,7 +2910,7 @@ class PixelChallengeConsole:
         log_body.grid_columnconfigure(0, weight=1)
         log_body.grid_rowconfigure(0, weight=1)
 
-        self.info_text = tk.Text(log_body, height=8, width=80, font=("Arial", 13),
+        self.info_text = tk.Text(log_body, height=5, width=80, font=("Arial", 13),
                                  bg="#12061f", fg="white", wrap="word", bd=0, relief="flat")
         self.info_text.grid(row=0, column=0, sticky="nsew")
         scroll = tk.Scrollbar(log_body, command=self.info_text.yview)
