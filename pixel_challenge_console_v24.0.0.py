@@ -478,7 +478,7 @@ class PixelChallengeConsole:
         self.dmx_link_all = tk.BooleanVar(value=True)
         self.dmx_scene = tk.StringVar(value="Cool Blue Static")
         self.dmx_speed = tk.IntVar(value=50)
-        self.dmx_brightness = tk.IntVar(value=80)
+        self.dmx_brightness = tk.IntVar(value=63)
         self.dmx_mode = tk.StringVar(value="auto")  # blackout, gameplay, results, wash, test, manual
 
         self.checkin_open = False
@@ -1288,14 +1288,18 @@ class PixelChallengeConsole:
         if mode == 1:
             self.mode_btn.configure(
                 text="MODE 1\nTIMED",
-                bg="#1b63ff",
-                activebackground="#1b63ff"
+                bg="#0f0617",
+                activebackground="#1b2040",
+                highlightbackground="white",
+                highlightthickness=2
             )
         else:
             self.mode_btn.configure(
                 text="MODE 2\nOBJECTIVE",
-                bg="#9440ff",
-                activebackground="#9440ff"
+                bg="#0f0617",
+                activebackground="#2a0a40",
+                highlightbackground="#bb88ff",
+                highlightthickness=2
             )
 
     def toggle_auto(self):
@@ -1480,8 +1484,33 @@ class PixelChallengeConsole:
 
     def on_theme_checked(self):
         self.selected_themes = {name for name, var in self.theme_vars.items() if var.get()}
+        self.refresh_theme_highlights()
         self.save_settings()
         self.apply_attract_state()
+
+    def refresh_theme_highlights(self):
+        """Update background color of each theme row to highlight checked themes."""
+        if not hasattr(self, 'theme_rows'):
+            return
+        for name, (row, chk, slider) in self.theme_rows.items():
+            checked = self.theme_vars[name].get() if name in self.theme_vars else False
+            bg = "#1b3a6b" if checked else "#17071f"
+            try:
+                row.configure(bg=bg)
+                chk.configure(bg=bg, activebackground=bg)
+                slider.configure(bg=bg)
+            except Exception:
+                pass
+
+    def scroll_theme_up(self):
+        """Scroll the theme list canvas up by one theme row."""
+        if hasattr(self, 'theme_canvas'):
+            self.theme_canvas.yview_scroll(-1, "units")
+
+    def scroll_theme_down(self):
+        """Scroll the theme list canvas down by one theme row."""
+        if hasattr(self, 'theme_canvas'):
+            self.theme_canvas.yview_scroll(1, "units")
 
     def on_theme_selected(self, event=None):
         name = self.theme_listbox_selection()
@@ -1498,13 +1527,22 @@ class PixelChallengeConsole:
             self.attract.step = 0
 
     def on_theme_selected_manual(self, theme_name: str):
-        if hasattr(self, 'theme_select_box'):
-            self.theme_select_box.selection_clear(0, "end")
-            try:
-                idx = self.theme_names.index(theme_name)
-                self.theme_select_box.selection_set(idx)
-            except Exception:
-                pass
+        """Scroll the theme list to make the given theme visible."""
+        if not hasattr(self, 'theme_rows') or theme_name not in self.theme_rows:
+            return
+        try:
+            row, chk, slider = self.theme_rows[theme_name]
+            self.theme_canvas.update_idletasks()
+            row_y = row.winfo_y()
+            canvas_h = self.theme_canvas.winfo_height()
+            scroll_region = self.theme_canvas.bbox("all")
+            if scroll_region:
+                total_h = scroll_region[3]
+                if total_h > canvas_h and total_h > 0:
+                    frac = max(0.0, min(1.0, row_y / total_h))
+                    self.theme_canvas.yview_moveto(frac)
+        except Exception:
+            pass
 
     # =========================================================================
     # JOYSTICK / CONTROLLER METHODS
@@ -2373,15 +2411,15 @@ class PixelChallengeConsole:
         main_container.grid_columnconfigure(0, weight=0)
         main_container.grid_columnconfigure(1, weight=1)
 
-        # LEFT SIDE: Attract mode with its own vertical paned window (unchanged)
+        # LEFT SIDE: Attract mode + Audio Mixer in vertical paned window
         self.left_vertical = tk.PanedWindow(main_container, orient="vertical", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
         self.left_vertical.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
 
         self.attract_container = tk.Frame(self.left_vertical, bg="#12061f")
         self.left_vertical.add(self.attract_container, minsize=300)
 
-        left_bottom_filler = tk.Frame(self.left_vertical, bg="#12061f")
-        self.left_vertical.add(left_bottom_filler, minsize=50)
+        self.audio_container = tk.Frame(self.left_vertical, bg="#12061f")
+        self.left_vertical.add(self.audio_container, minsize=200)
 
         # RIGHT SIDE: vertical paned — upper row (top) | lower row (bottom) | buttons (fixed)
         right_outer = tk.Frame(main_container, bg="#12061f")
@@ -2390,7 +2428,7 @@ class PixelChallengeConsole:
         right_outer.grid_rowconfigure(1, weight=0)
         right_outer.grid_columnconfigure(0, weight=1)
 
-        # Vertical paned window: upper content row | lower row
+        # Vertical paned window: upper content row | log (full width)
         self.main_vertical = tk.PanedWindow(right_outer, orient="vertical", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
         self.main_vertical.grid(row=0, column=0, sticky="nsew")
 
@@ -2410,15 +2448,9 @@ class PixelChallengeConsole:
         self.controllers_container = tk.Frame(self.content_paned, bg="#12061f")
         self.content_paned.add(self.controllers_container, minsize=MIN_CONTROLLERS)
 
-        # LOWER ROW: horizontal PanedWindow — Audio Mixer (left) | Info/Log (right)
-        self.lower_paned = tk.PanedWindow(self.main_vertical, orient="horizontal", sashwidth=8, sashrelief="raised", bg="#0b0314", opaqueresize=True)
-        self.main_vertical.add(self.lower_paned, minsize=MIN_INFO_HEIGHT)
-
-        self.audio_container = tk.Frame(self.lower_paned, bg="#12061f")
-        self.lower_paned.add(self.audio_container, minsize=200)
-
-        self.log_container = tk.Frame(self.lower_paned, bg="#12061f")
-        self.lower_paned.add(self.log_container, minsize=MIN_LOG_WIDTH)
+        # LOWER ROW: INFORMATION / LOG — full width (audio mixer moved to left column)
+        self.log_container = tk.Frame(self.main_vertical, bg="#12061f")
+        self.main_vertical.add(self.log_container, minsize=MIN_INFO_HEIGHT)
 
         # Button row (fixed at bottom below main_vertical, not in paned window)
         self.bottom_container = tk.Frame(right_outer, bg="#12061f")
@@ -2439,7 +2471,6 @@ class PixelChallengeConsole:
         self.left_vertical.bind("<ButtonRelease-1>", self.save_sash_positions)
         self.main_vertical.bind("<ButtonRelease-1>", self.save_sash_positions)
         self.content_paned.bind("<ButtonRelease-1>", self.save_sash_positions)
-        self.lower_paned.bind("<ButtonRelease-1>", self.save_sash_positions)
 
     def restore_sashes(self):
         self.root.update_idletasks()
@@ -2482,13 +2513,6 @@ class PixelChallengeConsole:
         except Exception:
             pass
 
-        # Lower paned sash: AUDIO | LOG (50/50 split)
-        try:
-            if hasattr(self, 'lower_paned'):
-                self.lower_paned.sash_place(0, max(200, (total_w - 340) // 2), 0)
-        except Exception:
-            pass
-
     def save_sash_positions(self, event=None):
         try:
             if hasattr(self, 'left_vertical'):
@@ -2528,10 +2552,11 @@ class PixelChallengeConsole:
         self.config_btn = self.neon_button(center, "CONFIG", self.open_config_window, bg="#9440ff", width=8)
         self.config_btn.grid(row=0, column=2, padx=10)
         
-        # Mode toggle button
-        self.mode_btn = tk.Button(center, text="MODE 1\nTIMED", command=self.toggle_game_mode, 
-                                   bg="#1b63ff", fg="white", activebackground="#1b63ff", 
-                                   activeforeground="white", relief="raised", bd=3, 
+        # Mode toggle button — outlined/bordered style (white border on dark bg)
+        self.mode_btn = tk.Button(center, text="MODE 1\nTIMED", command=self.toggle_game_mode,
+                                   bg="#0f0617", fg="white", activebackground="#1b2040",
+                                   activeforeground="white", relief="solid", bd=2,
+                                   highlightbackground="white", highlightthickness=2,
                                    font=("Arial", 12, "bold"), width=10, pady=2, cursor="hand2")
         self.mode_btn.grid(row=0, column=3, padx=10)
         
@@ -2556,40 +2581,95 @@ class PixelChallengeConsole:
         self.animate_btn.pack(side="left", padx=(0, 6))
         self.lanes_test_btn = self.neon_button(anim_row, "LANES TEST", self.on_all_lanes_test, bg="#1b63ff", width=12)
         self.lanes_test_btn.pack(side="left", padx=(0, 6))
-        tk.Label(left_body, text="CYCLE DURATION (secs)", bg="#17071f", fg="#cccccc", font=("Arial", 14, "bold")).pack(anchor="center", pady=(6, 2))
-        tk.Scale(left_body, from_=20, to=200, resolution=20, orient="horizontal", variable=self.cycle_seconds, bg="#17071f", fg="white", troughcolor="#071a30", highlightthickness=0, font=("Arial", 12, "bold"), command=self.on_cycle_changed, length=520).pack(fill="x", pady=(0, 8))
-        tk.Label(left_body, text="THEME BRIGHTNESS (%)", bg="#17071f", fg="#cccccc", font=("Arial", 14, "bold")).pack(anchor="center", pady=(4, 2))
-        tk.Scale(left_body, from_=0, to=100, resolution=1, orient="horizontal", variable=self.theme_brightness_percent, bg="#17071f", fg="white", troughcolor="#071a30", highlightthickness=0, font=("Arial", 12, "bold"), command=self.on_theme_brightness_changed, length=520).pack(fill="x", pady=(0, 6))
-        tk.Label(left_body, text="GAMEPLAY BRIGHTNESS (%)", bg="#17071f", fg="#cccccc", font=("Arial", 14, "bold")).pack(anchor="center", pady=(4, 2))
-        tk.Scale(left_body, from_=0, to=100, resolution=1, orient="horizontal", variable=self.gameplay_brightness_percent, bg="#17071f", fg="white", troughcolor="#071a30", highlightthickness=0, font=("Arial", 12, "bold"), command=self.on_gameplay_brightness_changed, length=520).pack(fill="x", pady=(0, 12))
+        # --- Compact 3-column −/+ controls for Duration, Theme Bright, Game Bright ---
+        ctrl_outer = tk.Frame(left_body, bg="#17071f")
+        ctrl_outer.pack(fill="x", pady=(6, 8))
+        headers = ["DURATION", "THEME BRIGHT", "GAME BRIGHT"]
+        for col, hdr in enumerate(headers):
+            ctrl_outer.grid_columnconfigure(col, weight=1)
+            tk.Label(ctrl_outer, text=hdr, bg="#17071f", fg="#cccccc",
+                     font=("Arial", 11, "bold")).grid(row=0, column=col, padx=4, pady=(0, 2))
+            pair = tk.Frame(ctrl_outer, bg="#17071f")
+            pair.grid(row=1, column=col, padx=4, pady=2)
+            if col == 0:
+                def _dec_dur(s=self):
+                    s.cycle_seconds.set(max(20, s.cycle_seconds.get() - 5))
+                    s.on_cycle_changed(s.cycle_seconds.get())
+                def _inc_dur(s=self):
+                    s.cycle_seconds.set(min(200, s.cycle_seconds.get() + 5))
+                    s.on_cycle_changed(s.cycle_seconds.get())
+                tk.Button(pair, text="−", command=_dec_dur,
+                          bg="#1a0a2e", fg="white", activebackground="#2d1055", activeforeground="white",
+                          relief="raised", bd=2, font=("Arial", 14, "bold"),
+                          width=3, pady=2, cursor="hand2").pack(side="left", padx=2)
+                tk.Button(pair, text="+", command=_inc_dur,
+                          bg="#1a0a2e", fg="white", activebackground="#2d1055", activeforeground="white",
+                          relief="raised", bd=2, font=("Arial", 14, "bold"),
+                          width=3, pady=2, cursor="hand2").pack(side="left", padx=2)
+            elif col == 1:
+                def _dec_tbr(s=self):
+                    s.theme_brightness_percent.set(max(0, s.theme_brightness_percent.get() - 10))
+                    s.on_theme_brightness_changed(s.theme_brightness_percent.get())
+                def _inc_tbr(s=self):
+                    s.theme_brightness_percent.set(min(100, s.theme_brightness_percent.get() + 10))
+                    s.on_theme_brightness_changed(s.theme_brightness_percent.get())
+                tk.Button(pair, text="−", command=_dec_tbr,
+                          bg="#1a0a2e", fg="white", activebackground="#2d1055", activeforeground="white",
+                          relief="raised", bd=2, font=("Arial", 14, "bold"),
+                          width=3, pady=2, cursor="hand2").pack(side="left", padx=2)
+                tk.Button(pair, text="+", command=_inc_tbr,
+                          bg="#1a0a2e", fg="white", activebackground="#2d1055", activeforeground="white",
+                          relief="raised", bd=2, font=("Arial", 14, "bold"),
+                          width=3, pady=2, cursor="hand2").pack(side="left", padx=2)
+            else:
+                def _dec_gbr(s=self):
+                    s.gameplay_brightness_percent.set(max(0, s.gameplay_brightness_percent.get() - 10))
+                    s.on_gameplay_brightness_changed(s.gameplay_brightness_percent.get())
+                def _inc_gbr(s=self):
+                    s.gameplay_brightness_percent.set(min(100, s.gameplay_brightness_percent.get() + 10))
+                    s.on_gameplay_brightness_changed(s.gameplay_brightness_percent.get())
+                tk.Button(pair, text="−", command=_dec_gbr,
+                          bg="#1a0a2e", fg="white", activebackground="#2d1055", activeforeground="white",
+                          relief="raised", bd=2, font=("Arial", 14, "bold"),
+                          width=3, pady=2, cursor="hand2").pack(side="left", padx=2)
+                tk.Button(pair, text="+", command=_inc_gbr,
+                          bg="#1a0a2e", fg="white", activebackground="#2d1055", activeforeground="white",
+                          relief="raised", bd=2, font=("Arial", 14, "bold"),
+                          width=3, pady=2, cursor="hand2").pack(side="left", padx=2)
         tk.Label(left_body, text="THEMES (check to include in CYCLE)", bg="#17071f", fg="#cccccc", font=("Arial", 16, "bold")).pack(anchor="center", pady=(2, 6))
         theme_frame = tk.Frame(left_body, bg="#17071f")
         theme_frame.pack(fill="both", expand=True, pady=(0, 6))
-        canvas = tk.Canvas(theme_frame, bg="#17071f", highlightthickness=0, width=320, height=680)
-        vsb = tk.Scrollbar(theme_frame, orient="vertical", command=canvas.yview)
-        self.theme_listbox = tk.Frame(canvas, bg="#17071f")
-        self.theme_listbox.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.create_window((0, 0), window=self.theme_listbox, anchor="nw")
-        canvas.configure(yscrollcommand=vsb.set)
-        canvas.pack(side="left", fill="both", expand=True)
-        vsb.pack(side="right", fill="y")
+        self.theme_canvas = tk.Canvas(theme_frame, bg="#17071f", highlightthickness=0, width=320, height=680)
+        # Up/Down arrow buttons replace the scrollbar
+        arrow_frame = tk.Frame(theme_frame, bg="#17071f")
+        arrow_frame.pack(side="right", fill="y", padx=(2, 0))
+        tk.Button(arrow_frame, text="▲", command=self.scroll_theme_up,
+                  bg="#1a0a2e", fg="white", activebackground="#2d1055", activeforeground="white",
+                  relief="raised", bd=2, font=("Arial", 12, "bold"),
+                  width=2, pady=4, cursor="hand2").pack(pady=(4, 2))
+        tk.Button(arrow_frame, text="▼", command=self.scroll_theme_down,
+                  bg="#1a0a2e", fg="white", activebackground="#2d1055", activeforeground="white",
+                  relief="raised", bd=2, font=("Arial", 12, "bold"),
+                  width=2, pady=4, cursor="hand2").pack(pady=(2, 4))
+        self.theme_listbox = tk.Frame(self.theme_canvas, bg="#17071f")
+        self.theme_listbox.bind("<Configure>", lambda e: self.theme_canvas.configure(scrollregion=self.theme_canvas.bbox("all")))
+        self.theme_canvas.create_window((0, 0), window=self.theme_listbox, anchor="nw")
+        self.theme_canvas.pack(side="left", fill="both", expand=True)
+        self.theme_rows = {}
         for name in self.theme_names:
             var = tk.BooleanVar(value=(name in self.selected_themes))
             speed_var = tk.IntVar(value=self.theme_speed(name))
-            row = tk.Frame(self.theme_listbox, bg="#17071f")
+            checked = name in self.selected_themes
+            row_bg = "#1b3a6b" if checked else "#17071f"
+            row = tk.Frame(self.theme_listbox, bg=row_bg)
             row.pack(fill="x", pady=4, padx=4)
-            chk = tk.Checkbutton(row, text=name, variable=var, bg="#17071f", fg="white", activebackground="#17071f", activeforeground="white", selectcolor="#071a30", font=("Arial", 14, "bold"), command=self.on_theme_checked, anchor="w", padx=4)
+            chk = tk.Checkbutton(row, text=name, variable=var, bg=row_bg, fg="white", activebackground=row_bg, activeforeground="white", selectcolor="#071a30", font=("Arial", 14, "bold"), command=self.on_theme_checked, anchor="w", padx=4)
             chk.pack(side="left", fill="x", expand=True)
-            slider = tk.Scale(row, from_=1, to=10, orient="horizontal", variable=speed_var, bg="#17071f", fg="white", troughcolor="#071a30", highlightthickness=0, font=("Arial", 10, "bold"), command=lambda v, n=name: self.on_theme_speed_changed(n, v), length=220)
+            slider = tk.Scale(row, from_=1, to=10, orient="horizontal", variable=speed_var, bg=row_bg, fg="white", troughcolor="#071a30", highlightthickness=0, font=("Arial", 10, "bold"), command=lambda v, n=name: self.on_theme_speed_changed(n, v), length=220)
             slider.pack(side="right", padx=(6, 0))
             self.theme_vars[name] = var
             self.theme_speed_vars[name] = speed_var
-        self.theme_select_box = tk.Listbox(left_body, height=2, font=("Arial", 12), bg="#071a30", fg="white", selectbackground="#135dff", activestyle="none", bd=2, relief="sunken")
-        for name in self.theme_names:
-            self.theme_select_box.insert("end", name)
-        self.theme_select_box.selection_set(0)
-        self.theme_select_box.pack(fill="x", pady=(4, 4))
-        self.theme_select_box.bind("<<ListboxSelect>>", self.on_theme_selected)
+            self.theme_rows[name] = (row, chk, slider)
 
     def build_center_area(self, parent):
         parent.grid_rowconfigure(3, weight=1)
@@ -2612,14 +2692,6 @@ class PixelChallengeConsole:
         self.checkin_button.grid(row=0, column=0, sticky="w", padx=(0, 6))
         self.confirm_button = self.neon_button(checkin_row, "CONFIRM", self.on_confirm_players, bg="#1b63ff", width=12)
         self.confirm_button.grid(row=0, column=1, sticky="e", padx=(6, 0))
-
-        # Row 2: JOINED count — centered below buttons
-        joined_frame = tk.Frame(enroll_body, bg="#17071f")
-        joined_frame.pack(fill="x", pady=(0, 4))
-        inner = tk.Frame(joined_frame, bg="#17071f")
-        inner.pack(anchor="center")
-        tk.Label(inner, text="JOINED:", bg="#17071f", fg="#ffd74f", font=("Arial", 16, "bold")).pack(side="left", padx=(0, 4))
-        tk.Label(inner, textvariable=self.players_joined, bg="#24101f", fg="#ffd74f", font=("Arial", 20, "bold"), width=2).pack(side="left")
 
         filler = tk.Frame(parent, bg="#12061f")
         filler.grid(row=3, column=0, sticky="nsew")
@@ -2649,13 +2721,24 @@ class PixelChallengeConsole:
             ("RESULTS",  "#2ea62e"),
             ("WASH",     "#1a8a6a"),
             ("TEST",     "#cccc00"),
-            ("EDIT...",  "#555555"),
+            ("EDIT",     "#555555"),
         ]
         for label, color in quick_btns:
             fg = "black" if label == "TEST" else "white"
             tk.Button(quick_row, text=label,
                       command=lambda l=label: self.log(f"DMX {l} (placeholder)"),
                       bg=color, fg=fg, activebackground=color, activeforeground=fg,
+                      relief="raised", bd=2, font=("Arial", 10, "bold"),
+                      padx=6, pady=3, cursor="hand2").pack(side="left", padx=2)
+
+        # --- (a2) Second row of blank placeholder buttons for future assignment ---
+        slot_row = tk.Frame(dmx_body, bg="#17071f")
+        slot_row.pack(fill="x", pady=(0, 4))
+        slot_colors = ["#2a1a4a", "#1a2a4a", "#1a4a2a", "#4a2a1a", "#4a1a2a", "#2a4a1a"]
+        for i, bg_col in enumerate(slot_colors, start=1):
+            tk.Button(slot_row, text="", width=6,
+                      command=lambda n=i: self.log(f"DMX Slot {n} (unassigned)"),
+                      bg=bg_col, fg="white", activebackground=bg_col, activeforeground="white",
                       relief="raised", bd=2, font=("Arial", 10, "bold"),
                       padx=6, pady=3, cursor="hand2").pack(side="left", padx=2)
 
@@ -2686,10 +2769,10 @@ class PixelChallengeConsole:
         cards_frame = tk.Frame(dmx_body, bg="#17071f")
         cards_frame.pack(fill="x", pady=(2, 4))
         fixtures = [
-            ("L1", "#cc0000"),
-            ("L2", "#0044cc"),
-            ("L3", "#0044cc"),
-            ("L4", "#996600"),
+            ("L1", "#000000"),
+            ("L2", "#000000"),
+            ("L3", "#000000"),
+            ("L4", "#000000"),
         ]
         for label, swatch_color in fixtures:
             card = tk.Frame(cards_frame, bg="#1a0a2e", bd=1, relief="groove")
@@ -2697,7 +2780,7 @@ class PixelChallengeConsole:
             tk.Label(card, text=label, bg="#1a0a2e", fg="white",
                      font=("Arial", 12, "bold")).pack(pady=(4, 2))
             swatch = tk.Canvas(card, width=50, height=30, bg=swatch_color,
-                               highlightthickness=0)
+                               highlightbackground="white", highlightthickness=2)
             swatch.pack(padx=4, pady=2)
             tk.Label(card, text="Mode: Auto", bg="#1a0a2e", fg="#aaaaaa",
                      font=("Arial", 9)).pack()
@@ -2992,7 +3075,7 @@ class PixelChallengeConsole:
             # SLA display - get from sla_store for accuracy
             sla_value = self.sla_store.get_player_sla(idx)
             sla_valid = self.sla_store.is_sla_valid(idx)
-            sla_text = f"SLA={sla_value}" if sla_valid else f"SLA={sla_value}*"
+            sla_text = f"SLA-{sla_value}{'*' if not sla_valid else ''}"
             sla_color = "#ffd74f" if sla_valid else "#888888"
             tk.Label(frame, text=sla_text, bg=colors[idx], fg="white", font=("Arial", 14, "bold")).pack(fill="x", padx=8, pady=(0, 4))
             
