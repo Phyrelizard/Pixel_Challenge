@@ -2507,6 +2507,7 @@ class PixelChallengeConsole:
             pass
 
         # Right horizontal paned sash 0: DMX | right_inner
+        # Default width of 380 gives the expanded DMX panel adequate space for its larger elements
         try:
             if self.sash_center_mixer and hasattr(self, 'right_hpaned'):
                 self.right_hpaned.sash_place(0, int(self.sash_center_mixer), 0)
@@ -2516,6 +2517,8 @@ class PixelChallengeConsole:
             pass
 
         # Content paned sash 0: PLAYER | CONTROLLERS
+        # content_paned now holds only Player Status + Controllers (DMX moved to right_hpaned),
+        # so the minimum of 400 covers the player status minimum width (minsize=400)
         try:
             if self.sash_center_ctrl and hasattr(self, 'content_paned'):
                 self.content_paned.sash_place(0, int(self.sash_center_ctrl), 0)
