@@ -176,3 +176,64 @@ class ConsoleHostAPI:
             def get(self):
                 return False
         return MockVar()
+
+    # =========================================================================
+    # DMX Methods (v25.3.0)
+    # =========================================================================
+
+    def dmx_set_color(self, r: int, g: int, b: int) -> None:
+        """Set all DMX fixtures to an RGB color."""
+        try:
+            if hasattr(self.console, 'dmx') and self.console.dmx:
+                self.console.dmx.set_all_color(r, g, b)
+        except Exception as e:
+            self.log(f"dmx_set_color error: {e}")
+
+    def dmx_set_fixture_color(self, fixture_index: int, r: int, g: int, b: int) -> None:
+        """Set a specific DMX fixture to an RGB color."""
+        try:
+            if hasattr(self.console, 'dmx') and self.console.dmx:
+                self.console.dmx.set_fixture_color(fixture_index, r, g, b)
+        except Exception as e:
+            self.log(f"dmx_set_fixture_color error: {e}")
+
+    def dmx_apply_scene(self, scene_name: str) -> None:
+        """Apply a named DMX scene."""
+        try:
+            if hasattr(self.console, 'dmx') and self.console.dmx:
+                self.console.dmx.apply_scene(scene_name)
+        except Exception as e:
+            self.log(f"dmx_apply_scene error: {e}")
+
+    def dmx_blackout(self) -> None:
+        """Turn off all DMX fixtures."""
+        try:
+            if hasattr(self.console, 'dmx') and self.console.dmx:
+                self.console.dmx.blackout()
+        except Exception as e:
+            self.log(f"dmx_blackout error: {e}")
+
+    def dmx_set_strobe(self, speed: int) -> None:
+        """Set strobe speed on all DMX fixtures. 0=off, 16-255=speed."""
+        try:
+            if hasattr(self.console, 'dmx') and self.console.dmx:
+                self.console.dmx.set_all_strobe(speed)
+        except Exception as e:
+            self.log(f"dmx_set_strobe error: {e}")
+
+    def dmx_set_brightness(self, percent: int) -> None:
+        """Set DMX master brightness 0-100."""
+        try:
+            if hasattr(self.console, 'dmx') and self.console.dmx:
+                self.console.dmx.set_brightness(percent)
+        except Exception as e:
+            self.log(f"dmx_set_brightness error: {e}")
+
+    def dmx_get_scene_names(self) -> list:
+        """Get list of available DMX scene names."""
+        try:
+            if hasattr(self.console, 'dmx') and self.console.dmx:
+                return self.console.dmx.get_scene_names()
+        except Exception:
+            pass
+        return []
