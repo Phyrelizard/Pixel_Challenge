@@ -15,19 +15,19 @@
     "Lane Chase RL": 3
   },
   "selected_themes": [
-    "Rainbow Pulse",
+    "Calm Mode",
     "Ice Burst",
-    "Calm Mode"
+    "Rainbow Pulse"
   ],
   "sash_left_attract_bottom": 595,
-  "sash_center_ctrl": 1063,
+  "sash_center_ctrl": 401,
   "sash_main_info": 504,
-  "sash_bottom_log": 598,
+  "sash_bottom_log": 525,
   "sash_center_mixer": 655,
   "sash_mixer_height": null,
   "falcon_brightness": 30,
   "gameplay_brightness": 72,
-  "music_volume": 0,
+  "music_volume": 9,
   "sfx_volume": 35,
   "voice_volume": 39,
   "master_volume": 14,
