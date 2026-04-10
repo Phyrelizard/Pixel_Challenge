@@ -11,13 +11,20 @@
         "blue": 3,
         "color_macros": 4,
         "strobe": 5,
-        "dimmer": 6,
-        "auto_programs": 7,
-        "program_speed": 8
+        "mode": 6,
+        "dimmer": 7,
+        "dimmer_speed": 8
       },
-      "strobe_range": {"off_max": 15, "min": 16, "max": 255},
-      "dimmer_range": {"off": 0, "full": 255},
-      "notes": "Color macros CH4: 0-15 no function, 16-255 overrides RGB. Dimmer CH6 must be >0 for output."
+      "strobe_range": {
+        "off_max": 15,
+        "min": 16,
+        "max": 255
+      },
+      "dimmer_range": {
+        "off": 0,
+        "full": 255
+      },
+      "notes": "Dimmer CH4 must be >0 for output. Color macros CH6: 0-15 no function, 16-255 overrides RGB."
     }
   ]
 }

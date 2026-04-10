@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v25.3.1
+Pixel Challenge Host Console v25.3.4
 
 """
 
@@ -26,7 +26,7 @@ from games.base import PlayerConfig
 # SLA System (v21.8.0)
 from sla import SLAStore, SLACalibration
 
-VERSION_LABEL = "v25.3.1"
+VERSION_LABEL = "v25.3.4"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 DEFAULT_FALCON_IP = "192.168.2.113"
@@ -423,16 +423,16 @@ class DMXService:
                 base = self._fixture_base_address(i)
                 # Channel offsets (1-based in profile → 0-based offset from base)
                 r_off   = p.get("red",          1)
-                g_off   = p.get("green",         2)
-                b_off   = p.get("blue",          3)
-                mac_off = p.get("color_macros",  4)
-                str_off = p.get("strobe",        5)
-                dim_off = p.get("dimmer",        6)
-                aut_off = p.get("auto_programs", 7)
-                spd_off = p.get("program_speed", 8)
+                g_off   = p.get("green",        2)
+                b_off   = p.get("blue",         3)
+                mac_off = p.get("color_macros", 4)
+                str_off = p.get("strobe",       5)
+                mod_off = p.get("mode",         6)
+                dim_off = p.get("dimmer",       7)
+                dsp_off = p.get("dimmer_speed", 8)
 
                 def _safe_set(offset, value, _buf=buf, _base=base):
-                    idx = _base + offset
+                    idx = _base + (offset - 1)
                     if 0 <= idx < 512:
                         _buf[idx] = clamp8(value)
 
@@ -441,9 +441,9 @@ class DMXService:
                 _safe_set(b_off,   state.get("b",      0))
                 _safe_set(mac_off, 0)                          # color macros off
                 _safe_set(str_off, state.get("strobe", 0))
-                _safe_set(dim_off, state.get("dimmer", 255))
-                _safe_set(aut_off, 0)                          # auto programs off
-                _safe_set(spd_off, 0)                          # program speed 0
+                _safe_set(mod_off, 0)                          # mode: no function (0-31)
+                _safe_set(dim_off, state.get("dimmer", 255))   # dimmer on CH7
+                _safe_set(dsp_off, 0)                          # dimmer speed off
 
             self.falcon.sender[self.universe].dmx_data = bytes(buf)
         except Exception as e:
@@ -1181,12 +1181,13 @@ class PixelChallengeConsole:
                     "channels": 8,
                     "channel_map": {
                         "red": 1, "green": 2, "blue": 3,
-                        "color_macros": 4, "strobe": 5, "dimmer": 6,
-                        "auto_programs": 7, "program_speed": 8
+                        "color_macros": 4, "strobe": 5, "mode": 6,
+                        "dimmer": 7, "dimmer_speed": 8
                     },
+                    
                     "strobe_range": {"off_max": 15, "min": 16, "max": 255},
                     "dimmer_range": {"off": 0, "full": 255},
-                    "notes": "Color macros CH4: 0-15 no function, 16-255 overrides RGB. Dimmer CH6 must be >0 for output."
+                            "notes": "Dimmer CH4 must be >0 for output. Color macros CH6: 0-15 no function, 16-255 overrides RGB."
                 }
             ]
         }
@@ -4078,8 +4079,8 @@ class PixelChallengeConsole:
                          font=("Arial", 10), width=5).pack(side="left")
                 v = tk.StringVar(value="Not Used")
                 # Default sensible assignments for 8-ch fixture
-                defaults = {1: "Red", 2: "Green", 3: "Blue", 4: "Color Macros",
-                             5: "Strobe", 6: "Dimmer", 7: "Auto Programs", 8: "Speed"}
+                defaults = {1: "Red", 2: "Green", 3: "Blue", 4: "Dimmer",
+                             5: "Strobe", 6: "Color Macros", 7: "Auto Programs", 8: "Speed"}
                 if ch_idx in defaults:
                     v.set(defaults[ch_idx])
                 ch_vars.append(v)
