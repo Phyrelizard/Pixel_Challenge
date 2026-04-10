@@ -1264,6 +1264,14 @@ class PixelChallengeConsole:
                 hex_color = f"#{rc:02x}{gc:02x}{bc:02x}"
                 try:
                     canvas.configure(bg=hex_color)
+                    # Update Dim/Strobe labels if stored
+                    if hasattr(self, '_dmx_card_dim_labels') and i < len(self._dmx_card_dim_labels):
+                        dim_pct = int(dimmer / 255 * 100)
+                        self._dmx_card_dim_labels[i].configure(text=f"Dim: {dim_pct}%")
+                    if hasattr(self, '_dmx_card_strobe_labels') and i < len(self._dmx_card_strobe_labels):
+                        strobe = state.get("strobe", 0)
+                        strobe_txt = "Strobe: On" if strobe >= 16 else "Strobe: Off"
+                        self._dmx_card_strobe_labels[i].configure(text=strobe_txt)
                 except Exception:
                     pass
 
@@ -3232,10 +3240,12 @@ class PixelChallengeConsole:
                   )
                   ).pack(pady=(6, 8), padx=6, fill="x")
 
-        # --- (c) Four Fixture Cards with live swatches (compact) ---
+        # --- (c) Four Fixture Cards with live swatches ---
         cards_frame = tk.Frame(dmx_body, bg="#17071f")
         cards_frame.pack(fill="x", pady=(2, 4))
         self.dmx_fixture_swatches = []
+        self._dmx_card_dim_labels = []
+        self._dmx_card_strobe_labels = []
         fixture_labels = ["L1", "L2", "L3", "L4"]
         for idx, label in enumerate(fixture_labels):
             card = tk.Frame(cards_frame, bg="#1a0a2e", bd=1, relief="groove")
@@ -3246,47 +3256,70 @@ class PixelChallengeConsole:
                                highlightbackground="white", highlightthickness=2)
             swatch.pack(padx=6, pady=4)
             self.dmx_fixture_swatches.append(swatch)
+            tk.Label(card, text="Mode: Auto", bg="#1a0a2e", fg="#aaaaaa",
+                     font=("Arial", 11)).pack()
+            strobe_lbl = tk.Label(card, text="Strobe: Off", bg="#1a0a2e", fg="#aaaaaa",
+                                  font=("Arial", 11))
+            strobe_lbl.pack()
+            self._dmx_card_strobe_labels.append(strobe_lbl)
+            dim_lbl = tk.Label(card, text="Dim: 100%", bg="#1a0a2e", fg="#aaaaaa",
+                               font=("Arial", 11))
+            dim_lbl.pack()
+            self._dmx_card_dim_labels.append(dim_lbl)
             tk.Button(card, text="OVERRIDE", bg="#2ea62e", fg="white",
                       activebackground="#2ea62e", activeforeground="white",
                       relief="raised", bd=1, font=("Arial", 11, "bold"),
                       padx=6, pady=4, cursor="hand2",
                       command=lambda l=label: self.log(f"DMX Override {l} (placeholder)")
-                      ).pack(pady=(4, 8), padx=6, fill="x")
+                      ).pack(pady=(6, 8), padx=6, fill="x")
 
-        # --- (d) Scene row (full width) + Speed/Brightness row below ---
+        # --- (d) Scene row (full width, tall) ---
         scene_row = tk.Frame(dmx_body, bg="#17071f")
-        scene_row.pack(fill="x", pady=(2, 2))
+        scene_row.pack(fill="x", pady=(4, 4))
         tk.Label(scene_row, text="Scene:", bg="#17071f", fg="#ffd74f",
                  font=("Arial", 15, "bold")).pack(side="left", padx=(0, 4))
         scene_names = self.dmx.get_scene_names() if self.dmx else ["Cool Blue Static", "Warm Amber"]
         scene_combo = ttk.Combobox(scene_row, textvariable=self.dmx_scene,
                                    values=scene_names,
-                                   font=("Arial", 11), state="readonly", width=30)
-        scene_combo.pack(side="left", fill="x", expand=True)
+                                   font=("Arial", 14), state="readonly", width=30)
+        scene_combo.pack(side="left", fill="x", expand=True, ipady=6)
 
+        # --- Speed / Brightness — label on top, slider below, side by side ---
         slider_row = tk.Frame(dmx_body, bg="#17071f")
         slider_row.pack(fill="x", pady=(2, 4))
-        tk.Label(slider_row, text="Speed:", bg="#17071f", fg="#cccccc",
+
+        # Speed column (left)
+        speed_col = tk.Frame(slider_row, bg="#17071f")
+        speed_col.pack(side="left", fill="x", expand=True)
+        speed_lbl_row = tk.Frame(speed_col, bg="#17071f")
+        speed_lbl_row.pack(fill="x")
+        tk.Label(speed_lbl_row, text="Speed:", bg="#17071f", fg="#cccccc",
                  font=("Arial", 15, "bold")).pack(side="left", padx=(0, 4))
-        tk.Scale(slider_row, from_=0, to=100, resolution=1, orient="horizontal",
+        tk.Label(speed_lbl_row, textvariable=self.dmx_speed, bg="#17071f", fg="white",
+                 font=("Arial", 12, "bold")).pack(side="left", padx=(0, 2))
+        tk.Label(speed_lbl_row, text="%", bg="#17071f", fg="white",
+                 font=("Arial", 12)).pack(side="left")
+        tk.Scale(speed_col, from_=0, to=100, resolution=1, orient="horizontal",
                  variable=self.dmx_speed, bg="#17071f", fg="white",
                  troughcolor="#071a30", highlightthickness=0,
-                 font=("Arial", 10, "bold"), length=190).pack(side="left", padx=(0, 8))
-        tk.Label(slider_row, textvariable=self.dmx_speed, bg="#17071f", fg="white",
-                 font=("Arial", 12, "bold")).pack(side="left", padx=(0, 2))
-        tk.Label(slider_row, text="%", bg="#17071f", fg="white",
-                 font=("Arial", 12)).pack(side="left", padx=(0, 14))
-        tk.Label(slider_row, text="Brightness:", bg="#17071f", fg="#ffd74f",
+                 font=("Arial", 10, "bold"), length=190).pack(fill="x", padx=(0, 8))
+
+        # Brightness column (right)
+        bright_col = tk.Frame(slider_row, bg="#17071f")
+        bright_col.pack(side="left", fill="x", expand=True)
+        bright_lbl_row = tk.Frame(bright_col, bg="#17071f")
+        bright_lbl_row.pack(fill="x")
+        tk.Label(bright_lbl_row, text="Brightness:", bg="#17071f", fg="#ffd74f",
                  font=("Arial", 15, "bold")).pack(side="left", padx=(0, 4))
-        tk.Scale(slider_row, from_=0, to=100, resolution=1, orient="horizontal",
+        tk.Label(bright_lbl_row, textvariable=self.dmx_brightness, bg="#17071f", fg="#ffd74f",
+                 font=("Arial", 12, "bold")).pack(side="left", padx=(0, 2))
+        tk.Label(bright_lbl_row, text="%", bg="#17071f", fg="#ffd74f",
+                 font=("Arial", 12)).pack(side="left")
+        tk.Scale(bright_col, from_=0, to=100, resolution=1, orient="horizontal",
                  variable=self.dmx_brightness, bg="#17071f", fg="white",
                  troughcolor="#071a30", highlightthickness=0,
                  font=("Arial", 10, "bold"), length=190,
-                 command=self.on_dmx_brightness_changed).pack(side="left", padx=(0, 8))
-        tk.Label(slider_row, textvariable=self.dmx_brightness, bg="#17071f", fg="#ffd74f",
-                 font=("Arial", 12, "bold")).pack(side="left", padx=(0, 2))
-        tk.Label(slider_row, text="%", bg="#17071f", fg="#ffd74f",
-                 font=("Arial", 12)).pack(side="left")
+                 command=self.on_dmx_brightness_changed).pack(fill="x", padx=(0, 8))
 
     def build_audio_area(self, parent):
         """Build the AUDIO MIXER panel — extracted from build_dmx_audio_area (v24.0.0)."""
