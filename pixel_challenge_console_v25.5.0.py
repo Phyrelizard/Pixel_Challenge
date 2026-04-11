@@ -3367,7 +3367,7 @@ class PixelChallengeConsole:
                     pass
 
         self.open_setup_window()
-        if self.setup_window and tk.Toplevel.winfo_exists(self.setup_window):
+        if self.setup_window and self.setup_window.winfo_exists():
             # Override the setup window close protocol to return to editor
             self.setup_window.protocol("WM_DELETE_WINDOW", _on_setup_close)
 
