@@ -1,0 +1,638 @@
+[
+  {
+    "name": "Cool Blue Static",
+    "category": "idle",
+    "game": "global",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": [
+        "L1",
+        "L2",
+        "L3",
+        "L4"
+      ],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": [
+        "#0044cc",
+        "#0066ff",
+        "#4499ff",
+        "#88bbff",
+        "#0033aa",
+        "#0077cc",
+        "#003399",
+        "#005588"
+      ],
+      "mode": "palette_cycle",
+      "brightness": 100,
+      "saturation": 90,
+      "blending": 20
+    },
+    "pattern": {
+      "type": "static",
+      "speed": 50,
+      "fade_time": 0.35,
+      "direction": 90,
+      "loop": true
+    },
+    "transitions": {
+      "fade_in": 0.5,
+      "fade_out": 1.0,
+      "crossfade": true,
+      "auto_expire": 0.0,
+      "return_to_default": true,
+      "return_to_default_time": 2.5
+    },
+    "triggers": [
+      "host_idle",
+      "attract_cycle"
+    ],
+    "trigger_behavior": "loop",
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0.35,
+      "auto_expire": 2.0
+    },
+    "button_assignment": null
+  },
+  {
+    "name": "Rainbow Wave",
+    "category": "gameplay",
+    "game": "global",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": [
+        "L1",
+        "L2",
+        "L3",
+        "L4"
+      ],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": [
+        "#ff0000",
+        "#ff8800",
+        "#ffee00",
+        "#00cc00",
+        "#0066ff",
+        "#aa00ff",
+        "#ff00aa",
+        "#ff4400"
+      ],
+      "mode": "palette_cycle",
+      "brightness": 100,
+      "saturation": 90,
+      "blending": 20
+    },
+    "pattern": {
+      "type": "sweep",
+      "speed": 60,
+      "fade_time": 0.35,
+      "direction": 90,
+      "loop": true
+    },
+    "transitions": {
+      "fade_in": 0.5,
+      "fade_out": 1.0,
+      "crossfade": true,
+      "auto_expire": 0.0,
+      "return_to_default": true,
+      "return_to_default_time": 2.5
+    },
+    "triggers": [
+      "gameplay_start"
+    ],
+    "trigger_behavior": "loop",
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0.35,
+      "auto_expire": 2.0
+    },
+    "button_assignment": null
+  },
+  {
+    "name": "Fire Burst",
+    "category": "gameplay",
+    "game": "splash",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": [
+        "L1",
+        "L2",
+        "L3",
+        "L4"
+      ],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": [
+        "#FF4400",
+        "#FF8800",
+        "#FFCC00",
+        "#FF2200",
+        "#FFAA00",
+        "#FFE400",
+        "#FF0000",
+        "#FF6600"
+      ],
+      "mode": "palette_cycle",
+      "brightness": 100,
+      "saturation": 90,
+      "blending": 20
+    },
+    "pattern": {
+      "type": "pulse",
+      "speed": 100,
+      "fade_time": 0.35,
+      "direction": 90,
+      "loop": true
+    },
+    "transitions": {
+      "fade_in": 0.5,
+      "fade_out": 1.0,
+      "crossfade": true,
+      "auto_expire": 0.0,
+      "return_to_default": true,
+      "return_to_default_time": 2.5
+    },
+    "triggers": [
+      "gameplay_start",
+      "timer_countdown"
+    ],
+    "trigger_behavior": "loop",
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0.35,
+      "auto_expire": 2.0
+    },
+    "button_assignment": null
+  },
+  {
+    "name": "Gold Victory",
+    "category": "results",
+    "game": "global",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": [
+        "L1",
+        "L2",
+        "L3",
+        "L4"
+      ],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": [
+        "#ffd700",
+        "#ffcc00",
+        "#ffaa00",
+        "#ffffff",
+        "#ffe066",
+        "#ffdd44",
+        "#ffbb00",
+        "#fff0aa"
+      ],
+      "mode": "palette_cycle",
+      "brightness": 100,
+      "saturation": 90,
+      "blending": 20
+    },
+    "pattern": {
+      "type": "chase",
+      "speed": 70,
+      "fade_time": 0.35,
+      "direction": 90,
+      "loop": true
+    },
+    "transitions": {
+      "fade_in": 0.5,
+      "fade_out": 1.0,
+      "crossfade": true,
+      "auto_expire": 0.0,
+      "return_to_default": true,
+      "return_to_default_time": 2.5
+    },
+    "triggers": [
+      "results_shown",
+      "scoreboard_shown"
+    ],
+    "trigger_behavior": "loop",
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0.35,
+      "auto_expire": 2.0
+    },
+    "button_assignment": null
+  },
+  {
+    "name": "Team Sync",
+    "category": "gameplay",
+    "game": "global",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": [
+        "L1",
+        "L2",
+        "L3",
+        "L4"
+      ],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": [
+        "#ff3300",
+        "#3399ff",
+        "#00ff66",
+        "#cc00ff",
+        "#ff6600",
+        "#0066cc",
+        "#00cc44",
+        "#aa00cc"
+      ],
+      "mode": "palette_cycle",
+      "brightness": 100,
+      "saturation": 90,
+      "blending": 20
+    },
+    "pattern": {
+      "type": "alternating",
+      "speed": 50,
+      "fade_time": 0.35,
+      "direction": 90,
+      "loop": true
+    },
+    "transitions": {
+      "fade_in": 0.5,
+      "fade_out": 1.0,
+      "crossfade": true,
+      "auto_expire": 0.0,
+      "return_to_default": true,
+      "return_to_default_time": 2.5
+    },
+    "triggers": [
+      "gameplay_start"
+    ],
+    "trigger_behavior": "loop",
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0.35,
+      "auto_expire": 2.0
+    },
+    "button_assignment": null
+  },
+  {
+    "name": "Lava Pulse",
+    "category": "gameplay",
+    "game": "global",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": [
+        "L1",
+        "L2",
+        "L3",
+        "L4"
+      ],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": [
+        "#ff1100",
+        "#ff4400",
+        "#ff7700",
+        "#cc0000",
+        "#ff2200",
+        "#ff5500",
+        "#dd1100",
+        "#ff3300"
+      ],
+      "mode": "palette_cycle",
+      "brightness": 100,
+      "saturation": 90,
+      "blending": 20
+    },
+    "pattern": {
+      "type": "pulse",
+      "speed": 80,
+      "fade_time": 0.35,
+      "direction": 90,
+      "loop": true
+    },
+    "transitions": {
+      "fade_in": 0.5,
+      "fade_out": 1.0,
+      "crossfade": true,
+      "auto_expire": 0.0,
+      "return_to_default": true,
+      "return_to_default_time": 2.5
+    },
+    "triggers": [
+      "gameplay_start"
+    ],
+    "trigger_behavior": "loop",
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0.35,
+      "auto_expire": 2.0
+    },
+    "button_assignment": null
+  },
+  {
+    "name": "Red Alert",
+    "category": "warning",
+    "game": "global",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "high",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": [
+        "L1",
+        "L2",
+        "L3",
+        "L4"
+      ],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": [
+        "#ff0000",
+        "#cc0000",
+        "#ff4400",
+        "#ff0000",
+        "#dd0000",
+        "#ff0000",
+        "#aa0000",
+        "#ff2200"
+      ],
+      "mode": "palette_cycle",
+      "brightness": 100,
+      "saturation": 90,
+      "blending": 20
+    },
+    "pattern": {
+      "type": "strobe",
+      "speed": 90,
+      "fade_time": 0.35,
+      "direction": 90,
+      "loop": true
+    },
+    "transitions": {
+      "fade_in": 0.5,
+      "fade_out": 1.0,
+      "crossfade": true,
+      "auto_expire": 0.0,
+      "return_to_default": true,
+      "return_to_default_time": 2.5
+    },
+    "triggers": [
+      "fault_condition",
+      "network_lost"
+    ],
+    "trigger_behavior": "loop",
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0.35,
+      "auto_expire": 2.0
+    },
+    "button_assignment": null
+  },
+  {
+    "name": "Amber Blaze",
+    "category": "test",
+    "game": "global",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": [
+        "L1",
+        "L2",
+        "L3",
+        "L4"
+      ],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": [
+        "#ff9900",
+        "#ffbb00",
+        "#ffaa00",
+        "#dd8800",
+        "#ffcc00",
+        "#ff8800",
+        "#eebb00",
+        "#ff9900"
+      ],
+      "mode": "palette_cycle",
+      "brightness": 100,
+      "saturation": 90,
+      "blending": 20
+    },
+    "pattern": {
+      "type": "static",
+      "speed": 30,
+      "fade_time": 0.35,
+      "direction": 90,
+      "loop": true
+    },
+    "transitions": {
+      "fade_in": 0.5,
+      "fade_out": 1.0,
+      "crossfade": true,
+      "auto_expire": 0.0,
+      "return_to_default": true,
+      "return_to_default_time": 2.5
+    },
+    "triggers": [
+      "manual_test",
+      "lane_test"
+    ],
+    "trigger_behavior": "loop",
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0.35,
+      "auto_expire": 2.0
+    },
+    "button_assignment": null
+  },
+  {
+    "name": "Green Chase Up",
+    "category": "attract",
+    "game": "global",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": [
+        "L1",
+        "L2",
+        "L3",
+        "L4"
+      ],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": [
+        "#00ff44",
+        "#00cc33",
+        "#00ee33",
+        "#44ff66",
+        "#00aa22",
+        "#00dd44",
+        "#22ff55",
+        "#00bb33"
+      ],
+      "mode": "palette_cycle",
+      "brightness": 100,
+      "saturation": 90,
+      "blending": 20
+    },
+    "pattern": {
+      "type": "chase",
+      "speed": 55,
+      "fade_time": 0.35,
+      "direction": 90,
+      "loop": true
+    },
+    "transitions": {
+      "fade_in": 0.5,
+      "fade_out": 1.0,
+      "crossfade": true,
+      "auto_expire": 0.0,
+      "return_to_default": true,
+      "return_to_default_time": 2.5
+    },
+    "triggers": [
+      "app_startup",
+      "attract_cycle"
+    ],
+    "trigger_behavior": "loop",
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0.35,
+      "auto_expire": 2.0
+    },
+    "button_assignment": null
+  },
+  {
+    "name": "Yellow Flash",
+    "category": "attract",
+    "game": "global",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": [
+        "L1",
+        "L2",
+        "L3",
+        "L4"
+      ],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": [
+        "#ffff00",
+        "#ffee00",
+        "#ffcc00",
+        "#ffffaa",
+        "#ffdd00",
+        "#ffee44",
+        "#ffff66",
+        "#eeee00"
+      ],
+      "mode": "palette_cycle",
+      "brightness": 100,
+      "saturation": 90,
+      "blending": 20
+    },
+    "pattern": {
+      "type": "bounce",
+      "speed": 65,
+      "fade_time": 0.35,
+      "direction": 90,
+      "loop": true
+    },
+    "transitions": {
+      "fade_in": 0.5,
+      "fade_out": 1.0,
+      "crossfade": true,
+      "auto_expire": 0.0,
+      "return_to_default": true,
+      "return_to_default_time": 2.5
+    },
+    "triggers": [
+      "auto_attract"
+    ],
+    "trigger_behavior": "loop",
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0.35,
+      "auto_expire": 2.0
+    },
+    "button_assignment": null
+  }
+]
