@@ -106,7 +106,7 @@ COLOR_PRESETS = [
     {"name": "Midnight Blue", "hex": "#001155"},
     {"name": "Spring Green",  "hex": "#00ee66"},
     {"name": "Rose Blush",    "hex": "#ffaacc"},
-    {"name": "Arctic Frost",  "hex": "#cceeFF"},
+    {"name": "Arctic Frost",  "hex": "#cceeff"},
     {"name": "Cherry Red",    "hex": "#dd1133"},
     {"name": "Ocean Teal",    "hex": "#008899"},
     {"name": "Honey Amber",   "hex": "#dd9900"},
