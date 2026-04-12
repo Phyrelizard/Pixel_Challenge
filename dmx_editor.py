@@ -1407,7 +1407,8 @@ class DMXLightingEditor:
         # Per-trigger behavior modes
         tbm = getattr(scene, "trigger_behavior_map", {})
         for ev, var in self._trigger_behavior_vars.items():
-            mode = tbm.get(ev, {}).get("mode", "loop") if isinstance(tbm.get(ev), dict) else tbm.get(ev, "loop")
+            entry = tbm.get(ev)
+            mode = entry.get("mode", "loop") if isinstance(entry, dict) else (entry or "loop")
             var.set(mode if mode in TRIGGER_BEHAVIOR_MODES else "loop")
 
         # Refresh list highlight
