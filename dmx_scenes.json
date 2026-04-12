@@ -1,69 +1,5 @@
 [
   {
-    "name": "Cool Blue Static",
-    "category": "idle",
-    "game": "global",
-    "mode_filter": "any",
-    "enabled": true,
-    "locked": false,
-    "priority": "normal",
-    "fixture_target": {
-      "bank": 1,
-      "range": "1-4",
-      "groups": [
-        "L1",
-        "L2",
-        "L3",
-        "L4"
-      ],
-      "link_mode": "linked"
-    },
-    "colors": {
-      "palette": [
-        "#0044cc",
-        "#0066ff",
-        "#4499ff",
-        "#88bbff",
-        "#0033aa",
-        "#0077cc",
-        "#003399",
-        "#005588"
-      ],
-      "mode": "palette_cycle",
-      "brightness": 100,
-      "saturation": 90,
-      "blending": 20
-    },
-    "pattern": {
-      "type": "static",
-      "speed": 50,
-      "fade_time": 0.35,
-      "direction": 90,
-      "loop": true
-    },
-    "transitions": {
-      "fade_in": 0.5,
-      "fade_out": 1.0,
-      "crossfade": true,
-      "auto_expire": 0.0,
-      "return_to_default": true,
-      "return_to_default_time": 2.5
-    },
-    "triggers": [
-      "host_idle",
-      "attract_cycle"
-    ],
-    "trigger_behavior": "loop",
-    "dmx_settings": {
-      "channels": "master_rgb",
-      "universe": 5,
-      "size": 4,
-      "blackout_time": 0.35,
-      "auto_expire": 2.0
-    },
-    "button_assignment": null
-  },
-  {
     "name": "Rainbow Wave",
     "category": "gameplay",
     "game": "global",
@@ -117,6 +53,7 @@
       "gameplay_start"
     ],
     "trigger_behavior": "loop",
+    "trigger_behavior_map": {},
     "dmx_settings": {
       "channels": "master_rgb",
       "universe": 5,
@@ -124,6 +61,16 @@
       "blackout_time": 0.35,
       "auto_expire": 2.0
     },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "fallback_scene": "",
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100
+    },
+    "fixture_roles": {},
     "button_assignment": null
   },
   {
@@ -181,6 +128,7 @@
       "timer_countdown"
     ],
     "trigger_behavior": "loop",
+    "trigger_behavior_map": {},
     "dmx_settings": {
       "channels": "master_rgb",
       "universe": 5,
@@ -188,6 +136,16 @@
       "blackout_time": 0.35,
       "auto_expire": 2.0
     },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "fallback_scene": "",
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100
+    },
+    "fixture_roles": {},
     "button_assignment": null
   },
   {
@@ -245,6 +203,7 @@
       "scoreboard_shown"
     ],
     "trigger_behavior": "loop",
+    "trigger_behavior_map": {},
     "dmx_settings": {
       "channels": "master_rgb",
       "universe": 5,
@@ -252,6 +211,16 @@
       "blackout_time": 0.35,
       "auto_expire": 2.0
     },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "fallback_scene": "",
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100
+    },
+    "fixture_roles": {},
     "button_assignment": null
   },
   {
@@ -308,6 +277,7 @@
       "gameplay_start"
     ],
     "trigger_behavior": "loop",
+    "trigger_behavior_map": {},
     "dmx_settings": {
       "channels": "master_rgb",
       "universe": 5,
@@ -315,6 +285,16 @@
       "blackout_time": 0.35,
       "auto_expire": 2.0
     },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "fallback_scene": "",
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100
+    },
+    "fixture_roles": {},
     "button_assignment": null
   },
   {
@@ -371,6 +351,7 @@
       "gameplay_start"
     ],
     "trigger_behavior": "loop",
+    "trigger_behavior_map": {},
     "dmx_settings": {
       "channels": "master_rgb",
       "universe": 5,
@@ -378,6 +359,16 @@
       "blackout_time": 0.35,
       "auto_expire": 2.0
     },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "fallback_scene": "",
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100
+    },
+    "fixture_roles": {},
     "button_assignment": null
   },
   {
@@ -435,6 +426,7 @@
       "network_lost"
     ],
     "trigger_behavior": "loop",
+    "trigger_behavior_map": {},
     "dmx_settings": {
       "channels": "master_rgb",
       "universe": 5,
@@ -442,6 +434,16 @@
       "blackout_time": 0.35,
       "auto_expire": 2.0
     },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "fallback_scene": "",
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100
+    },
+    "fixture_roles": {},
     "button_assignment": null
   },
   {
@@ -499,6 +501,7 @@
       "lane_test"
     ],
     "trigger_behavior": "loop",
+    "trigger_behavior_map": {},
     "dmx_settings": {
       "channels": "master_rgb",
       "universe": 5,
@@ -506,6 +509,16 @@
       "blackout_time": 0.35,
       "auto_expire": 2.0
     },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "fallback_scene": "",
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100
+    },
+    "fixture_roles": {},
     "button_assignment": null
   },
   {
@@ -563,6 +576,7 @@
       "attract_cycle"
     ],
     "trigger_behavior": "loop",
+    "trigger_behavior_map": {},
     "dmx_settings": {
       "channels": "master_rgb",
       "universe": 5,
@@ -570,6 +584,16 @@
       "blackout_time": 0.35,
       "auto_expire": 2.0
     },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "fallback_scene": "",
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100
+    },
+    "fixture_roles": {},
     "button_assignment": null
   },
   {
@@ -626,6 +650,7 @@
       "auto_attract"
     ],
     "trigger_behavior": "loop",
+    "trigger_behavior_map": {},
     "dmx_settings": {
       "channels": "master_rgb",
       "universe": 5,
@@ -633,6 +658,543 @@
       "blackout_time": 0.35,
       "auto_expire": 2.0
     },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "fallback_scene": "",
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100
+    },
+    "fixture_roles": {},
+    "button_assignment": null
+  },
+  {
+    "name": "Cool Blue Static (Copy)",
+    "category": "idle",
+    "game": "global",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": [
+        "L1",
+        "L2",
+        "L3",
+        "L4"
+      ],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": [
+        "#0044cc",
+        "#0066ff",
+        "#4499ff",
+        "#88bbff",
+        "#0033aa",
+        "#0077cc",
+        "#003399",
+        "#005588"
+      ],
+      "mode": "palette_cycle",
+      "brightness": 100,
+      "saturation": 90,
+      "blending": 20
+    },
+    "pattern": {
+      "type": "static",
+      "speed": 50,
+      "fade_time": 0.35,
+      "direction": 90,
+      "loop": true
+    },
+    "transitions": {
+      "fade_in": 0.5,
+      "fade_out": 1.0,
+      "crossfade": true,
+      "auto_expire": 0.0,
+      "return_to_default": true,
+      "return_to_default_time": 2.5
+    },
+    "triggers": [
+      "host_idle",
+      "attract_cycle"
+    ],
+    "trigger_behavior": "loop",
+    "trigger_behavior_map": {},
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0.35,
+      "auto_expire": 2.0
+    },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "fallback_scene": "",
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100
+    },
+    "fixture_roles": {},
+    "button_assignment": null
+  },
+  {
+    "name": "Yellow Flash test",
+    "category": "attract",
+    "game": "global",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": [
+        "L1",
+        "L2",
+        "L3",
+        "L4",
+        "L8"
+      ],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": [
+        "#ffff00",
+        "#ffee00",
+        "#ffcc00",
+        "#ffffaa",
+        "#ffdd00",
+        "#ffee44",
+        "#ffff66",
+        "#eeee00"
+      ],
+      "mode": "palette_cycle",
+      "brightness": 100,
+      "saturation": 90,
+      "blending": 20
+    },
+    "pattern": {
+      "type": "random_flash",
+      "speed": 65,
+      "fade_time": 0.35,
+      "direction": 90,
+      "loop": true
+    },
+    "transitions": {
+      "fade_in": 0.5,
+      "fade_out": 1.0,
+      "crossfade": true,
+      "auto_expire": 0.0,
+      "return_to_default": true,
+      "return_to_default_time": 2.5,
+      "delay_before_start": 0.0
+    },
+    "triggers": [
+      "auto_attract",
+      "countdown_5",
+      "countdown_4",
+      "countdown_3",
+      "countdown_2",
+      "countdown_1",
+      "countdown_go"
+    ],
+    "trigger_behavior": "loop",
+    "trigger_behavior_map": {
+      "auto_attract": {
+        "mode": "play_once",
+        "priority": "normal",
+        "duration": 0
+      },
+      "countdown_5": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      },
+      "countdown_4": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      },
+      "countdown_3": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      },
+      "countdown_2": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      },
+      "countdown_1": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      },
+      "countdown_go": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      }
+    },
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0.35,
+      "auto_expire": 2.0,
+      "return_to_default_time": 2.5
+    },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "fallback_scene": "",
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100
+    },
+    "fixture_roles": {},
+    "button_assignment": null
+  },
+  {
+    "name": "Cool Blue Static",
+    "category": "idle",
+    "game": "surround",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": [
+        "L1",
+        "L2",
+        "L3",
+        "L4",
+        "L8"
+      ],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": [
+        "#0044cc",
+        "#0066ff",
+        "#4499ff",
+        "#88bbff",
+        "#0033aa",
+        "#0077cc",
+        "#003399",
+        "#005588"
+      ],
+      "mode": "palette_cycle",
+      "brightness": 100,
+      "saturation": 90,
+      "blending": 20
+    },
+    "pattern": {
+      "type": "static",
+      "speed": 50,
+      "fade_time": 0.35,
+      "direction": 90,
+      "loop": true
+    },
+    "transitions": {
+      "fade_in": 0.5,
+      "fade_out": 1.0,
+      "crossfade": true,
+      "auto_expire": 0.0,
+      "return_to_default": true,
+      "return_to_default_time": 2.5,
+      "delay_before_start": 0.0
+    },
+    "triggers": [
+      "host_idle",
+      "attract_cycle"
+    ],
+    "trigger_behavior": "loop",
+    "trigger_behavior_map": {
+      "host_idle": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      },
+      "attract_cycle": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      }
+    },
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0.35,
+      "auto_expire": 2.0,
+      "return_to_default_time": 2.5
+    },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "fallback_scene": "",
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100
+    },
+    "fixture_roles": {},
+    "button_assignment": null
+  },
+  {
+    "name": "Yellow Flash (Copy)",
+    "category": "gameplay",
+    "game": "splash",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": [
+        "L1",
+        "L2",
+        "L3",
+        "L4",
+        "L8"
+      ],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": [
+        "#ffff00",
+        "#ffee00",
+        "#ffcc00",
+        "#ffffaa",
+        "#ffdd00",
+        "#ffee44",
+        "#ffff66",
+        "#eeee00"
+      ],
+      "mode": "palette_cycle",
+      "brightness": 100,
+      "saturation": 90,
+      "blending": 20
+    },
+    "pattern": {
+      "type": "palette_cycle",
+      "speed": 70,
+      "fade_time": 0.35,
+      "direction": 90,
+      "loop": true
+    },
+    "transitions": {
+      "fade_in": 0.5,
+      "fade_out": 1.0,
+      "crossfade": true,
+      "auto_expire": 0.0,
+      "return_to_default": true,
+      "return_to_default_time": 2.5,
+      "delay_before_start": 0.0
+    },
+    "triggers": [
+      "auto_attract",
+      "checkin_opened",
+      "player_joined",
+      "checkin_locked"
+    ],
+    "trigger_behavior": "loop",
+    "trigger_behavior_map": {
+      "auto_attract": {
+        "mode": "interrupt",
+        "priority": "normal",
+        "duration": 0
+      },
+      "checkin_opened": {
+        "mode": "interrupt",
+        "priority": "normal",
+        "duration": 0
+      },
+      "player_joined": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      },
+      "checkin_locked": {
+        "mode": "interrupt",
+        "priority": "normal",
+        "duration": 0
+      }
+    },
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0.35,
+      "auto_expire": 2.0,
+      "return_to_default_time": 2.5
+    },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "fallback_scene": "",
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100
+    },
+    "fixture_roles": {},
+    "button_assignment": null
+  },
+  {
+    "name": "Rainbow Wave (Copy)",
+    "category": "gameplay",
+    "game": "surround",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": [
+        "L1",
+        "L2",
+        "L3",
+        "L4",
+        "L8"
+      ],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": [
+        "#ff8800",
+        "#ffee00",
+        "#00cc00",
+        "#0066ff",
+        "#aa00ff",
+        "#ff00aa",
+        "#ff4400",
+        "#ff0000"
+      ],
+      "mode": "palette_cycle",
+      "brightness": 100,
+      "saturation": 90,
+      "blending": 20
+    },
+    "pattern": {
+      "type": "sweep",
+      "speed": 60,
+      "fade_time": 0.35,
+      "direction": 90,
+      "loop": true
+    },
+    "transitions": {
+      "fade_in": 0.5,
+      "fade_out": 1.0,
+      "crossfade": true,
+      "auto_expire": 0.0,
+      "return_to_default": true,
+      "return_to_default_time": 2.5,
+      "delay_before_start": 0.0
+    },
+    "triggers": [
+      "checkin_opened",
+      "player_joined",
+      "checkin_locked",
+      "intro_started",
+      "countdown_5",
+      "countdown_4",
+      "countdown_3",
+      "countdown_2",
+      "countdown_1",
+      "countdown_go",
+      "gameplay_start"
+    ],
+    "trigger_behavior": "loop",
+    "trigger_behavior_map": {
+      "checkin_opened": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      },
+      "player_joined": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      },
+      "checkin_locked": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      },
+      "intro_started": {
+        "mode": "interrupt",
+        "priority": "normal",
+        "duration": 0
+      },
+      "countdown_5": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      },
+      "countdown_4": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      },
+      "countdown_3": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      },
+      "countdown_2": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      },
+      "countdown_1": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      },
+      "countdown_go": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      },
+      "gameplay_start": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      }
+    },
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0.35,
+      "auto_expire": 2.0,
+      "return_to_default_time": 2.5
+    },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "fallback_scene": "",
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100
+    },
+    "fixture_roles": {},
     "button_assignment": null
   }
 ]

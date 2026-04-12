@@ -1,0 +1,37 @@
+
+
+CONSOLE V26.1.0
+
+Summary
+Files Changed
+1. pixel_challenge_console_v25.5.0.py (NEW — 4328 lines, based on v25.4.1)
+
+Updated docstring and VERSION_LABEL to "v25.5.0"
+Added DMX_SCENES_FILE and DMX_SAVED_COLORS_FILE constants
+In build_dmx_area(): removed _dmx_edit() stub and EDIT button from quick button row; added full-width purple EDITOR button row (a3)
+Added three new methods: open_dmx_editor(), on_editor_closed(), open_dmx_hw_config_from_editor()
+2. dmx_editor_data.py (UPDATED — 569→632 lines)
+
+SCENE_CATEGORIES: added "wash", "fault", "victory"
+GAME_FILTERS: added "ascend"
+PATTERN_TYPES: added 7 new patterns (wave_center, wave_lr, wave_player, build_up, explosion, sparkle, breathing)
+Added TRIGGER_BEHAVIOR_MODES and FIXTURE_ROLES constants
+DMXScene.default(): added safety dict (with unit comments), trigger_behavior_map, fixture_roles
+DMXScene.__init__/to_dict/validate(): updated for all new fields
+SceneValidator.validate(): added safety advisory warnings
+3. dmx_editor.py (UPDATED — 1629→2130 lines)
+
+Fixture grid: 2×8 (16 fixtures F1–F16), ALL/NONE buttons, fixture control row (COLOR/REVERSE/SHIFT L/SHIFT R/MIRROR + intensity slider)
+New right panel sections: TRANSITION RULES, DMX SETTINGS, SAFETY & LIMITS
+Triggers: per-trigger behavior combobox, Copy/Paste Triggers buttons
+Button assignment: updated labels (SCORE/INTRO/GAMEPLAY/START/TEST), right-click context menu
+Playback animation: real _preview_timer_id cycling with play/rewind/fast/loop
+Keyboard shortcuts: Ctrl+S (save), Ctrl+D (duplicate), Ctrl+Z (undo), Escape (close)
+1-step undo: _undo_snapshot stored on scene load/save
+Dirty indicator: * in breadcrumb, warn-on-close dialog
+Scene sorting: Name/Category/Game sort buttons above scene list
+Overwrite confirm: prompt before replacing an existing scene with a different name
+WARM/COOL buttons: color temperature shifts in COLOR PALETTE section
+Scoped scrolling: module-level _scroll_owner guard prevents multiple scrollable frames from interfering
+ASCEND game filter: fixed key from "custom" to "ascend"
+

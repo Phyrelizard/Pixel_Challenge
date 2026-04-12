@@ -11,18 +11,30 @@ import os
 # Constants
 # ---------------------------------------------------------------------------
 
-SCENE_CATEGORIES = ["idle", "attract", "gameplay", "results", "warning", "test", "custom"]
+SCENE_CATEGORIES = [
+    "idle", "attract", "gameplay", "results", "wash",
+    "warning", "fault", "victory", "test", "custom",
+]
 
-GAME_FILTERS = ["global", "splash", "surround", "pong", "snake", "custom"]
+GAME_FILTERS = ["global", "splash", "surround", "pong", "snake", "ascend", "custom"]
 
 PATTERN_TYPES = [
     "static", "pulse", "sweep", "chase", "strobe", "bounce",
     "alternating", "palette_cycle", "random_flash", "fade_loop",
+    "wave_center", "wave_lr", "wave_player", "build_up",
+    "explosion", "sparkle", "breathing",
 ]
 
 APPLY_MODES = ["linked", "split", "individual", "random"]
 
 PRIORITY_LEVELS = ["low", "normal", "high", "critical"]
+
+TRIGGER_BEHAVIOR_MODES = ["play_once", "loop", "interrupt", "queue", "blend"]
+
+FIXTURE_ROLES = [
+    "stage_wash", "player_accent", "crowd_wash", "back_wall",
+    "effect_lights", "warning", "ambient", "feature",
+]
 
 TRIGGER_EVENTS = [
     "app_startup",
@@ -182,6 +194,17 @@ class DMXScene:
                 "auto_expire": 2.0,
             },
             "button_assignment": None,
+            "safety": {
+                "max_brightness": 100,        # percentage (0–100)
+                "strobe_cap": 80,             # percentage (0–100); max strobe intensity
+                "safe_startup": True,         # apply a safe low-level scene on DMX init
+                "fallback_scene": "",         # scene name to use if current scene fails
+                "idle_timeout": 300,          # seconds before auto-returning to idle scene
+                "test_brightness_limit": 80,  # percentage (0–100); cap during test mode
+                "global_master": 100,         # percentage (0–100); master intensity multiplier
+            },
+            "trigger_behavior_map": {},
+            "fixture_roles": {},
         }
 
     def __init__(self, data: dict = None):
@@ -190,11 +213,11 @@ class DMXScene:
             # Top-level scalar fields
             for key in ("name", "category", "game", "mode_filter", "enabled",
                         "locked", "priority", "triggers", "trigger_behavior",
-                        "button_assignment"):
+                        "button_assignment", "trigger_behavior_map", "fixture_roles"):
                 setattr(self, key, data.get(key, defaults[key]))
             # Nested dicts — merge with defaults so missing sub-keys are filled
             for key in ("fixture_target", "colors", "pattern", "transitions",
-                        "dmx_settings"):
+                        "dmx_settings", "safety"):
                 merged = dict(defaults[key])
                 merged.update(data.get(key) or {})
                 setattr(self, key, merged)
@@ -217,7 +240,10 @@ class DMXScene:
             "transitions": dict(self.transitions),
             "triggers": list(self.triggers),
             "trigger_behavior": self.trigger_behavior,
+            "trigger_behavior_map": dict(self.trigger_behavior_map),
             "dmx_settings": dict(self.dmx_settings),
+            "safety": dict(self.safety),
+            "fixture_roles": dict(self.fixture_roles),
             "button_assignment": self.button_assignment,
         }
 
@@ -252,6 +278,21 @@ class DMXScene:
         saturation = self.colors.get("saturation", 100)
         if not (0 <= saturation <= 100):
             errors.append("Saturation must be between 0 and 100.")
+        # Safety field validation
+        safety = getattr(self, "safety", {})
+        for key in ("max_brightness", "strobe_cap", "global_master"):
+            val = safety.get(key, 100)
+            if not (0 <= val <= 100):
+                errors.append(f"Safety {key} must be between 0 and 100.")
+        # trigger_behavior_map mode validation
+        for trig, cfg in getattr(self, "trigger_behavior_map", {}).items():
+            mode = cfg.get("mode", "loop") if isinstance(cfg, dict) else cfg
+            if mode not in TRIGGER_BEHAVIOR_MODES:
+                errors.append(f"Unknown trigger behavior mode '{mode}' for trigger '{trig}'.")
+        # fixture_roles value validation
+        for group, role in getattr(self, "fixture_roles", {}).items():
+            if role not in FIXTURE_ROLES:
+                errors.append(f"Unknown fixture role '{role}' for group '{group}'.")
         return errors
 
 
@@ -565,5 +606,21 @@ class SceneValidator:
 
         if scene.pattern.get("type") == "strobe" and scene.priority not in ("high", "critical"):
             warnings.append("Strobe scenes should generally use 'high' or 'critical' priority.")
+
+        # Safety advisory warnings
+        safety = getattr(scene, "safety", {})
+        max_brightness = safety.get("max_brightness", 100)
+        if max_brightness > 90:
+            warnings.append(
+                "Max brightness is above 90 — consider capping for safety in enclosed venues."
+            )
+        strobe_cap = safety.get("strobe_cap", 80)
+        if strobe_cap > 80 and scene.pattern.get("type") == "strobe":
+            warnings.append(
+                "Strobe safety cap is above 80 — high-rate strobes may cause discomfort."
+            )
+        global_master = safety.get("global_master", 100)
+        if global_master < 10:
+            warnings.append("Global master intensity is very low — output may be invisible.")
 
         return warnings
