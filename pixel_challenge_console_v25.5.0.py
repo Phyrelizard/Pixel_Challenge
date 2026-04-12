@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v25.4.0
+Pixel Challenge Host Console v25.5.0
 
 """
 

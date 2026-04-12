@@ -195,13 +195,13 @@ class DMXScene:
             },
             "button_assignment": None,
             "safety": {
-                "max_brightness": 100,
-                "strobe_cap": 80,
-                "safe_startup": True,
-                "fallback_scene": "",
-                "idle_timeout": 300,
-                "test_brightness_limit": 80,
-                "global_master": 100,
+                "max_brightness": 100,        # percentage (0–100)
+                "strobe_cap": 80,             # percentage (0–100); max strobe intensity
+                "safe_startup": True,         # apply a safe low-level scene on DMX init
+                "fallback_scene": "",         # scene name to use if current scene fails
+                "idle_timeout": 300,          # seconds before auto-returning to idle scene
+                "test_brightness_limit": 80,  # percentage (0–100); cap during test mode
+                "global_master": 100,         # percentage (0–100); master intensity multiplier
             },
             "trigger_behavior_map": {},
             "fixture_roles": {},

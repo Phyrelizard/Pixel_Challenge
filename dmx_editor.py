@@ -92,6 +92,10 @@ def _contrasting_fg(hex_color: str):
     return "#000000" if luminance > 140 else "#ffffff"
 
 
+# Module-level scroll owner — only the canvas the mouse is currently over scrolls.
+_scroll_owner: list = [None]
+
+
 def _make_scrollable_frame(parent, bg=BG_PANEL):
     """Returns (outer_frame, canvas, inner_frame, scrollbar)."""
     outer = tk.Frame(parent, bg=bg)
@@ -109,21 +113,29 @@ def _make_scrollable_frame(parent, bg=BG_PANEL):
     canvas.bind("<Configure>", lambda e: canvas.itemconfig(win_id, width=e.width))
 
     def _on_mousewheel(event):
-        delta = -1 * (event.delta // 120) if event.delta else (-1 if event.num == 4 else 1)
-        canvas.yview_scroll(delta, "units")
+        if _scroll_owner[0] is canvas:
+            delta = -1 * (event.delta // 120) if event.delta else (-1 if event.num == 4 else 1)
+            canvas.yview_scroll(delta, "units")
 
     def _on_enter(event):
-        canvas.bind_all("<MouseWheel>", _on_mousewheel)
-        canvas.bind_all("<Button-4>", _on_mousewheel)
-        canvas.bind_all("<Button-5>", _on_mousewheel)
+        _scroll_owner[0] = canvas
 
     def _on_leave(event):
-        canvas.unbind_all("<MouseWheel>")
-        canvas.unbind_all("<Button-4>")
-        canvas.unbind_all("<Button-5>")
+        if _scroll_owner[0] is canvas:
+            _scroll_owner[0] = None
 
+    # Bind enter/leave on both canvas and inner frame so the owner is tracked
+    # regardless of whether the pointer is over the canvas or its child widgets.
     canvas.bind("<Enter>", _on_enter)
     canvas.bind("<Leave>", _on_leave)
+    inner.bind("<Enter>", _on_enter)
+    inner.bind("<Leave>", _on_leave)
+
+    # Use add="+" so multiple scrollable frames can coexist; the _scroll_owner
+    # guard ensures only the hovered frame responds.
+    canvas.bind_all("<MouseWheel>", _on_mousewheel, add="+")
+    canvas.bind_all("<Button-4>",   _on_mousewheel, add="+")
+    canvas.bind_all("<Button-5>",   _on_mousewheel, add="+")
 
     scrollbar.pack(side="right", fill="y")
     canvas.pack(side="left", fill="both", expand=True)
