@@ -735,290 +735,93 @@ class DMXLightingEditor:
 
     def _build_center_panel(self, parent):
         # Breadcrumb
-        self._breadcrumb_var = tk.StringVar(value="global  ›  New Scene")
+        self._breadcrumb_var = tk.StringVar(value="global  \u203a  New Scene")
         tk.Label(parent, textvariable=self._breadcrumb_var,
                  bg=BG_DARK, fg=FG_LABEL, font=FONT_SMALL
-                 ).pack(anchor="w", padx=12, pady=(8, 2))
+                 ).pack(anchor="w", padx=12, pady=(4, 1))
 
-        # Fixture grid (2×8 = 16 fixtures)
+        # ============================================================
+        # ROW 1: Fixture Targets (left) + Color Palette / Presets (right)
+        # ============================================================
+        row1 = tk.Frame(parent, bg=BG_DARK)
+        row1.pack(fill="x", padx=8, pady=2)
+
+        # ---- Fixture Targets (left half) ----
         grid_outer = tk.LabelFrame(
-            parent, text=" FIXTURE TARGETS ", bg=BG_DARK, fg=FG_GOLD,
+            row1, text=" FIXTURE TARGETS ", bg=BG_DARK, fg=FG_GOLD,
             font=FONT_SUBHDR, highlightthickness=1,
             highlightbackground=BORDER_COLOR
         )
-        grid_outer.pack(fill="x", padx=12, pady=4)
+        grid_outer.pack(side="left", fill="both", padx=(0, 4), pady=0)
 
-        # ALL / NONE row above grid
         top_ctrl = tk.Frame(grid_outer, bg=BG_DARK)
-        top_ctrl.pack(fill="x", padx=6, pady=(4, 0))
+        top_ctrl.pack(fill="x", padx=4, pady=(2, 0))
         tk.Button(top_ctrl, text="ALL", bg=BTN_BLUE, fg=FG_WHITE, font=FONT_SMALL,
                   relief="raised", bd=2, cursor="hand2",
-                  command=self._select_all_fixtures).pack(side="left", padx=4)
+                  command=self._select_all_fixtures).pack(side="left", padx=3)
         tk.Button(top_ctrl, text="NONE", bg=BTN_GRAY, fg=FG_WHITE, font=FONT_SMALL,
                   relief="raised", bd=2, cursor="hand2",
-                  command=self._deselect_all_fixtures).pack(side="left", padx=4)
+                  command=self._deselect_all_fixtures).pack(side="left", padx=3)
 
-        # 2×8 fixture grid
         self._fixture_canvases = []
-        for row in range(2):
+        for row_idx in range(2):
             row_frame = tk.Frame(grid_outer, bg=BG_DARK)
-            row_frame.pack(pady=4)
+            row_frame.pack(pady=2)
             for col in range(8):
-                idx = row * 8 + col
-                c = tk.Canvas(row_frame, width=64, height=52,
+                idx = row_idx * 8 + col
+                c = tk.Canvas(row_frame, width=56, height=44,
                               bg="#330022", highlightthickness=2,
                               highlightbackground=BORDER_COLOR, cursor="hand2")
-                c.pack(side="left", padx=3)
-                c.create_text(32, 26, text=f"F{idx + 1}",
-                              fill=FG_WHITE, font=("Arial", 13, "bold"),
+                c.pack(side="left", padx=2)
+                c.create_text(28, 22, text=f"F{idx + 1}",
+                              fill=FG_WHITE, font=("Arial", 12, "bold"),
                               tags="num")
                 c.bind("<Button-1>", lambda e, i=idx: self._toggle_fixture(i))
                 self._fixture_canvases.append(c)
 
-        # Fixture control row: COLOR / REVERSE / SHIFT L / SHIFT R / MIRROR + intensity
         ctrl_row = tk.Frame(grid_outer, bg=BG_DARK)
-        ctrl_row.pack(fill="x", padx=6, pady=(2, 6))
+        ctrl_row.pack(fill="x", padx=4, pady=(1, 3))
         for txt, cmd in [
-            ("▶ COLOR",  self._fixture_cycle_color),
+            ("\u25b6 COLOR",  self._fixture_cycle_color),
             ("REVERSE",  self._fixture_reverse),
             ("SHIFT L",  self._fixture_shift_left),
             ("SHIFT R",  self._fixture_shift_right),
-            ("MIRROR ▶", self._fixture_mirror),
+            ("MIRROR \u25b6", self._fixture_mirror),
         ]:
             tk.Button(ctrl_row, text=txt, bg=BG_MEDIUM, fg=FG_WHITE,
                       font=FONT_SMALL, relief="raised", bd=2, cursor="hand2",
-                      command=cmd).pack(side="left", padx=3)
+                      command=cmd).pack(side="left", padx=2)
         tk.Label(ctrl_row, text="INT:", bg=BG_DARK, fg=FG_LABEL,
-                 font=FONT_SMALL).pack(side="left", padx=(12, 2))
+                 font=FONT_SMALL).pack(side="left", padx=(8, 1))
         tk.Scale(ctrl_row, variable=self.fixture_intensity_var, from_=0, to=100,
                  orient="horizontal", bg=BG_DARK, fg=FG_WHITE,
                  troughcolor=BG_MEDIUM, highlightthickness=0, font=FONT_SMALL,
-                 length=80, showvalue=False).pack(side="left")
+                 length=70, showvalue=False).pack(side="left")
 
-        # Playback controls
-        pb_frame = tk.Frame(parent, bg=BG_DARK)
-        pb_frame.pack(fill="x", padx=12, pady=4)
-        for sym, cmd in [
-            ("|◀", self._pb_rewind),
-            ("▶",  self._pb_play),
-            ("▶▶", self._pb_fast),
-            ("⟳",  self._pb_loop),
-        ]:
-            tk.Button(pb_frame, text=sym, bg=BG_MEDIUM, fg=FG_WHITE,
-                      font=FONT_LABEL, relief="raised", bd=2,
-                      cursor="hand2", padx=8, command=cmd
-                      ).pack(side="left", padx=4)
-
-        self._pb_state_label = tk.Label(pb_frame, text="⏹ Stopped",
-                                         bg=BG_DARK, fg=FG_LABEL, font=FONT_SMALL)
-        self._pb_state_label.pack(side="left", padx=8)
-
-        # Color gradient bar
-        self._grad_canvas = tk.Canvas(
-            pb_frame, height=28, bg="#220033",
-            highlightthickness=1, highlightbackground=BORDER_COLOR
-        )
-        self._grad_canvas.pack(side="left", fill="x", expand=True, padx=8)
-        self._draw_gradient_bar()
-
-        # Scene preview section
-        preview_frame = tk.LabelFrame(
-            parent, text=" SCENE PREVIEW ", bg=BG_DARK, fg=FG_GOLD,
+        # ---- Color Palette + Named Presets (right half) ----
+        color_outer = tk.LabelFrame(
+            row1, text=" COLOR PALETTE ", bg=BG_DARK, fg=FG_GOLD,
             font=FONT_SUBHDR, highlightthickness=1,
             highlightbackground=BORDER_COLOR
         )
-        preview_frame.pack(fill="x", padx=12, pady=4)
+        color_outer.pack(side="left", fill="both", expand=True, padx=(4, 0), pady=0)
 
-        step_row = tk.Frame(preview_frame, bg=BG_DARK)
-        step_row.pack(fill="x", padx=8, pady=6)
-        tk.Button(step_row, text="MOD ALL", bg=BTN_PURPLE, fg=FG_WHITE,
-                  font=FONT_SMALL, relief="raised", bd=2, cursor="hand2",
-                  command=self._mod_all).pack(side="left", padx=(0, 8))
-        self._step_canvases = []
-        for i in range(9):
-            c = tk.Canvas(step_row, width=48, height=34,
-                          bg="#330022", highlightthickness=1,
-                          highlightbackground=BORDER_COLOR, cursor="hand2")
-            c.pack(side="left", padx=2)
-            c.create_text(24, 17, text=str(i + 1), fill=FG_WHITE,
-                          font=FONT_SMALL, tags="num")
-            self._step_canvases.append(c)
-
-        # Button assignment row
-        assign_frame = tk.LabelFrame(
-            parent, text=" ASSIGN SCENE TO BUTTON ",
-            bg=BG_DARK, fg=FG_GOLD, font=FONT_SUBHDR,
-            highlightthickness=1, highlightbackground=BORDER_COLOR
-        )
-        assign_frame.pack(fill="x", padx=12, pady=4)
-        assign_row = tk.Frame(assign_frame, bg=BG_DARK)
-        assign_row.pack(pady=6, padx=8)
-
-        assign_slots = [
-            ("SCORE",    BTN_GRAY),
-            ("INTRO",    BTN_BLUE),
-            ("GAMEPLAY", BTN_BLUE),
-            ("START",    BTN_GREEN),
-            ("TEST",     BTN_ORANGE),
-            ("—",        BG_MEDIUM),
-            ("—",        BG_MEDIUM),
-            ("—",        BG_MEDIUM),
-        ]
-        self._assign_buttons = []
-        for label, color in assign_slots:
-            b = tk.Button(
-                assign_row, text=label, bg=color, fg=FG_WHITE,
-                font=FONT_SMALL, relief="raised", bd=2, cursor="hand2",
-                width=10,
-                command=lambda l=label: self._assign_to_button(l)
-            )
-            b.pack(side="left", padx=3)
-            b.bind("<Button-3>", lambda e, l=label: self._show_assign_context_menu(e, l))
-            self._assign_buttons.append(b)
-
-        # Status / info strip
-        self._center_status_var = tk.StringVar(value="No scene loaded.")
-        tk.Label(parent, textvariable=self._center_status_var,
-                 bg=BG_DARK, fg=FG_LABEL, font=FONT_SMALL
-                 ).pack(anchor="w", padx=12, pady=(4, 0))
-
-        # ---- Settings area (relocated from right panel) ----
-        self._build_settings_area(parent)
-
-    # ------------------------------------------------------------------
-    # Right panel
-    # ------------------------------------------------------------------
-
-    def _build_settings_area(self, parent):
-        """Build the settings panels in a scrollable 3-column layout."""
-        settings_outer, settings_canvas, settings_inner, _ = \
-            _make_scrollable_frame(parent, bg=BG_DARK)
-        settings_outer.pack(fill="both", expand=True, padx=8, pady=(4, 0))
-
-        cols_frame = tk.Frame(settings_inner, bg=BG_DARK)
-        cols_frame.pack(fill="x")
-
-        col0 = tk.Frame(cols_frame, bg=BG_PANEL,
-                         highlightthickness=1, highlightbackground=BORDER_COLOR)
-        col0.grid(row=0, column=0, sticky="nsew", padx=(0, 3), pady=0)
-
-        col1 = tk.Frame(cols_frame, bg=BG_PANEL,
-                         highlightthickness=1, highlightbackground=BORDER_COLOR)
-        col1.grid(row=0, column=1, sticky="nsew", padx=3, pady=0)
-
-        col2 = tk.Frame(cols_frame, bg=BG_PANEL,
-                         highlightthickness=1, highlightbackground=BORDER_COLOR)
-        col2.grid(row=0, column=2, sticky="nsew", padx=(3, 0), pady=0)
-
-        cols_frame.columnconfigure(0, weight=1)
-        cols_frame.columnconfigure(1, weight=1)
-        cols_frame.columnconfigure(2, weight=1)
-        cols_frame.rowconfigure(0, weight=1)
-
-        self._build_settings_col0(col0)
-        self._build_settings_col1(col1)
-        self._build_settings_col2(col2)
-
-    def _build_settings_col0(self, p):
-        """Column 0: Trigger Settings + Fixture Target."""
-        # ------ TRIGGER SETTINGS ------
-        self._section(p, "TRIGGER SETTINGS")
-        self._labeled_entry(p, "Name:", self.scene_name_var)
-        self._labeled_combo(p, "Type:", self.scene_type_var, SCENE_CATEGORIES)
-        self._labeled_combo(p, "Game:", self.scene_game_var, GAME_FILTERS)
-        self._labeled_combo(p, "Apply Mode:", self.scene_apply_mode_var,
-                            ["linked", "split", "individual", "random"])
-        self._labeled_combo(p, "Priority:", self.scene_priority_var,
-                            ["low", "normal", "high", "critical"])
-
-        chk_row = tk.Frame(p, bg=BG_PANEL)
-        chk_row.pack(fill="x", padx=8, pady=2)
-        tk.Checkbutton(chk_row, text="Enabled", variable=self.scene_enabled_var,
-                       bg=BG_PANEL, fg=FG_WHITE, selectcolor=BG_MEDIUM,
-                       activebackground=BG_PANEL, font=FONT_SMALL
-                       ).pack(side="left", padx=4)
-        tk.Checkbutton(chk_row, text="Locked", variable=self.scene_locked_var,
-                       bg=BG_PANEL, fg=FG_WHITE, selectcolor=BG_MEDIUM,
-                       activebackground=BG_PANEL, font=FONT_SMALL
-                       ).pack(side="left", padx=4)
-
-        # ------ FIXTURE TARGET ------
-        self._section(p, "FIXTURE TARGET")
-
-        bank_row = tk.Frame(p, bg=BG_PANEL)
-        bank_row.pack(fill="x", padx=8, pady=2)
-        tk.Label(bank_row, text="BANK:", bg=BG_PANEL, fg=FG_LABEL,
-                 font=FONT_SMALL).pack(side="left")
-        self._bank_buttons = []
-        for i, label in enumerate(["1-4", "5-8", "9-12", "13-16"]):
-            b = tk.Button(bank_row, text=label, bg=BG_MEDIUM, fg=FG_WHITE,
-                          font=FONT_SMALL, relief="raised", bd=2, cursor="hand2",
-                          command=lambda i=i: self._select_bank(i))
-            b.pack(side="left", padx=2)
-            self._bank_buttons.append(b)
-
-        ft_row = tk.Frame(p, bg=BG_PANEL)
-        ft_row.pack(fill="x", padx=8, pady=2)
-        tk.Button(ft_row, text="SEL ALL", bg=BTN_BLUE, fg=FG_WHITE,
-                  font=FONT_SMALL, relief="raised", bd=2, cursor="hand2",
-                  command=self._select_all_fixtures).pack(side="left", padx=2)
-        for label in ["[1]", "[2]", "[S]", "[L]"]:
-            tk.Button(ft_row, text=label, bg=BG_MEDIUM, fg=FG_WHITE,
-                      font=FONT_SMALL, relief="raised", bd=2, cursor="hand2"
-                      ).pack(side="left", padx=2)
-
-        range_row = tk.Frame(p, bg=BG_PANEL)
-        range_row.pack(fill="x", padx=8, pady=2)
-        tk.Label(range_row, text="Range:", bg=BG_PANEL, fg=FG_LABEL,
-                 font=FONT_SMALL).pack(side="left")
-        self._range_var = tk.StringVar(value="1-4")
-        range_cb = ttk.Combobox(
-            range_row, textvariable=self._range_var, state="readonly", width=10,
-            values=["1-4", "5-8", "9-12", "13-16", "1-8", "1-12", "1-16", "all"]
-        )
-        range_cb.pack(side="left", padx=4)
-
-        group_row = tk.Frame(p, bg=BG_PANEL)
-        group_row.pack(fill="x", padx=8, pady=2)
-        tk.Label(group_row, text="Groups:", bg=BG_PANEL, fg=FG_LABEL,
-                 font=FONT_SMALL).pack(side="left")
-        self._group_vars = {}
-        for g in ["L1", "L2", "L3", "L4", "L8"]:
-            var = tk.BooleanVar(value=True)
-            self._group_vars[g] = var
-            cb = tk.Checkbutton(group_row, text=g, variable=var,
-                                bg=BG_PANEL, fg=FG_WHITE, selectcolor=BG_MEDIUM,
-                                activebackground=BG_PANEL, font=FONT_SMALL)
-            cb.pack(side="left", padx=2)
-
-        dyn_row = tk.Frame(p, bg=BG_PANEL)
-        dyn_row.pack(fill="x", padx=8, pady=2)
-        self._dyn_highlight_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(dyn_row, text="Dynamic Highlight", variable=self._dyn_highlight_var,
-                       bg=BG_PANEL, fg=FG_WHITE, selectcolor=BG_MEDIUM,
-                       activebackground=BG_PANEL, font=FONT_SMALL).pack(side="left")
-
-    def _build_settings_col1(self, p):
-        """Column 1: Color Palette + Presets + Saved Colors + Lighting Effect."""
-        # ------ COLOR PALETTE ------
-        self._section(p, "COLOR PALETTE")
-
-        slot_row = tk.Frame(p, bg=BG_PANEL)
-        slot_row.pack(fill="x", padx=8, pady=4)
+        slot_row = tk.Frame(color_outer, bg=BG_DARK)
+        slot_row.pack(fill="x", padx=6, pady=(2, 2))
         self.palette_slot_btns = []
         for i in range(8):
-            c = tk.Canvas(slot_row, width=36, height=36,
+            c = tk.Canvas(slot_row, width=34, height=34,
                           bg=self._palette[i], highlightthickness=2,
                           highlightbackground=BORDER_COLOR, cursor="hand2")
             c.pack(side="left", padx=2)
-            c.create_text(18, 18, text=str(i + 1), fill=FG_WHITE,
+            c.create_text(17, 17, text=str(i + 1), fill=FG_WHITE,
                           font=("Arial", 11, "bold"), tags="num")
             c.bind("<Button-1>", lambda e, i=i: self._select_palette_slot(i))
             self.palette_slot_btns.append(c)
 
-        palette_ctrl = tk.Frame(p, bg=BG_PANEL)
-        palette_ctrl.pack(fill="x", padx=8, pady=2)
-        tk.Button(palette_ctrl, text="CUSTOM ▼", bg=BTN_PURPLE, fg=FG_WHITE,
+        palette_ctrl = tk.Frame(color_outer, bg=BG_DARK)
+        palette_ctrl.pack(fill="x", padx=6, pady=2)
+        tk.Button(palette_ctrl, text="CUSTOM \u25bc", bg=BTN_PURPLE, fg=FG_WHITE,
                   font=FONT_SMALL, relief="raised", bd=2, cursor="hand2",
                   command=self._toggle_hsv).pack(side="left", padx=2)
         tk.Button(palette_ctrl, text="RESET", bg=BTN_GRAY, fg=FG_WHITE,
@@ -1032,21 +835,25 @@ class DMXLightingEditor:
                   command=self._apply_cool_temp).pack(side="left", padx=2)
 
         # HSV wheel (collapsible)
-        self._hsv_frame = tk.Frame(p, bg=BG_DEEP)
+        self._hsv_frame = tk.Frame(color_outer, bg=BG_DEEP)
         self._color_wheel = HSVColorWheel(
-            self._hsv_frame, size=200, callback=self._on_wheel_color
+            self._hsv_frame, size=180, callback=self._on_wheel_color
         )
-        self._color_wheel.frame.pack(pady=4)
-
-        # RGB sliders
+        self._color_wheel.frame.pack(pady=2)
         rgb_frame = tk.Frame(self._hsv_frame, bg=BG_DEEP)
-        rgb_frame.pack(fill="x", padx=8, pady=2)
+        rgb_frame.pack(fill="x", padx=6, pady=2)
         self._build_rgb_sliders(rgb_frame)
 
-        # Named presets
-        self._section(p, "NAMED PRESETS")
-        presets_frame = tk.Frame(p, bg=BG_PANEL)
-        presets_frame.pack(fill="x", padx=8, pady=4)
+        # Named presets - scrollable area
+        presets_lbl = tk.Label(color_outer, text="NAMED PRESETS", bg=BG_DARK,
+                               fg=FG_GOLD, font=FONT_SUBHDR)
+        presets_lbl.pack(anchor="w", padx=6, pady=(4, 1))
+
+        presets_outer, _, presets_inner, _ = _make_scrollable_frame(color_outer, bg=BG_DARK)
+        presets_outer.pack(fill="both", expand=True, padx=4, pady=(0, 3))
+
+        presets_frame = tk.Frame(presets_inner, bg=BG_DARK)
+        presets_frame.pack(fill="x")
         cols = 5
         for i, preset in enumerate(COLOR_PRESETS):
             hex_c = preset["hex"]
@@ -1055,47 +862,222 @@ class DMXLightingEditor:
             b = tk.Label(
                 presets_frame, text=name, bg=hex_c, fg=fg,
                 font=("Arial", 9), relief="raised", cursor="hand2",
-                width=10, anchor="center", padx=3, pady=3
+                width=10, anchor="center", padx=2, pady=2
             )
             b.grid(row=i // cols, column=i % cols, padx=1, pady=1, sticky="ew")
             b.bind("<Button-1>", lambda e, h=hex_c: self._pick_preset_color(h))
         for c in range(cols):
             presets_frame.columnconfigure(c, weight=1)
 
-        # Saved colors
-        self._section(p, "SAVED COLORS")
-        self._saved_colors_frame = tk.Frame(p, bg=BG_PANEL)
-        self._saved_colors_frame.pack(fill="x", padx=8, pady=4)
-        self._build_saved_colors()
+        # ============================================================
+        # ROW 2: Playback controls + gradient bar (16 bars)
+        # ============================================================
+        pb_frame = tk.Frame(parent, bg=BG_DARK)
+        pb_frame.pack(fill="x", padx=12, pady=2)
+        for sym, cmd in [
+            ("|\u25c0", self._pb_rewind),
+            ("\u25b6",  self._pb_play),
+            ("\u25b6\u25b6", self._pb_fast),
+            ("\u27f3",  self._pb_loop),
+        ]:
+            tk.Button(pb_frame, text=sym, bg=BG_MEDIUM, fg=FG_WHITE,
+                      font=FONT_LABEL, relief="raised", bd=2,
+                      cursor="hand2", padx=8, command=cmd
+                      ).pack(side="left", padx=3)
 
-        # ------ LIGHTING EFFECT ------
-        self._section(p, "LIGHTING EFFECT")
+        self._pb_state_label = tk.Label(pb_frame, text="\u23f9 Stopped",
+                                          bg=BG_DARK, fg=FG_LABEL, font=FONT_SMALL)
+        self._pb_state_label.pack(side="left", padx=6)
 
-        # Mini palette row mirroring slot colors
-        mini_row = tk.Frame(p, bg=BG_PANEL)
-        mini_row.pack(fill="x", padx=8, pady=2)
-        self._effect_swatches = []
-        for i in range(8):
-            c = tk.Canvas(mini_row, width=28, height=22,
-                          bg=self._palette[i], highlightthickness=1,
-                          highlightbackground=BORDER_COLOR)
+        self._grad_canvas = tk.Canvas(
+            pb_frame, height=28, bg="#220033",
+            highlightthickness=1, highlightbackground=BORDER_COLOR
+        )
+        self._grad_canvas.pack(side="left", fill="x", expand=True, padx=6)
+        self._draw_gradient_bar()
+
+        # ============================================================
+        # ROW 3: Scene Preview (1-20) + Assign Scene to Button
+        # ============================================================
+        row3 = tk.Frame(parent, bg=BG_DARK)
+        row3.pack(fill="x", padx=8, pady=2)
+
+        preview_frame = tk.LabelFrame(
+            row3, text=" SCENE PREVIEW ", bg=BG_DARK, fg=FG_GOLD,
+            font=FONT_SUBHDR, highlightthickness=1,
+            highlightbackground=BORDER_COLOR
+        )
+        preview_frame.pack(side="left", fill="x", expand=True, padx=(0, 4))
+
+        step_row = tk.Frame(preview_frame, bg=BG_DARK)
+        step_row.pack(fill="x", padx=4, pady=3)
+        tk.Button(step_row, text="MOD ALL", bg=BTN_PURPLE, fg=FG_WHITE,
+                  font=FONT_SMALL, relief="raised", bd=2, cursor="hand2",
+                  command=self._mod_all).pack(side="left", padx=(0, 4))
+        self._step_canvases = []
+        for i in range(20):
+            c = tk.Canvas(step_row, width=36, height=28,
+                          bg="#330022", highlightthickness=1,
+                          highlightbackground=BORDER_COLOR, cursor="hand2")
             c.pack(side="left", padx=1)
-            self._effect_swatches.append(c)
+            c.create_text(18, 14, text=str(i + 1), fill=FG_WHITE,
+                          font=("Arial", 10), tags="num")
+            self._step_canvases.append(c)
 
-        self._labeled_combo(p, "Pattern:", self.pattern_var, PATTERN_TYPES)
-        self._labeled_scale(p, "Speed:", self.speed_var, 0, 200)
-        self._labeled_scale(p, "Fade Time:", self.fade_time_var, 0.0, 5.0, resolution=0.05)
-        self._labeled_scale(p, "Blending:", self.blending_var, 0, 100)
-        self._labeled_scale(p, "Saturation:", self.saturation_var, 0, 100)
-        self._labeled_scale(p, "Direction:", self.direction_var, 0, 360)
+        assign_frame = tk.LabelFrame(
+            row3, text=" ASSIGN SCENE TO BUTTON ",
+            bg=BG_DARK, fg=FG_GOLD, font=FONT_SUBHDR,
+            highlightthickness=1, highlightbackground=BORDER_COLOR
+        )
+        assign_frame.pack(side="left", padx=(4, 0))
+        assign_row = tk.Frame(assign_frame, bg=BG_DARK)
+        assign_row.pack(pady=3, padx=4)
 
-    def _build_settings_col2(self, p):
-        """Column 2: Triggers + Transition Rules + DMX Settings + Safety."""
-        # ------ TRIGGERS ------
-        self._section(p, "TRIGGERS")
-        trig_outer, _, trig_inner, _ = _make_scrollable_frame(p, bg=BG_PANEL)
-        trig_outer.pack(fill="x", padx=8, pady=4)
-        trig_outer.configure(height=220)
+        assign_slots = [
+            ("SCORE",    BTN_GRAY),
+            ("INTRO",    BTN_BLUE),
+            ("GAMEPLAY", BTN_BLUE),
+            ("START",    BTN_GREEN),
+            ("TEST",     BTN_ORANGE),
+            ("\u2014",        BG_MEDIUM),
+            ("\u2014",        BG_MEDIUM),
+            ("\u2014",        BG_MEDIUM),
+        ]
+        self._assign_buttons = []
+        for label, color in assign_slots:
+            b = tk.Button(
+                assign_row, text=label, bg=color, fg=FG_WHITE,
+                font=FONT_SMALL, relief="raised", bd=2, cursor="hand2",
+                width=9,
+                command=lambda l=label: self._assign_to_button(l)
+            )
+            b.pack(side="left", padx=2)
+            b.bind("<Button-3>", lambda e, l=label: self._show_assign_context_menu(e, l))
+            self._assign_buttons.append(b)
+
+        # ============================================================
+        # ROW 4: Settings - 2 columns (no outer scrollbar)
+        # ============================================================
+        self._center_status_var = tk.StringVar(value="No scene loaded.")
+        tk.Label(parent, textvariable=self._center_status_var,
+                 bg=BG_DARK, fg=FG_LABEL, font=FONT_SMALL
+                 ).pack(anchor="w", padx=12, pady=(2, 0))
+
+        self._build_settings_area(parent)
+
+    # ------------------------------------------------------------------
+    # Settings area — 2 columns, no outer scrollbar
+    # ------------------------------------------------------------------
+
+    def _build_settings_area(self, parent):
+        """Build settings in a flat 2-column grid below the main controls."""
+        cols_frame = tk.Frame(parent, bg=BG_DARK)
+        cols_frame.pack(fill="both", expand=True, padx=8, pady=(2, 0))
+
+        col0 = tk.Frame(cols_frame, bg=BG_PANEL,
+                         highlightthickness=1, highlightbackground=BORDER_COLOR)
+        col0.grid(row=0, column=0, sticky="nsew", padx=(0, 3), pady=0)
+
+        col1 = tk.Frame(cols_frame, bg=BG_PANEL,
+                         highlightthickness=1, highlightbackground=BORDER_COLOR)
+        col1.grid(row=0, column=1, sticky="nsew", padx=(3, 0), pady=0)
+
+        cols_frame.columnconfigure(0, weight=1)
+        cols_frame.columnconfigure(1, weight=1)
+        cols_frame.rowconfigure(0, weight=1)
+
+        self._build_settings_col0(col0)
+        self._build_settings_col1(col1)
+
+    def _build_settings_col0(self, p):
+        """Column 0: Trigger Settings (left) + Triggers (right) side-by-side."""
+        inner = tk.Frame(p, bg=BG_PANEL)
+        inner.pack(fill="both", expand=True, padx=2, pady=2)
+
+        # ---- Trigger Settings (left sub-col) ----
+        ts_frame = tk.Frame(inner, bg=BG_PANEL)
+        ts_frame.pack(side="left", fill="both", expand=True, padx=(0, 2))
+
+        self._section(ts_frame, "TRIGGER SETTINGS")
+        self._labeled_entry(ts_frame, "Name:", self.scene_name_var)
+        self._labeled_combo(ts_frame, "Type:", self.scene_type_var, SCENE_CATEGORIES)
+        self._labeled_combo(ts_frame, "Game:", self.scene_game_var, GAME_FILTERS)
+        self._labeled_combo(ts_frame, "Apply Mode:", self.scene_apply_mode_var,
+                            ["linked", "split", "individual", "random"])
+        self._labeled_combo(ts_frame, "Priority:", self.scene_priority_var,
+                            ["low", "normal", "high", "critical"])
+
+        chk_row = tk.Frame(ts_frame, bg=BG_PANEL)
+        chk_row.pack(fill="x", padx=8, pady=2)
+        tk.Checkbutton(chk_row, text="Enabled", variable=self.scene_enabled_var,
+                       bg=BG_PANEL, fg=FG_WHITE, selectcolor=BG_MEDIUM,
+                       activebackground=BG_PANEL, font=FONT_SMALL
+                       ).pack(side="left", padx=4)
+        tk.Checkbutton(chk_row, text="Locked", variable=self.scene_locked_var,
+                       bg=BG_PANEL, fg=FG_WHITE, selectcolor=BG_MEDIUM,
+                       activebackground=BG_PANEL, font=FONT_SMALL
+                       ).pack(side="left", padx=4)
+
+        # Fixture Target compact
+        self._section(ts_frame, "FIXTURE TARGET")
+        bank_row = tk.Frame(ts_frame, bg=BG_PANEL)
+        bank_row.pack(fill="x", padx=8, pady=1)
+        tk.Label(bank_row, text="BANK:", bg=BG_PANEL, fg=FG_LABEL,
+                 font=FONT_SMALL).pack(side="left")
+        self._bank_buttons = []
+        for i, label in enumerate(["1-4", "5-8", "9-12", "13-16"]):
+            b = tk.Button(bank_row, text=label, bg=BG_MEDIUM, fg=FG_WHITE,
+                          font=FONT_SMALL, relief="raised", bd=2, cursor="hand2",
+                          command=lambda i=i: self._select_bank(i))
+            b.pack(side="left", padx=1)
+            self._bank_buttons.append(b)
+
+        range_row = tk.Frame(ts_frame, bg=BG_PANEL)
+        range_row.pack(fill="x", padx=8, pady=1)
+        tk.Label(range_row, text="Range:", bg=BG_PANEL, fg=FG_LABEL,
+                 font=FONT_SMALL).pack(side="left")
+        self._range_var = tk.StringVar(value="1-4")
+        ttk.Combobox(range_row, textvariable=self._range_var, state="readonly", width=8,
+                     values=["1-4", "5-8", "9-12", "13-16", "1-8", "1-12", "1-16", "all"]
+                     ).pack(side="left", padx=4)
+        tk.Label(range_row, text="Groups:", bg=BG_PANEL, fg=FG_LABEL,
+                 font=FONT_SMALL).pack(side="left", padx=(6, 0))
+        self._group_vars = {}
+        for g in ["L1", "L2", "L3", "L4", "L8"]:
+            var = tk.BooleanVar(value=True)
+            self._group_vars[g] = var
+            tk.Checkbutton(range_row, text=g, variable=var,
+                           bg=BG_PANEL, fg=FG_WHITE, selectcolor=BG_MEDIUM,
+                           activebackground=BG_PANEL, font=("Arial", 11)
+                           ).pack(side="left", padx=1)
+
+        self._dyn_highlight_var = tk.BooleanVar(value=False)
+
+        # Validation + bottom buttons
+        self.validation_label = tk.Label(
+            ts_frame, text="\u2714 Scene OK", bg=BG_PANEL, fg=FG_GREEN, font=FONT_SMALL
+        )
+        self.validation_label.pack(padx=8, pady=(4, 1), anchor="w")
+
+        bottom_btn_row = tk.Frame(ts_frame, bg=BG_PANEL)
+        bottom_btn_row.pack(fill="x", padx=8, pady=(1, 4))
+        tk.Button(bottom_btn_row, text="\U0001f512 LOCK SCENE", bg=BTN_GRAY, fg=FG_WHITE,
+                  font=FONT_SMALL, relief="raised", bd=2, cursor="hand2",
+                  command=self._toggle_lock).pack(side="left", padx=2, expand=True, fill="x")
+        tk.Button(bottom_btn_row, text="\u21ba REVERT", bg=BTN_RED, fg=FG_WHITE,
+                  font=FONT_SMALL, relief="raised", bd=2, cursor="hand2",
+                  command=self._revert_scene).pack(side="left", padx=2, expand=True, fill="x")
+        tk.Button(bottom_btn_row, text="\u2699 RECONFIGURE", bg=BTN_PURPLE, fg=FG_WHITE,
+                  font=FONT_SMALL, relief="raised", bd=2, cursor="hand2",
+                  command=self._on_reconfigure).pack(side="left", padx=2, expand=True, fill="x")
+
+        # ---- Triggers (right sub-col) ----
+        trig_frame = tk.Frame(inner, bg=BG_PANEL)
+        trig_frame.pack(side="left", fill="both", padx=(2, 0))
+
+        self._section(trig_frame, "TRIGGERS")
+        trig_scroll_outer, _, trig_inner, _ = _make_scrollable_frame(trig_frame, bg=BG_PANEL)
+        trig_scroll_outer.pack(fill="both", expand=True, padx=4, pady=2)
 
         for ev in TRIGGER_EVENTS:
             row = tk.Frame(trig_inner, bg=BG_PANEL)
@@ -1107,12 +1089,12 @@ class DMXLightingEditor:
                 activebackground=BG_PANEL, font=FONT_SMALL,
                 anchor="w"
             ).pack(side="left", fill="x", expand=True)
-            bm_cb = ttk.Combobox(row, textvariable=self._trigger_behavior_vars[ev],
-                                 values=TRIGGER_BEHAVIOR_MODES, state="readonly", width=10)
-            bm_cb.pack(side="right", padx=2)
+            ttk.Combobox(row, textvariable=self._trigger_behavior_vars[ev],
+                         values=TRIGGER_BEHAVIOR_MODES, state="readonly", width=9
+                         ).pack(side="right", padx=2)
 
-        trig_cp_row = tk.Frame(p, bg=BG_PANEL)
-        trig_cp_row.pack(fill="x", padx=8, pady=(2, 4))
+        trig_cp_row = tk.Frame(trig_frame, bg=BG_PANEL)
+        trig_cp_row.pack(fill="x", padx=6, pady=(1, 4))
         tk.Button(trig_cp_row, text="Copy Triggers", bg=BTN_BLUE, fg=FG_WHITE,
                   font=FONT_SMALL, relief="raised", bd=2, cursor="hand2",
                   command=self._copy_triggers).pack(side="left", padx=2)
@@ -1120,79 +1102,36 @@ class DMXLightingEditor:
                   font=FONT_SMALL, relief="raised", bd=2, cursor="hand2",
                   command=self._paste_triggers).pack(side="left", padx=2)
 
-        # ------ TRANSITION RULES ------
-        self._section(p, "TRANSITION RULES")
-        self._labeled_scale(p, "Fade In:", self.trans_fade_in_var, 0.0, 5.0, resolution=0.05)
-        self._labeled_scale(p, "Fade Out:", self.trans_fade_out_var, 0.0, 5.0, resolution=0.05)
-        trans_chk_row = tk.Frame(p, bg=BG_PANEL)
-        trans_chk_row.pack(fill="x", padx=8, pady=2)
-        tk.Checkbutton(trans_chk_row, text="Crossfade", variable=self.trans_crossfade_var,
-                       bg=BG_PANEL, fg=FG_WHITE, selectcolor=BG_MEDIUM,
-                       activebackground=BG_PANEL, font=FONT_SMALL).pack(side="left", padx=4)
-        tk.Checkbutton(trans_chk_row, text="Return to Default", variable=self.trans_return_var,
-                       bg=BG_PANEL, fg=FG_WHITE, selectcolor=BG_MEDIUM,
-                       activebackground=BG_PANEL, font=FONT_SMALL).pack(side="left", padx=4)
-        self._labeled_scale(p, "Delay Start:", self.trans_delay_var, 0.0, 10.0, resolution=0.1)
-        self._labeled_scale(p, "Auto-Expire:", self.trans_auto_expire_var, 0.0, 60.0, resolution=0.5)
-        self._labeled_scale(p, "Return Time:", self.trans_return_time_var, 0.0, 30.0, resolution=0.5)
+    def _build_settings_col1(self, p):
+        """Column 1: Saved Colors + Lighting Effect."""
+        inner = tk.Frame(p, bg=BG_PANEL)
+        inner.pack(fill="both", expand=True, padx=2, pady=2)
 
-        # ------ DMX SETTINGS ------
-        self._section(p, "DMX SETTINGS")
-        self._labeled_combo(p, "Channels:", self.dmx_channels_var,
-                            ["master_rgb", "master_rgbw", "strobe", "dimmer_only"])
-        dmx_spin_row = tk.Frame(p, bg=BG_PANEL)
-        dmx_spin_row.pack(fill="x", padx=8, pady=2)
-        tk.Label(dmx_spin_row, text="Universe:", bg=BG_PANEL, fg=FG_LABEL,
-                 font=FONT_SMALL, width=12, anchor="e").pack(side="left")
-        tk.Spinbox(dmx_spin_row, from_=1, to=64, textvariable=self.dmx_universe_var,
-                   bg=BG_MEDIUM, fg=FG_WHITE, width=5, font=FONT_SMALL,
-                   buttonbackground=BG_MEDIUM, relief="flat").pack(side="left", padx=4)
-        tk.Label(dmx_spin_row, text="Size:", bg=BG_PANEL, fg=FG_LABEL,
-                 font=FONT_SMALL).pack(side="left", padx=(8, 0))
-        tk.Spinbox(dmx_spin_row, from_=1, to=16, textvariable=self.dmx_size_var,
-                   bg=BG_MEDIUM, fg=FG_WHITE, width=4, font=FONT_SMALL,
-                   buttonbackground=BG_MEDIUM, relief="flat").pack(side="left", padx=4)
-        self._labeled_scale(p, "Blackout:", self.dmx_blackout_time_var, 0.0, 5.0, resolution=0.05)
-        self._labeled_scale(p, "Auto-Expire:", self.dmx_auto_expire_var, 0.0, 30.0, resolution=0.5)
-        self._labeled_scale(p, "Return Time:", self.dmx_return_time_var, 0.0, 30.0, resolution=0.5)
+        # ---- Saved Colors ----
+        self._section(inner, "SAVED COLORS")
+        self._saved_colors_frame = tk.Frame(inner, bg=BG_PANEL)
+        self._saved_colors_frame.pack(fill="x", padx=8, pady=2)
+        self._build_saved_colors()
 
-        # ------ SAFETY & LIMITS ------
-        self._section(p, "SAFETY & LIMITS")
-        self._labeled_scale(p, "Max Bright:", self.safety_max_brightness_var, 0, 100)
-        self._labeled_scale(p, "Strobe Cap:", self.safety_strobe_cap_var, 0, 100)
-        self._labeled_scale(p, "Global Mstr:", self.safety_global_master_var, 0, 100)
-        self._labeled_scale(p, "Test Limit:", self.safety_test_limit_var, 0, 100)
-        self._labeled_scale(p, "Idle Timeout:", self.safety_idle_timeout_var, 0, 600)
-        safety_chk_row = tk.Frame(p, bg=BG_PANEL)
-        safety_chk_row.pack(fill="x", padx=8, pady=2)
-        tk.Checkbutton(safety_chk_row, text="Safe Startup", variable=self.safety_safe_startup_var,
-                       bg=BG_PANEL, fg=FG_WHITE, selectcolor=BG_MEDIUM,
-                       activebackground=BG_PANEL, font=FONT_SMALL).pack(side="left", padx=4)
+        # ---- Lighting Effect ----
+        self._section(inner, "LIGHTING EFFECT")
 
-        # ------ BOTTOM BUTTONS ------
-        spacer = tk.Frame(p, bg=BG_PANEL, height=8)
-        spacer.pack()
+        mini_row = tk.Frame(inner, bg=BG_PANEL)
+        mini_row.pack(fill="x", padx=8, pady=2)
+        self._effect_swatches = []
+        for i in range(8):
+            c = tk.Canvas(mini_row, width=28, height=22,
+                          bg=self._palette[i], highlightthickness=1,
+                          highlightbackground=BORDER_COLOR)
+            c.pack(side="left", padx=1)
+            self._effect_swatches.append(c)
 
-        reconf_btn = tk.Button(
-            p, text="⚙ RECONFIGURE", bg=BTN_PURPLE, fg=FG_WHITE,
-            font=FONT_LABEL, relief="raised", bd=2, cursor="hand2",
-            command=self._on_reconfigure
-        )
-        reconf_btn.pack(fill="x", padx=8, pady=2)
-
-        self.validation_label = tk.Label(
-            p, text="✔ Scene OK", bg=BG_PANEL, fg=FG_GREEN, font=FONT_SMALL
-        )
-        self.validation_label.pack(padx=8, pady=2, anchor="w")
-
-        bottom_btn_row = tk.Frame(p, bg=BG_PANEL)
-        bottom_btn_row.pack(fill="x", padx=8, pady=(2, 6))
-        tk.Button(bottom_btn_row, text="🔒 LOCK SCENE", bg=BTN_GRAY, fg=FG_WHITE,
-                  font=FONT_SMALL, relief="raised", bd=2, cursor="hand2",
-                  command=self._toggle_lock).pack(side="left", padx=2, expand=True, fill="x")
-        tk.Button(bottom_btn_row, text="↺ REVERT", bg=BTN_RED, fg=FG_WHITE,
-                  font=FONT_SMALL, relief="raised", bd=2, cursor="hand2",
-                  command=self._revert_scene).pack(side="left", padx=2, expand=True, fill="x")
+        self._labeled_combo(inner, "Pattern:", self.pattern_var, PATTERN_TYPES)
+        self._labeled_scale(inner, "Speed:", self.speed_var, 0, 200)
+        self._labeled_scale(inner, "Fade Time:", self.fade_time_var, 0.0, 5.0, resolution=0.05)
+        self._labeled_scale(inner, "Blending:", self.blending_var, 0, 100)
+        self._labeled_scale(inner, "Saturation:", self.saturation_var, 0, 100)
+        self._labeled_scale(inner, "Direction:", self.direction_var, 0, 360)
 
     # ------------------------------------------------------------------
     # Bottom bar
@@ -1941,10 +1880,12 @@ class DMXLightingEditor:
         if not palette:
             return
         self._grad_canvas.delete("all")
-        seg = max(1, w // len(palette))
-        for i, hex_c in enumerate(palette):
+        # Double the palette to 16 bars for the gradient display
+        bars = (palette * 3)[:16]
+        seg = max(1, w // len(bars))
+        for i, hex_c in enumerate(bars):
             x0 = i * seg
-            x1 = x0 + seg if i < len(palette) - 1 else w
+            x1 = x0 + seg if i < len(bars) - 1 else w
             self._grad_canvas.create_rectangle(x0, 0, x1, h, fill=hex_c, outline="")
 
     # ------------------------------------------------------------------
@@ -1981,13 +1922,11 @@ class DMXLightingEditor:
             "  • MOD ALL sets all palette slots to the current color.\n"
             "  • Assign the scene to a quick-launch button (right-click for options).\n"
             "  • Playback bar: |◀ rewind, ▶ play, ▶▶ speed up, ⟳ toggle loop.\n\n"
-            "CENTER — SETTINGS (3 columns below)\n"
-            "  • Col 1: Scene name, type, game, priority, fixture target/groups.\n"
-            "  • Col 2: Color Palette — 8 slots. Click a slot then use wheel/sliders.\n"
-            "    CUSTOM ▼ toggles the HSV color wheel. WARM / COOL shift colors.\n"
-            "    Named presets, saved colors, lighting effect pattern/speed/fade.\n"
-            "  • Col 3: Triggers — tick events; set behavior per trigger.\n"
-            "    Copy/Paste Triggers, Transition Rules, DMX Settings, Safety & Limits.\n\n"
+            "CENTER — SETTINGS (2 columns below)\n"
+            "  • Left: Trigger Settings + Fixture Target + Triggers side by side.\n"
+            "  • Right: Saved Colors, Lighting Effect (pattern/speed/fade/blending).\n"
+            "  • Color Palette + Named Presets are to the right of Fixture Targets.\n"
+            "  • Transition Rules, DMX Settings, Safety are on the Console Setup page.\n\n"
             "KEYBOARD SHORTCUTS\n"
             "  • Ctrl+S — Save scene\n"
             "  • Ctrl+D — Duplicate scene\n"
