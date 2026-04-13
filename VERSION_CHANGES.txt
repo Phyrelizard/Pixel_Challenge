@@ -1,6 +1,26 @@
 
 
-CONSOLE V26.1.0
+CONSOLE 
+
+v26.4.0
+
+ 1. Replace game filter buttons in left panel with a dropdown menu (same font)
+ 2. Rename "DUPE" → "COPY" and "DELETE" → "DEL" in left panel bottom buttons
+ 3. Add "NEW" button in top bar between game dropdown and SAVE button — opens name dialog, creates scene
+ 4. Replace Named Presets grid with a dropdown menu (colored swatch indicator). Moved Saved Colors + Lighting Effect into COLOR PALETTE section
+ 5. Add Event Timeline section (ATTRACT → CHECK-IN → INTRO → COUNTDOWN → GAMEPLAY → RESULTS → IDLE) next to playback nav, above Scene Preview
+ 6. Assign Scene to Button moved to its own full-width row: SCORE, INTRO, GAMEPLAY, START, TEST + 6 blank buttons extending to screen width
+ 7. Shortened Name entry field in Trigger Settings (width=22 instead of fill-expand)
+ 8. Added editor version label "v1.4.0" to lower right corner next to HELP button
+ 9. Doubled scrollbar widths (30px wide tk.Scrollbar) for touchscreen fat fingers
+ 10. Syntax check passed with python3 -m py_compile
+ 11. Help text updated to reflect all layout changes
+ 12. Parallel validation passed — no code review issues, no CodeQL alerts
+
+
+
+
+V26.1.0
 
 Summary
 Files Changed
