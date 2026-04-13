@@ -71,6 +71,14 @@ def clamp8(v: float) -> int:
     return max(0, min(255, int(v)))
 
 
+def _hex_to_rgb(hex_color: str) -> tuple:
+    """Convert '#RRGGBB' hex string to (r, g, b) ints."""
+    hex_color = hex_color.lstrip("#")
+    if len(hex_color) != 6:
+        return (0, 0, 0)
+    return (int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16))
+
+
 def scale_color(rgb, factor: float):
     r, g, b = rgb
     return (clamp8(r * factor), clamp8(g * factor), clamp8(b * factor))
@@ -816,6 +824,11 @@ class PixelChallengeConsole:
         self.refresh_controller_panel()
         self.refresh_info_window()
 
+        # Load user-authored DMX scenes and slot assignments (after build_ui)
+        self._load_user_scenes_into_dmx()
+        self._load_slot_assignments()
+        self._refresh_dmx_scene_combo()
+
         self.init_joysticks()
         self.root.after(16, self.poll_joysticks)
         self.root.after(self.current_animation_interval_ms(), self.animation_tick)
@@ -1245,6 +1258,107 @@ class PixelChallengeConsole:
         if self.dmx:
             self.dmx.set_brightness(pct)
         self.refresh_dmx_fixture_cards()
+
+    def _on_dmx_scene_selected(self, event=None):
+        """Handle scene dropdown selection — apply chosen scene via DMXService."""
+        name = self.dmx_scene.get()
+        if self.dmx and name:
+            self.dmx.apply_scene(name)
+            self.refresh_dmx_fixture_cards()
+            self.log(f"DMX scene applied: {name}")
+
+    def _on_dmx_speed_changed(self, value):
+        """Handle speed slider change — store value for scene animation speed."""
+        pct = int(float(value))
+        self.dmx_speed.set(pct)
+        self.log(f"DMX speed: {pct}%")
+
+    def _on_dmx_bank_selected(self, bank_index: int, bank_label: str):
+        """Handle bank button selection — highlight active bank."""
+        self.dmx_bank.set(bank_index + 1)
+        if hasattr(self, '_dmx_bank_buttons'):
+            for i, btn in enumerate(self._dmx_bank_buttons):
+                btn.configure(bg="#5544cc" if i == bank_index else "#2a1a4a")
+        self.log(f"DMX bank selected: {bank_label}")
+
+    def _on_dmx_slot_pressed(self, slot_index: int):
+        """Handle user-assignable slot button press — apply the assigned scene."""
+        if not hasattr(self, '_dmx_slot_scenes') or slot_index >= len(self._dmx_slot_scenes):
+            self.log(f"DMX Slot {slot_index + 1} (unassigned)")
+            return
+        scene_name = self._dmx_slot_scenes[slot_index]
+        if scene_name and self.dmx:
+            self.dmx.apply_scene(scene_name)
+            self.refresh_dmx_fixture_cards()
+            self.log(f"DMX Slot {slot_index + 1} applied: {scene_name}")
+        else:
+            self.log(f"DMX Slot {slot_index + 1} (unassigned)")
+
+    def _load_user_scenes_into_dmx(self):
+        """Load user-authored scenes from dmx_scenes.json into DMXService."""
+        if not self.dmx:
+            return
+        try:
+            if os.path.isfile(DMX_SCENES_FILE):
+                with open(DMX_SCENES_FILE, "r", encoding="utf-8") as fh:
+                    raw = json.load(fh)
+                for item in raw:
+                    name = item.get("name", "")
+                    if not name:
+                        continue
+                    # Convert editor scene format to DMXService scene format
+                    colors = item.get("colors", {})
+                    fc = colors.get("fixture_colors", colors.get("palette", []))
+                    fixtures = []
+                    for i in range(self.dmx.num_fixtures):
+                        hex_c = fc[i % len(fc)] if fc else "#000000"
+                        r, g, b = _hex_to_rgb(hex_c)
+                        fixtures.append({"r": r, "g": g, "b": b, "strobe": 0, "dimmer": 255})
+                    self.dmx.scenes[name] = {"fixtures": fixtures}
+                self.log(f"Loaded {len(raw)} user scene(s) from dmx_scenes.json")
+        except Exception as e:
+            self.log(f"DMX: Could not load user scenes: {e}")
+
+    def _load_slot_assignments(self):
+        """Load slot button assignments from dmx_scenes.json button_assignment data."""
+        self._dmx_slot_scenes = [""] * 6
+        self._dmx_slot_names = [""] * 6
+        slot_labels = ["SCORE", "INTRO", "GAMEPLAY", "START", "TEST"]  # fixed buttons (not slots)
+        try:
+            if os.path.isfile(DMX_SCENES_FILE):
+                with open(DMX_SCENES_FILE, "r", encoding="utf-8") as fh:
+                    raw = json.load(fh)
+                for item in raw:
+                    assignment = item.get("button_assignment")
+                    if not assignment or assignment in slot_labels:
+                        continue
+                    # Check if assignment matches a user slot name or user slot index
+                    slot_names = item.get("user_slot_names", [""] * 6)
+                    for si in range(6):
+                        sn = slot_names[si] if si < len(slot_names) else ""
+                        if sn and assignment == sn:
+                            self._dmx_slot_scenes[si] = item.get("name", "")
+                            self._dmx_slot_names[si] = sn
+                            break
+        except Exception:
+            pass
+        # Update slot button text
+        self._refresh_dmx_slot_buttons()
+
+    def _refresh_dmx_slot_buttons(self):
+        """Update slot button text labels from loaded assignments."""
+        if not hasattr(self, '_dmx_slot_buttons'):
+            return
+        for i, btn in enumerate(self._dmx_slot_buttons):
+            name = self._dmx_slot_names[i] if i < len(self._dmx_slot_names) else ""
+            btn.configure(text=name if name else "")
+
+    def _refresh_dmx_scene_combo(self):
+        """Refresh the scene dropdown with current available scenes."""
+        if not hasattr(self, '_dmx_scene_combo'):
+            return
+        scene_names = self.dmx.get_scene_names() if self.dmx else []
+        self._dmx_scene_combo.configure(values=scene_names)
 
     def refresh_dmx_fixture_cards(self):
         """Update fixture card swatches from current DMX fixture_states."""
@@ -3112,16 +3226,19 @@ class PixelChallengeConsole:
                       relief="raised", bd=2, font=("Arial", 12, "bold"),
                       padx=10, pady=6, cursor="hand2").pack(side="left", padx=3, fill="x", expand=True)
 
-        # --- (a2) Second row of blank placeholder buttons for future assignment ---
+        # --- (a2) Second row of user-assignable slot buttons ---
         slot_row = tk.Frame(dmx_body, bg="#17071f")
         slot_row.pack(fill="x", pady=(0, 4))
         slot_colors = ["#FF6600", "#00BBFF", "#FF3399", "#00DD66", "#FFCC00", "#AA44FF"]
-        for i, bg_col in enumerate(slot_colors, start=1):
-            tk.Button(slot_row, text="", width=6,
-                      command=lambda n=i: self.log(f"DMX Slot {n} (unassigned)"),
-                      bg=bg_col, fg="white", activebackground=bg_col, activeforeground="white",
-                      relief="raised", bd=2, font=("Arial", 12, "bold"),
-                      padx=10, pady=6, cursor="hand2").pack(side="left", padx=3, fill="x", expand=True)
+        self._dmx_slot_buttons = []
+        for i, bg_col in enumerate(slot_colors):
+            btn = tk.Button(slot_row, text="", width=6,
+                            command=lambda n=i: self._on_dmx_slot_pressed(n),
+                            bg=bg_col, fg="white", activebackground=bg_col, activeforeground="white",
+                            relief="raised", bd=2, font=("Arial", 12, "bold"),
+                            padx=10, pady=6, cursor="hand2")
+            btn.pack(side="left", padx=3, fill="x", expand=True)
+            self._dmx_slot_buttons.append(btn)
 
         # --- (a3) EDITOR button row ---
         editor_row = tk.Frame(dmx_body, bg="#17071f")
@@ -3138,16 +3255,18 @@ class PixelChallengeConsole:
         tk.Label(bank_row, text="BANK:", bg="#17071f", fg="#cccccc",
                  font=("Arial", 13, "bold")).pack(side="left", padx=(0, 4))
         bank_labels = ["1-4", "5-8", "9-12", "13-16"]
+        self._dmx_bank_buttons = []
         for i, bl in enumerate(bank_labels):
             active = (i == 0)
             bg = "#5544cc" if active else "#2a1a4a"
             fg = "white"
-            tk.Button(bank_row, text=bl, bg=bg, fg=fg,
-                      activebackground=bg, activeforeground=fg,
-                      relief="raised", bd=2, font=("Arial", 12, "bold"),
-                      padx=10, pady=4, cursor="hand2",
-                      command=lambda b=bl: self.log(f"DMX Bank {b} (placeholder)")
-                      ).pack(side="left", padx=3)
+            btn = tk.Button(bank_row, text=bl, bg=bg, fg=fg,
+                            activebackground=bg, activeforeground=fg,
+                            relief="raised", bd=2, font=("Arial", 12, "bold"),
+                            padx=10, pady=4, cursor="hand2",
+                            command=lambda idx=i, lbl=bl: self._on_dmx_bank_selected(idx, lbl))
+            btn.pack(side="left", padx=3)
+            self._dmx_bank_buttons.append(btn)
         tk.Checkbutton(bank_row, text="\u2611 LINK ALL", variable=self.dmx_link_all,
                        bg="#17071f", fg="white", activebackground="#17071f",
                        activeforeground="white", selectcolor="#071a30",
@@ -3287,10 +3406,11 @@ class PixelChallengeConsole:
         tk.Label(scene_row, text="Scene:", bg="#17071f", fg="#ffd74f",
                  font=("Arial", 15, "bold")).pack(side="left", padx=(0, 4))
         scene_names = self.dmx.get_scene_names() if self.dmx else ["Cool Blue Static", "Warm Amber"]
-        scene_combo = ttk.Combobox(scene_row, textvariable=self.dmx_scene,
-                                   values=scene_names,
-                                   font=("Arial", 14), state="readonly", width=30)
-        scene_combo.pack(side="left", fill="x", expand=True, ipady=6)
+        self._dmx_scene_combo = ttk.Combobox(scene_row, textvariable=self.dmx_scene,
+                                              values=scene_names,
+                                              font=("Arial", 14), state="readonly", width=30)
+        self._dmx_scene_combo.pack(side="left", fill="x", expand=True, ipady=6)
+        self._dmx_scene_combo.bind("<<ComboboxSelected>>", self._on_dmx_scene_selected)
 
         # --- Speed / Brightness — label on top, slider below, side by side ---
         slider_row = tk.Frame(dmx_body, bg="#17071f")
@@ -3310,7 +3430,8 @@ class PixelChallengeConsole:
         tk.Scale(speed_col, from_=0, to=100, resolution=1, orient="horizontal",
                  variable=self.dmx_speed, bg="#17071f", fg="white",
                  troughcolor="#071a30", highlightthickness=0,
-                 font=("Arial", 10, "bold"), length=190).pack(fill="x", padx=(0, 8))
+                 font=("Arial", 10, "bold"), length=190,
+                 command=self._on_dmx_speed_changed).pack(fill="x", padx=(0, 8))
 
         # Brightness column (right)
         bright_col = tk.Frame(slider_row, bg="#17071f")
@@ -3346,13 +3467,18 @@ class PixelChallengeConsole:
         self.editor.show()
 
     def on_editor_closed(self):
-        """Called when the DMX editor is closed — restore normal console view (v25.5.0)."""
+        """Called when the DMX editor is closed — restore normal console view, reload scenes."""
         if hasattr(self, "editor") and self.editor is not None:
             try:
                 self.editor.hide()
             except Exception:
                 pass
-        self.log("DMX Editor closed.")
+        # Reload user scenes into DMXService and refresh UI
+        self._load_user_scenes_into_dmx()
+        self._refresh_dmx_scene_combo()
+        self._load_slot_assignments()
+        self.refresh_dmx_fixture_cards()
+        self.log("DMX Editor closed — scenes reloaded.")
 
     def open_dmx_hw_config_from_editor(self):
         """Open the DMX Hardware Configuration from within the editor (v25.5.0).
