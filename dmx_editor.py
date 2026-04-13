@@ -52,6 +52,10 @@ BTN_GRAY      = "#555555"
 BTN_YELLOW    = "#cccc00"
 SEL_BG        = "#3a1b53"
 
+EDITOR_VERSION = "v1.5.0"
+SCROLLBAR_WIDTH = 30
+USER_SLOT_COLORS = ["#FF6600", "#00BBFF", "#FF3399", "#00DD66", "#FFCC00", "#AA44FF"]
+
 CATEGORY_COLORS = {
     "gameplay": BTN_BLUE,
     "results":  BTN_PURPLE,
@@ -102,7 +106,7 @@ def _make_scrollable_frame(parent, bg=BG_PANEL):
     canvas = tk.Canvas(outer, bg=bg, highlightthickness=0, bd=0)
     # Wide scrollbar for touchscreen (fat-finger friendly)
     scrollbar = tk.Scrollbar(outer, orient="vertical", command=canvas.yview,
-                             width=30, bg=BG_MEDIUM, troughcolor=BG_DARK,
+                             width=SCROLLBAR_WIDTH, bg=BG_MEDIUM, troughcolor=BG_DARK,
                              activebackground=BORDER_COLOR)
     canvas.configure(yscrollcommand=scrollbar.set)
     inner = tk.Frame(canvas, bg=bg)
@@ -389,9 +393,7 @@ class DMXLightingEditor:
         self._active_fixture      = 0                   # currently selected fixture index
         self._hsv_visible         = False
         self._user_slot_names     = [""] * 6            # editable assign-button labels
-        self._user_slot_colors    = [
-            "#FF6600", "#00BBFF", "#FF3399", "#00DD66", "#FFCC00", "#AA44FF"
-        ]
+        self._user_slot_colors    = list(USER_SLOT_COLORS)
         self._scene_row_widgets   = {}
         self._undo_snapshot: DMXScene | None = None
         self._dirty = False
@@ -1041,7 +1043,6 @@ class DMXLightingEditor:
                 user_idx = slot_idx - 5
                 b.bind("<Double-Button-1>", lambda e, ui=user_idx: self._rename_user_slot(ui))
                 self._user_slot_btn_indices.append(slot_idx)
-            self._assign_buttons.append(b)
 
         # ============================================================
         # ROW 5: Settings (Trigger Settings + Triggers only)
@@ -1212,7 +1213,7 @@ class DMXLightingEditor:
 
         # Editor version label
         tk.Label(
-            parent, text="v1.5.0", bg=BG_DEEP, fg="#888888",
+            parent, text=EDITOR_VERSION, bg=BG_DEEP, fg="#888888",
             font=FONT_SMALL
         ).pack(side="right", padx=(0, 4), pady=6)
 
