@@ -373,6 +373,7 @@ class DMXLightingEditor:
         on_reconfigure_callback=None,
         game_list=None,
         current_game=None,
+        current_scene_name=None,
     ):
         self._parent              = parent
         self._dmx_service         = dmx_service
@@ -384,6 +385,7 @@ class DMXLightingEditor:
         self._on_reconfigure_cb   = on_reconfigure_callback
         self._game_list           = game_list or list(GAME_FILTERS)
         self._current_game        = current_game or "global"
+        self._initial_scene_name  = current_scene_name
         self._live_active         = False
         self._current_scene: DMXScene | None = None
         self._active_filter       = "global"
@@ -491,10 +493,18 @@ class DMXLightingEditor:
         center_frame.pack(side="left", fill="both", expand=True)
         self._build_center_panel(center_frame)
 
-        # Load first scene
+        # Load initial scene — prefer the last-known scene from the console
         all_scenes = self._library.list_all()
-        if all_scenes:
-            self._load_scene(all_scenes[0])
+        initial = None
+        if self._initial_scene_name:
+            for sc in all_scenes:
+                if sc.name == self._initial_scene_name:
+                    initial = sc
+                    break
+        if initial is None and all_scenes:
+            initial = all_scenes[0]
+        if initial is not None:
+            self._load_scene(initial)
         else:
             self._load_scene(DMXScene())
 
@@ -1289,6 +1299,7 @@ class DMXLightingEditor:
     def _build_saved_colors(self):
         for w in self._saved_colors_frame.winfo_children():
             w.destroy()
+        self._saved_color_copy_buffer = getattr(self, "_saved_color_copy_buffer", None)
         colors = self._color_palette_store.saved_colors[:16]
         row = tk.Frame(self._saved_colors_frame, bg=BG_DARK)
         row.pack(fill="x")
@@ -1298,12 +1309,47 @@ class DMXLightingEditor:
                           cursor="hand2")
             c.pack(side="left", padx=1)
             c.bind("<Button-1>", lambda e, h=hex_c: self._pick_preset_color(h))
+            c.bind("<Button-3>", lambda e, idx=i: self._saved_color_context_menu(e, idx))
         # Add button
         add_btn = tk.Button(row, text="+", bg=BG_MEDIUM, fg=FG_WHITE,
                             font=FONT_SMALL, relief="raised", bd=1,
                             cursor="hand2", width=2,
                             command=self._save_current_color)
         add_btn.pack(side="left", padx=2)
+
+    def _saved_color_context_menu(self, event, index):
+        """Show right-click context menu on a saved color tile."""
+        menu = tk.Menu(self._container, tearoff=0)
+        menu.add_command(label="Copy", command=lambda: self._copy_saved_color(index))
+        paste_state = "normal" if self._saved_color_copy_buffer else "disabled"
+        menu.add_command(label="Paste Before", state=paste_state,
+                         command=lambda: self._paste_saved_color(index))
+        menu.add_separator()
+        menu.add_command(label="Delete", command=lambda: self._delete_saved_color(index))
+        menu.tk_popup(event.x_root, event.y_root)
+
+    def _copy_saved_color(self, index):
+        colors = self._color_palette_store.saved_colors
+        if 0 <= index < len(colors):
+            self._saved_color_copy_buffer = colors[index]
+
+    def _paste_saved_color(self, index):
+        if not self._saved_color_copy_buffer:
+            return
+        colors = self._color_palette_store.saved_colors
+        if len(colors) < 16:
+            colors.insert(index, self._saved_color_copy_buffer)
+        else:
+            # At capacity — insert before and drop last
+            colors.insert(index, self._saved_color_copy_buffer)
+            colors[:] = colors[:16]
+        self._color_palette_store.save_saved()
+        self._build_saved_colors()
+
+    def _delete_saved_color(self, index):
+        self._color_palette_store.remove_saved(index)
+        self._color_palette_store.save_saved()
+        self._build_saved_colors()
 
     # ------------------------------------------------------------------
     # Scene list
@@ -2028,7 +2074,22 @@ class DMXLightingEditor:
     # ------------------------------------------------------------------
 
     def _preview_selected(self):
-        self._center_status_var.set("👁 Previewing scene (no DMX output)…")
+        """Animate the step colors across fixture targets in the editor preview."""
+        if self._preview_playing:
+            self._stop_preview()
+            self._center_status_var.set("Preview stopped.")
+            return
+        # Apply the step colors to fixture grid as a visual preview
+        step_colors = [c for c in self._step_colors if c != "#330022"]
+        if not step_colors:
+            self._center_status_var.set("👁 No step colors to preview.")
+            return
+        # Apply step colors to fixture grid (cyclic)
+        for i in range(len(self._fixture_canvases)):
+            color = step_colors[i % len(step_colors)]
+            self._fixture_colors[i] = color
+        self._update_fixture_grid()
+        self._center_status_var.set("👁 Step colors applied to fixture targets.")
 
     def _go_live(self):
         self._live_active = not self._live_active
@@ -2036,9 +2097,10 @@ class DMXLightingEditor:
             self._live_btn.configure(text="■ LIVE", bg="#990000")
             self._live_status_label.configure(text="● LIVE", fg="#ff4444")
             self._center_status_var.set("🔴 Scene is LIVE")
-            if self._dmx_service and self._current_scene:
+            if self._dmx_service:
                 try:
-                    self._dmx_service.apply_scene(self._current_scene)
+                    scene = self._collect_scene_data()
+                    self._dmx_service.apply_scene_data(scene)
                 except Exception:
                     pass
         else:
