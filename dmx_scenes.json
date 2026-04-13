@@ -1098,105 +1098,6 @@
     ]
   },
   {
-    "name": "Cool Blue Static (Copy)",
-    "category": "idle",
-    "game": "global",
-    "mode_filter": "any",
-    "enabled": true,
-    "locked": false,
-    "priority": "normal",
-    "fixture_target": {
-      "bank": 1,
-      "range": "1-4",
-      "groups": [
-        "L1",
-        "L2",
-        "L3",
-        "L4",
-        "L8"
-      ],
-      "link_mode": "linked"
-    },
-    "colors": {
-      "palette": [
-        "#00bbcc",
-        "#88aa77",
-        "#4499ff",
-        "#88bbff",
-        "#0033aa",
-        "#0077cc",
-        "#003399",
-        "#005588"
-      ],
-      "mode": "palette_cycle",
-      "brightness": 100,
-      "saturation": 90,
-      "blending": 20
-    },
-    "pattern": {
-      "type": "pulse",
-      "speed": 50,
-      "fade_time": 0.35,
-      "direction": 90,
-      "loop": true
-    },
-    "transitions": {
-      "fade_in": 0.5,
-      "fade_out": 1.0,
-      "crossfade": true,
-      "auto_expire": 0.0,
-      "return_to_default": true,
-      "return_to_default_time": 2.5,
-      "delay_before_start": 0.0
-    },
-    "triggers": [
-      "host_idle",
-      "attract_cycle"
-    ],
-    "trigger_behavior": "loop",
-    "trigger_behavior_map": {
-      "host_idle": {
-        "mode": "loop",
-        "priority": "normal",
-        "duration": 0
-      },
-      "attract_cycle": {
-        "mode": "loop",
-        "priority": "normal",
-        "duration": 0
-      }
-    },
-    "dmx_settings": {
-      "channels": "master_rgb",
-      "universe": 5,
-      "size": 4,
-      "blackout_time": 0.35,
-      "auto_expire": 2.0,
-      "return_to_default_time": 2.5
-    },
-    "safety": {
-      "max_brightness": 100,
-      "strobe_cap": 80,
-      "safe_startup": true,
-      "fallback_scene": "",
-      "idle_timeout": 300,
-      "test_brightness_limit": 80,
-      "global_master": 100
-    },
-    "fixture_roles": {},
-    "button_assignment": null,
-    "button_behavior": "press = activate",
-    "button_action": "quick scene recall",
-    "user_slot_names": [
-      "",
-      "",
-      "",
-      "",
-      "",
-      ""
-    ]
-  },
-  {
     "name": "Green Chase Up (Copy)",
     "category": "attract",
     "game": "global",
@@ -1674,6 +1575,415 @@
     "button_action": "quick scene recall",
     "user_slot_names": [
       "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "New test Scene 2",
+    "category": "gameplay",
+    "game": "global",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": [
+        "L1",
+        "L2",
+        "L3",
+        "L4",
+        "L8"
+      ],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": [
+        "#8800ff",
+        "#FF8800",
+        "#FFCC00",
+        "#FF2200",
+        "#FFAA00",
+        "#FFE400",
+        "#FF0000",
+        "#FF6600"
+      ],
+      "mode": "palette_cycle",
+      "brightness": 100,
+      "saturation": 90,
+      "blending": 20,
+      "fixture_colors": [
+        "#8800ff",
+        "#FF8800",
+        "#FFCC00",
+        "#FF2200",
+        "#FFAA00",
+        "#FFE400",
+        "#FF0000",
+        "#FF6600",
+        "#FF4400",
+        "#FF8800",
+        "#FFCC00",
+        "#FF2200",
+        "#FFAA00",
+        "#FFE400",
+        "#FF0000",
+        "#FF6600"
+      ],
+      "step_colors": [
+        "#FF4400",
+        "#FF8800",
+        "#FFCC00",
+        "#FF2200",
+        "#FFAA00",
+        "#FFE400",
+        "#FF0000",
+        "#FF6600",
+        "#FF4400",
+        "#FF8800",
+        "#FFCC00",
+        "#FF2200",
+        "#FFAA00",
+        "#FFE400",
+        "#FF0000",
+        "#FF6600",
+        "#FF4400",
+        "#FF8800",
+        "#FFCC00",
+        "#FF2200"
+      ]
+    },
+    "pattern": {
+      "type": "pulse",
+      "speed": 100,
+      "fade_time": 0.35,
+      "direction": 90,
+      "loop": true
+    },
+    "transitions": {
+      "fade_in": 0.5,
+      "fade_out": 1.0,
+      "crossfade": true,
+      "auto_expire": 0.0,
+      "return_to_default": true,
+      "return_to_default_time": 2.5,
+      "delay_before_start": 0.0
+    },
+    "triggers": [],
+    "trigger_behavior": "loop",
+    "trigger_behavior_map": {},
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0.35,
+      "auto_expire": 2.0,
+      "return_to_default_time": 2.5
+    },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "fallback_scene": "",
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100
+    },
+    "fixture_roles": {},
+    "button_assignment": null,
+    "button_behavior": "press = activate",
+    "button_action": "quick scene recall",
+    "user_slot_names": [
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Cool Blue Static (Copy)",
+    "category": "idle",
+    "game": "global",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": [
+        "L1",
+        "L2",
+        "L3",
+        "L4",
+        "L8"
+      ],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": [
+        "#26aaa0",
+        "#88aa77",
+        "#4499ff",
+        "#88bbff",
+        "#0033aa",
+        "#0077cc",
+        "#003399",
+        "#005588"
+      ],
+      "mode": "palette_cycle",
+      "brightness": 100,
+      "saturation": 90,
+      "blending": 20,
+      "fixture_colors": [
+        "#00bbcc",
+        "#3a9fa8",
+        "#4499ff",
+        "#88bbff",
+        "#0033aa",
+        "#0077cc",
+        "#003399",
+        "#005588",
+        "#00bbcc",
+        "#26aaa0",
+        "#4499ff",
+        "#88bbff",
+        "#0033aa",
+        "#0077cc",
+        "#003399",
+        "#005588"
+      ],
+      "step_colors": [
+        "#00bbcc",
+        "#88aa77",
+        "#4499ff",
+        "#88bbff",
+        "#0033aa",
+        "#0077cc",
+        "#003399",
+        "#005588",
+        "#00bbcc",
+        "#88aa77",
+        "#4499ff",
+        "#88bbff",
+        "#0033aa",
+        "#0077cc",
+        "#003399",
+        "#005588",
+        "#00bbcc",
+        "#88aa77",
+        "#4499ff",
+        "#88bbff"
+      ]
+    },
+    "pattern": {
+      "type": "pulse",
+      "speed": 50,
+      "fade_time": 0.35,
+      "direction": 90,
+      "loop": true
+    },
+    "transitions": {
+      "fade_in": 0.5,
+      "fade_out": 1.0,
+      "crossfade": true,
+      "auto_expire": 0.0,
+      "return_to_default": true,
+      "return_to_default_time": 2.5,
+      "delay_before_start": 0.0
+    },
+    "triggers": [
+      "host_idle",
+      "attract_cycle"
+    ],
+    "trigger_behavior": "loop",
+    "trigger_behavior_map": {
+      "host_idle": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      },
+      "attract_cycle": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      }
+    },
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0.35,
+      "auto_expire": 2.0,
+      "return_to_default_time": 2.5
+    },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "fallback_scene": "",
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100
+    },
+    "fixture_roles": {},
+    "button_assignment": null,
+    "button_behavior": "press = activate",
+    "button_action": "quick scene recall",
+    "user_slot_names": [
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "New test Scene 3",
+    "category": "gameplay",
+    "game": "global",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": [
+        "L1",
+        "L2",
+        "L3",
+        "L4",
+        "L8"
+      ],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": [
+        "#000000",
+        "#cc0b0f",
+        "#cdb34b",
+        "#000084",
+        "#cd914b",
+        "#cdcb4b",
+        "#cd004b",
+        "#cd4d4b"
+      ],
+      "mode": "palette_cycle",
+      "brightness": 100,
+      "saturation": 90,
+      "blending": 20,
+      "fixture_colors": [
+        "#cc0b0f",
+        "#0066ff",
+        "#8800ff",
+        "#e8f4ff",
+        "#ff0000",
+        "#e8f4ff",
+        "#060066",
+        "#4499ff",
+        "#003366",
+        "#4499ff",
+        "#FFCC00",
+        "#8678e0",
+        "#ff0000",
+        "#e8f4ff",
+        "#003366",
+        "#FF6600"
+      ],
+      "step_colors": [
+        "#e1002d",
+        "#cae5ff",
+        "#060066",
+        "#e1002d",
+        "#cae5ff",
+        "#060066",
+        "#e1002d",
+        "#cae5ff",
+        "#060066",
+        "#e1002d",
+        "#cae5ff",
+        "#060066",
+        "#e1002d",
+        "#cae5ff",
+        "#060066",
+        "#e1002d",
+        "#cae5ff",
+        "#060066",
+        "#e1002d",
+        "#cae5ff"
+      ]
+    },
+    "pattern": {
+      "type": "chase",
+      "speed": 57,
+      "fade_time": 0.35,
+      "direction": 90,
+      "loop": true
+    },
+    "transitions": {
+      "fade_in": 0.5,
+      "fade_out": 1.0,
+      "crossfade": true,
+      "auto_expire": 0.0,
+      "return_to_default": true,
+      "return_to_default_time": 2.5,
+      "delay_before_start": 0.0
+    },
+    "triggers": [
+      "checkin_opened",
+      "player_joined",
+      "checkin_locked"
+    ],
+    "trigger_behavior": "loop",
+    "trigger_behavior_map": {
+      "checkin_opened": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      },
+      "player_joined": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      },
+      "checkin_locked": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      }
+    },
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0.35,
+      "auto_expire": 2.0,
+      "return_to_default_time": 2.5
+    },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "fallback_scene": "",
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100
+    },
+    "fixture_roles": {},
+    "button_assignment": "\u2014",
+    "button_behavior": "press = activate",
+    "button_action": "quick scene recall",
+    "user_slot_names": [
+      "test rgb",
       "",
       "",
       "",
