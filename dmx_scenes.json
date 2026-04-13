@@ -1,89 +1,5 @@
 [
   {
-    "name": "Rainbow Wave",
-    "category": "gameplay",
-    "game": "global",
-    "mode_filter": "any",
-    "enabled": true,
-    "locked": false,
-    "priority": "normal",
-    "fixture_target": {
-      "bank": 1,
-      "range": "1-4",
-      "groups": [
-        "L1",
-        "L2",
-        "L3",
-        "L4"
-      ],
-      "link_mode": "linked"
-    },
-    "colors": {
-      "palette": [
-        "#ff0000",
-        "#ff8800",
-        "#ffee00",
-        "#00cc00",
-        "#0066ff",
-        "#aa00ff",
-        "#ff00aa",
-        "#ff4400"
-      ],
-      "mode": "palette_cycle",
-      "brightness": 100,
-      "saturation": 90,
-      "blending": 20
-    },
-    "pattern": {
-      "type": "sweep",
-      "speed": 60,
-      "fade_time": 0.35,
-      "direction": 90,
-      "loop": true
-    },
-    "transitions": {
-      "fade_in": 0.5,
-      "fade_out": 1.0,
-      "crossfade": true,
-      "auto_expire": 0.0,
-      "return_to_default": true,
-      "return_to_default_time": 2.5
-    },
-    "triggers": [
-      "gameplay_start"
-    ],
-    "trigger_behavior": "loop",
-    "trigger_behavior_map": {},
-    "dmx_settings": {
-      "channels": "master_rgb",
-      "universe": 5,
-      "size": 4,
-      "blackout_time": 0.35,
-      "auto_expire": 2.0
-    },
-    "safety": {
-      "max_brightness": 100,
-      "strobe_cap": 80,
-      "safe_startup": true,
-      "fallback_scene": "",
-      "idle_timeout": 300,
-      "test_brightness_limit": 80,
-      "global_master": 100
-    },
-    "fixture_roles": {},
-    "button_assignment": null,
-    "button_behavior": "press = activate",
-    "button_action": "quick scene recall",
-    "user_slot_names": [
-      "",
-      "",
-      "",
-      "",
-      "",
-      ""
-    ]
-  },
-  {
     "name": "Fire Burst",
     "category": "gameplay",
     "game": "splash",
@@ -1596,6 +1512,139 @@
         "priority": "normal",
         "duration": 0
       },
+      "gameplay_start": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      }
+    },
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0.35,
+      "auto_expire": 2.0,
+      "return_to_default_time": 2.5
+    },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "fallback_scene": "",
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100
+    },
+    "fixture_roles": {},
+    "button_assignment": null,
+    "button_behavior": "press = activate",
+    "button_action": "quick scene recall",
+    "user_slot_names": [
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ]
+  },
+  {
+    "name": "Rainbow Wave",
+    "category": "gameplay",
+    "game": "global",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": [
+        "L1",
+        "L2",
+        "L3",
+        "L4",
+        "L8"
+      ],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": [
+        "#af0075",
+        "#ff8800",
+        "#ffee00",
+        "#00cc00",
+        "#0066ff",
+        "#aa00ff",
+        "#ff00aa",
+        "#ff4400"
+      ],
+      "mode": "palette_cycle",
+      "brightness": 100,
+      "saturation": 90,
+      "blending": 20,
+      "fixture_colors": [
+        "#ff0000",
+        "#ff8800",
+        "#ffee00",
+        "#00cc00",
+        "#0066ff",
+        "#aa00ff",
+        "#ff00aa",
+        "#ff4400",
+        "#ff0000",
+        "#ff8800",
+        "#ffee00",
+        "#00cc00",
+        "#0066ff",
+        "#aa00ff",
+        "#af0075",
+        "#ff4400"
+      ],
+      "step_colors": [
+        "#ff0000",
+        "#ff8800",
+        "#ffee00",
+        "#00cc00",
+        "#0066ff",
+        "#aa00ff",
+        "#ff00aa",
+        "#ff4400",
+        "#ff0000",
+        "#ff8800",
+        "#ffee00",
+        "#00cc00",
+        "#0066ff",
+        "#aa00ff",
+        "#ff00aa",
+        "#ff4400",
+        "#ff0000",
+        "#ff8800",
+        "#ffee00",
+        "#00cc00"
+      ]
+    },
+    "pattern": {
+      "type": "sweep",
+      "speed": 60,
+      "fade_time": 0.35,
+      "direction": 90,
+      "loop": true
+    },
+    "transitions": {
+      "fade_in": 0.5,
+      "fade_out": 1.0,
+      "crossfade": true,
+      "auto_expire": 0.0,
+      "return_to_default": true,
+      "return_to_default_time": 2.5,
+      "delay_before_start": 0.0
+    },
+    "triggers": [
+      "gameplay_start"
+    ],
+    "trigger_behavior": "loop",
+    "trigger_behavior_map": {
       "gameplay_start": {
         "mode": "loop",
         "priority": "normal",

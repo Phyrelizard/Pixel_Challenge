@@ -15,9 +15,9 @@
     "Lane Chase RL": 3
   },
   "selected_themes": [
-    "Calm Mode",
     "Rainbow Pulse",
-    "Ice Burst"
+    "Ice Burst",
+    "Calm Mode"
   ],
   "sash_left_attract_bottom": 576,
   "sash_center_ctrl": 401,

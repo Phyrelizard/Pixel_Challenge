@@ -2,6 +2,32 @@
 
 CONSOLE 
 
+v26.5.2
+ Phase 1: Console DMX control quick wins (scene dropdown, slot buttons, speed slider, bank buttons)
+ Phase 2: Editor wiring (assign button persistence, step editor click-to-edit, bank selection)
+ Phase 3a: Slot button sync (editor → console via _load_slot_assignments)
+ Phase 3b: Fix _assign_to_button() missing _mark_dirty() call
+ Phase 3c: Results presets — animated DMX (Rainbow Rotate, Color Strobe, Chase Random) with DMXService.animate_step() + timer loop
+ Phase 3d: OVERRIDE buttons on fixture cards — wired to colorchooser.askcolor() dialog
+ Phase 3e: PREVIEW button — wired to apply current scene dropdown selection
+ Phase 3f: Stop animations on BLACKOUT/GAMEPLAY/RESULTS/WASH/TEST/scene select/slot press
+ Phase 3g: Speed slider controls animation tick interval (0=slow 500ms, 100=fast 50ms)
+ Syntax check all files pass
+
+
+v26.5.0
+
+ 1. Fix fixture mirroring bug: per-fixture color array _fixture_colors[16] for independent F1–F16 colors
+ 2. Fix fixture selection bug: clicking a fixture selects it, loads its color into wheel, changes apply only to active fixture
+ 3. Add ✕ CLOSE button on HSV color wheel panel
+ 4. Editable assign buttons with dynamic colors + double-click to rename
+ 5. Merged Triggers into single TRIGGER SETTINGS section
+ 6. Dynamic console DMX Control slot button colors
+ 7. Editor version v1.5.0
+ 8. Syntax check all files — clean
+ 9. Fixed duplicate append bug in assign buttons (code review feedback)
+ 10. Extracted module-level constants: EDITOR_VERSION, SCROLLBAR_WIDTH, USER_SLOT_COLORS (code review feedback)
+
 v26.4.0
 
  1. Replace game filter buttons in left panel with a dropdown menu (same font)
