@@ -100,7 +100,10 @@ def _make_scrollable_frame(parent, bg=BG_PANEL):
     """Returns (outer_frame, canvas, inner_frame, scrollbar)."""
     outer = tk.Frame(parent, bg=bg)
     canvas = tk.Canvas(outer, bg=bg, highlightthickness=0, bd=0)
-    scrollbar = ttk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+    # Wide scrollbar for touchscreen (fat-finger friendly)
+    scrollbar = tk.Scrollbar(outer, orient="vertical", command=canvas.yview,
+                             width=30, bg=BG_MEDIUM, troughcolor=BG_DARK,
+                             activebackground=BORDER_COLOR)
     canvas.configure(yscrollcommand=scrollbar.set)
     inner = tk.Frame(canvas, bg=bg)
     win_id = canvas.create_window((0, 0), window=inner, anchor="nw")
@@ -598,6 +601,13 @@ class DMXLightingEditor:
         )
         save_btn.pack(side="right", padx=4, pady=8)
 
+        new_btn = tk.Button(
+            parent, text="✚ NEW", command=self._new_scene,
+            bg=BTN_TEAL, fg=FG_WHITE, font=FONT_LABEL,
+            relief="raised", bd=2, cursor="hand2", padx=8
+        )
+        new_btn.pack(side="right", padx=4, pady=8)
+
         # Game combobox
         game_cb = ttk.Combobox(
             parent, textvariable=self.game_filter_var,
@@ -621,15 +631,14 @@ class DMXLightingEditor:
     # ------------------------------------------------------------------
 
     def _build_left_panel(self, parent):
-        # Games header
-        tk.Label(parent, text="GAMES", bg=BG_PANEL, fg=FG_GOLD,
-                 font=FONT_SUBHDR).pack(padx=8, pady=(8, 2), anchor="w")
+        # Games header + dropdown
+        game_hdr_row = tk.Frame(parent, bg=BG_PANEL)
+        game_hdr_row.pack(fill="x", padx=6, pady=(8, 2))
+        tk.Label(game_hdr_row, text="GAMES", bg=BG_PANEL, fg=FG_GOLD,
+                 font=FONT_SUBHDR).pack(side="left", padx=2)
 
-        filter_frame = tk.Frame(parent, bg=BG_PANEL)
-        filter_frame.pack(fill="x", padx=6, pady=2)
-
-        self._game_filter_buttons = {}
-        game_labels = [
+        self._game_filter_var = tk.StringVar(value=self._active_filter)
+        game_dropdown_labels = [
             ("GLOBAL",     "global"),
             ("SPLASH",     "splash"),
             ("DOT DASH",   "pong"),
@@ -637,19 +646,19 @@ class DMXLightingEditor:
             ("SURROUND",   "surround"),
             ("ASCEND",     "ascend"),
         ]
-        cols = 3
-        for i, (label, key) in enumerate(game_labels):
-            btn = tk.Button(
-                filter_frame, text=label, font=FONT_SMALL,
-                bg=BTN_GREEN if key == self._active_filter else BG_MEDIUM,
-                fg=FG_WHITE, relief="raised", bd=2, cursor="hand2",
-                command=lambda k=key: self._filter_by_game(k)
-            )
-            btn.grid(row=i // cols, column=i % cols, padx=2, pady=2, sticky="ew")
-            self._game_filter_buttons[key] = btn
-
-        for c in range(cols):
-            filter_frame.columnconfigure(c, weight=1)
+        self._game_dropdown_map = {lbl: key for lbl, key in game_dropdown_labels}
+        self._game_dropdown_rmap = {key: lbl for lbl, key in game_dropdown_labels}
+        game_display_values = [lbl for lbl, _ in game_dropdown_labels]
+        self._game_filter_combo = ttk.Combobox(
+            game_hdr_row, textvariable=self._game_filter_var,
+            values=game_display_values, state="readonly", width=14,
+            font=FONT_SMALL
+        )
+        self._game_filter_combo.set(self._game_dropdown_rmap.get(self._active_filter, "GLOBAL"))
+        self._game_filter_combo.pack(side="left", padx=6)
+        self._game_filter_combo.bind("<<ComboboxSelected>>", self._on_game_dropdown_changed)
+        # Keep legacy dict for compatibility — not used for button highlights
+        self._game_filter_buttons = {}
 
         # Scene sort controls
         sort_frame = tk.Frame(parent, bg=BG_PANEL)
@@ -700,7 +709,7 @@ class DMXLightingEditor:
         for text, color, cmd in [
             ("SAVE",      BTN_GREEN,  self._save_scene),
             ("SAVE AS",   BTN_BLUE,   self._save_scene_as),
-            ("DUPE",      BTN_PURPLE, self._duplicate_scene),
+            ("COPY",      BTN_PURPLE, self._duplicate_scene),
         ]:
             tk.Button(btn_frame1, text=text, bg=color, fg=FG_WHITE,
                       font=FONT_SMALL, relief="raised", bd=2, cursor="hand2",
@@ -710,7 +719,7 @@ class DMXLightingEditor:
         btn_frame2 = tk.Frame(parent, bg=BG_PANEL)
         btn_frame2.pack(fill="x", padx=6, pady=(0, 8))
         for text, color, cmd in [
-            ("DELETE",  BTN_RED,  self._delete_scene),
+            ("DEL",     BTN_RED,  self._delete_scene),
             ("EXPORT",  BTN_BLUE, self._export_scenes),
             ("IMPORT",  BTN_BLUE, self._import_scenes),
         ]:
@@ -844,33 +853,71 @@ class DMXLightingEditor:
         rgb_frame.pack(fill="x", padx=6, pady=2)
         self._build_rgb_sliders(rgb_frame)
 
-        # Named presets - scrollable area
-        presets_lbl = tk.Label(color_outer, text="NAMED PRESETS", bg=BG_DARK,
-                               fg=FG_GOLD, font=FONT_SUBHDR)
-        presets_lbl.pack(anchor="w", padx=6, pady=(4, 1))
+        # Named presets — dropdown with colored indicator
+        presets_row = tk.Frame(color_outer, bg=BG_DARK)
+        presets_row.pack(fill="x", padx=6, pady=(4, 2))
+        tk.Label(presets_row, text="PRESETS:", bg=BG_DARK, fg=FG_GOLD,
+                 font=FONT_SMALL).pack(side="left", padx=(0, 4))
+        self._preset_color_swatch = tk.Canvas(
+            presets_row, width=24, height=24, bg="#003366",
+            highlightthickness=1, highlightbackground=BORDER_COLOR
+        )
+        self._preset_color_swatch.pack(side="left", padx=(0, 4))
+        self._preset_names = [p["name"] for p in COLOR_PRESETS]
+        self._preset_var = tk.StringVar(value=self._preset_names[0])
+        preset_cb = ttk.Combobox(
+            presets_row, textvariable=self._preset_var,
+            values=self._preset_names, state="readonly", width=16,
+            font=FONT_SMALL
+        )
+        preset_cb.pack(side="left", padx=2)
+        preset_cb.bind("<<ComboboxSelected>>", self._on_preset_dropdown_changed)
 
-        presets_outer, _, presets_inner, _ = _make_scrollable_frame(color_outer, bg=BG_DARK)
-        presets_outer.pack(fill="both", expand=True, padx=4, pady=(0, 3))
+        # Saved colors — inline
+        saved_row = tk.Frame(color_outer, bg=BG_DARK)
+        saved_row.pack(fill="x", padx=6, pady=2)
+        tk.Label(saved_row, text="SAVED:", bg=BG_DARK, fg=FG_GOLD,
+                 font=FONT_SMALL).pack(side="left", padx=(0, 4))
+        self._saved_colors_frame = tk.Frame(saved_row, bg=BG_DARK)
+        self._saved_colors_frame.pack(side="left", fill="x", expand=True)
+        self._build_saved_colors()
 
-        presets_frame = tk.Frame(presets_inner, bg=BG_DARK)
-        presets_frame.pack(fill="x")
-        cols = 5
-        for i, preset in enumerate(COLOR_PRESETS):
-            hex_c = preset["hex"]
-            name  = preset["name"]
-            fg    = _contrasting_fg(hex_c)
-            b = tk.Label(
-                presets_frame, text=name, bg=hex_c, fg=fg,
-                font=("Arial", 9), relief="raised", cursor="hand2",
-                width=10, anchor="center", padx=2, pady=2
-            )
-            b.grid(row=i // cols, column=i % cols, padx=1, pady=1, sticky="ew")
-            b.bind("<Button-1>", lambda e, h=hex_c: self._pick_preset_color(h))
-        for c in range(cols):
-            presets_frame.columnconfigure(c, weight=1)
+        # Lighting effect — compact row
+        effect_row = tk.Frame(color_outer, bg=BG_DARK)
+        effect_row.pack(fill="x", padx=6, pady=2)
+        tk.Label(effect_row, text="EFFECT:", bg=BG_DARK, fg=FG_GOLD,
+                 font=FONT_SMALL).pack(side="left", padx=(0, 4))
+        self._effect_swatches = []
+        for i in range(8):
+            c = tk.Canvas(effect_row, width=22, height=18,
+                          bg=self._palette[i], highlightthickness=1,
+                          highlightbackground=BORDER_COLOR)
+            c.pack(side="left", padx=1)
+            self._effect_swatches.append(c)
+        ttk.Combobox(effect_row, textvariable=self.pattern_var,
+                     values=PATTERN_TYPES, state="readonly", width=12,
+                     font=FONT_SMALL).pack(side="left", padx=(6, 2))
+
+        effect_sliders = tk.Frame(color_outer, bg=BG_DARK)
+        effect_sliders.pack(fill="x", padx=6, pady=(0, 3))
+        for lbl, var, f, t, res in [
+            ("Spd:", self.speed_var, 0, 200, 1),
+            ("Fade:", self.fade_time_var, 0.0, 5.0, 0.05),
+            ("Blend:", self.blending_var, 0, 100, 1),
+            ("Sat:", self.saturation_var, 0, 100, 1),
+            ("Dir:", self.direction_var, 0, 360, 1),
+        ]:
+            tk.Label(effect_sliders, text=lbl, bg=BG_DARK, fg=FG_LABEL,
+                     font=("Arial", 11)).pack(side="left")
+            sc = tk.Scale(effect_sliders, variable=var, from_=f, to=t,
+                          orient="horizontal", resolution=res,
+                          bg=BG_DARK, fg=FG_WHITE, troughcolor=BG_MEDIUM,
+                          highlightthickness=0, font=("Arial", 9),
+                          length=60, showvalue=True)
+            sc.pack(side="left", padx=(0, 4))
 
         # ============================================================
-        # ROW 2: Playback controls + gradient bar (16 bars)
+        # ROW 2: Playback controls + Event Timeline + gradient bar
         # ============================================================
         pb_frame = tk.Frame(parent, bg=BG_DARK)
         pb_frame.pack(fill="x", padx=12, pady=2)
@@ -889,6 +936,26 @@ class DMXLightingEditor:
                                           bg=BG_DARK, fg=FG_LABEL, font=FONT_SMALL)
         self._pb_state_label.pack(side="left", padx=6)
 
+        # Event Timeline — shows game flow stages
+        tl_frame = tk.LabelFrame(
+            pb_frame, text=" EVENT TIMELINE ", bg=BG_DARK, fg=FG_GOLD,
+            font=("Arial", 11, "bold"), highlightthickness=1,
+            highlightbackground=BORDER_COLOR
+        )
+        tl_frame.pack(side="left", padx=(8, 4))
+        self._timeline_labels = []
+        timeline_stages = [
+            "ATTRACT", "CHECK-IN", "INTRO", "COUNTDOWN",
+            "GAMEPLAY", "RESULTS", "IDLE",
+        ]
+        for stage in timeline_stages:
+            lbl = tk.Label(
+                tl_frame, text=stage, bg=BG_MEDIUM, fg=FG_WHITE,
+                font=("Arial", 10), relief="raised", padx=4, pady=1
+            )
+            lbl.pack(side="left", padx=1, pady=2)
+            self._timeline_labels.append(lbl)
+
         self._grad_canvas = tk.Canvas(
             pb_frame, height=28, bg="#220033",
             highlightthickness=1, highlightbackground=BORDER_COLOR
@@ -897,17 +964,14 @@ class DMXLightingEditor:
         self._draw_gradient_bar()
 
         # ============================================================
-        # ROW 3: Scene Preview (1-20) + Assign Scene to Button
+        # ROW 3: Scene Preview (1-20)
         # ============================================================
-        row3 = tk.Frame(parent, bg=BG_DARK)
-        row3.pack(fill="x", padx=8, pady=2)
-
         preview_frame = tk.LabelFrame(
-            row3, text=" SCENE PREVIEW ", bg=BG_DARK, fg=FG_GOLD,
+            parent, text=" SCENE PREVIEW ", bg=BG_DARK, fg=FG_GOLD,
             font=FONT_SUBHDR, highlightthickness=1,
             highlightbackground=BORDER_COLOR
         )
-        preview_frame.pack(side="left", fill="x", expand=True, padx=(0, 4))
+        preview_frame.pack(fill="x", padx=8, pady=2)
 
         step_row = tk.Frame(preview_frame, bg=BG_DARK)
         step_row.pack(fill="x", padx=4, pady=3)
@@ -924,14 +988,17 @@ class DMXLightingEditor:
                           font=("Arial", 10), tags="num")
             self._step_canvases.append(c)
 
+        # ============================================================
+        # ROW 4: Assign Scene to Button (full-width own row)
+        # ============================================================
         assign_frame = tk.LabelFrame(
-            row3, text=" ASSIGN SCENE TO BUTTON ",
+            parent, text=" ASSIGN SCENE TO BUTTON ",
             bg=BG_DARK, fg=FG_GOLD, font=FONT_SUBHDR,
             highlightthickness=1, highlightbackground=BORDER_COLOR
         )
-        assign_frame.pack(side="left", padx=(4, 0))
+        assign_frame.pack(fill="x", padx=8, pady=2)
         assign_row = tk.Frame(assign_frame, bg=BG_DARK)
-        assign_row.pack(pady=3, padx=4)
+        assign_row.pack(fill="x", pady=3, padx=4)
 
         assign_slots = [
             ("SCORE",    BTN_GRAY),
@@ -939,24 +1006,26 @@ class DMXLightingEditor:
             ("GAMEPLAY", BTN_BLUE),
             ("START",    BTN_GREEN),
             ("TEST",     BTN_ORANGE),
-            ("\u2014",        BG_MEDIUM),
-            ("\u2014",        BG_MEDIUM),
-            ("\u2014",        BG_MEDIUM),
+            ("\u2014",   BG_MEDIUM),
+            ("\u2014",   BG_MEDIUM),
+            ("\u2014",   BG_MEDIUM),
+            ("\u2014",   BG_MEDIUM),
+            ("\u2014",   BG_MEDIUM),
+            ("\u2014",   BG_MEDIUM),
         ]
         self._assign_buttons = []
         for label, color in assign_slots:
             b = tk.Button(
                 assign_row, text=label, bg=color, fg=FG_WHITE,
                 font=FONT_SMALL, relief="raised", bd=2, cursor="hand2",
-                width=9,
                 command=lambda l=label: self._assign_to_button(l)
             )
-            b.pack(side="left", padx=2)
+            b.pack(side="left", padx=2, expand=True, fill="x")
             b.bind("<Button-3>", lambda e, l=label: self._show_assign_context_menu(e, l))
             self._assign_buttons.append(b)
 
         # ============================================================
-        # ROW 4: Settings - 2 columns (no outer scrollbar)
+        # ROW 5: Settings (Trigger Settings + Triggers only)
         # ============================================================
         self._center_status_var = tk.StringVar(value="No scene loaded.")
         tk.Label(parent, textvariable=self._center_status_var,
@@ -966,31 +1035,18 @@ class DMXLightingEditor:
         self._build_settings_area(parent)
 
     # ------------------------------------------------------------------
-    # Settings area — 2 columns, no outer scrollbar
+    # Settings area — Trigger Settings + Triggers (full-width)
     # ------------------------------------------------------------------
 
     def _build_settings_area(self, parent):
-        """Build settings in a flat 2-column grid below the main controls."""
-        cols_frame = tk.Frame(parent, bg=BG_DARK)
-        cols_frame.pack(fill="both", expand=True, padx=8, pady=(2, 0))
+        """Build settings as side-by-side Trigger Settings + Triggers."""
+        settings_frame = tk.Frame(parent, bg=BG_PANEL,
+                                   highlightthickness=1, highlightbackground=BORDER_COLOR)
+        settings_frame.pack(fill="both", expand=True, padx=8, pady=(2, 0))
+        self._build_settings_content(settings_frame)
 
-        col0 = tk.Frame(cols_frame, bg=BG_PANEL,
-                         highlightthickness=1, highlightbackground=BORDER_COLOR)
-        col0.grid(row=0, column=0, sticky="nsew", padx=(0, 3), pady=0)
-
-        col1 = tk.Frame(cols_frame, bg=BG_PANEL,
-                         highlightthickness=1, highlightbackground=BORDER_COLOR)
-        col1.grid(row=0, column=1, sticky="nsew", padx=(3, 0), pady=0)
-
-        cols_frame.columnconfigure(0, weight=1)
-        cols_frame.columnconfigure(1, weight=1)
-        cols_frame.rowconfigure(0, weight=1)
-
-        self._build_settings_col0(col0)
-        self._build_settings_col1(col1)
-
-    def _build_settings_col0(self, p):
-        """Column 0: Trigger Settings (left) + Triggers (right) side-by-side."""
+    def _build_settings_content(self, p):
+        """Trigger Settings (left) + Triggers (right) side-by-side."""
         inner = tk.Frame(p, bg=BG_PANEL)
         inner.pack(fill="both", expand=True, padx=2, pady=2)
 
@@ -999,7 +1055,7 @@ class DMXLightingEditor:
         ts_frame.pack(side="left", fill="both", expand=True, padx=(0, 2))
 
         self._section(ts_frame, "TRIGGER SETTINGS")
-        self._labeled_entry(ts_frame, "Name:", self.scene_name_var)
+        self._labeled_entry_short(ts_frame, "Name:", self.scene_name_var)
         self._labeled_combo(ts_frame, "Type:", self.scene_type_var, SCENE_CATEGORIES)
         self._labeled_combo(ts_frame, "Game:", self.scene_game_var, GAME_FILTERS)
         self._labeled_combo(ts_frame, "Apply Mode:", self.scene_apply_mode_var,
@@ -1102,37 +1158,6 @@ class DMXLightingEditor:
                   font=FONT_SMALL, relief="raised", bd=2, cursor="hand2",
                   command=self._paste_triggers).pack(side="left", padx=2)
 
-    def _build_settings_col1(self, p):
-        """Column 1: Saved Colors + Lighting Effect."""
-        inner = tk.Frame(p, bg=BG_PANEL)
-        inner.pack(fill="both", expand=True, padx=2, pady=2)
-
-        # ---- Saved Colors ----
-        self._section(inner, "SAVED COLORS")
-        self._saved_colors_frame = tk.Frame(inner, bg=BG_PANEL)
-        self._saved_colors_frame.pack(fill="x", padx=8, pady=2)
-        self._build_saved_colors()
-
-        # ---- Lighting Effect ----
-        self._section(inner, "LIGHTING EFFECT")
-
-        mini_row = tk.Frame(inner, bg=BG_PANEL)
-        mini_row.pack(fill="x", padx=8, pady=2)
-        self._effect_swatches = []
-        for i in range(8):
-            c = tk.Canvas(mini_row, width=28, height=22,
-                          bg=self._palette[i], highlightthickness=1,
-                          highlightbackground=BORDER_COLOR)
-            c.pack(side="left", padx=1)
-            self._effect_swatches.append(c)
-
-        self._labeled_combo(inner, "Pattern:", self.pattern_var, PATTERN_TYPES)
-        self._labeled_scale(inner, "Speed:", self.speed_var, 0, 200)
-        self._labeled_scale(inner, "Fade Time:", self.fade_time_var, 0.0, 5.0, resolution=0.05)
-        self._labeled_scale(inner, "Blending:", self.blending_var, 0, 100)
-        self._labeled_scale(inner, "Saturation:", self.saturation_var, 0, 100)
-        self._labeled_scale(inner, "Direction:", self.direction_var, 0, 360)
-
     # ------------------------------------------------------------------
     # Bottom bar
     # ------------------------------------------------------------------
@@ -1167,6 +1192,12 @@ class DMXLightingEditor:
         )
         help_btn.pack(side="right", padx=8, pady=6)
 
+        # Editor version label
+        tk.Label(
+            parent, text="v1.4.0", bg=BG_DEEP, fg="#888888",
+            font=FONT_SMALL
+        ).pack(side="right", padx=(0, 4), pady=6)
+
     # ------------------------------------------------------------------
     # Helpers for right-panel widgets
     # ------------------------------------------------------------------
@@ -1185,6 +1216,17 @@ class DMXLightingEditor:
         tk.Entry(row, textvariable=var, bg=BG_MEDIUM, fg=FG_WHITE,
                  insertbackground=FG_WHITE, relief="flat", font=FONT_SMALL
                  ).pack(side="left", fill="x", expand=True, padx=4)
+
+    def _labeled_entry_short(self, parent, label, var):
+        """Short entry field — fits just enough for typical scene names."""
+        row = tk.Frame(parent, bg=BG_PANEL)
+        row.pack(fill="x", padx=8, pady=2)
+        tk.Label(row, text=label, bg=BG_PANEL, fg=FG_LABEL,
+                 font=FONT_SMALL, width=8, anchor="e").pack(side="left")
+        tk.Entry(row, textvariable=var, bg=BG_MEDIUM, fg=FG_WHITE,
+                 insertbackground=FG_WHITE, relief="flat", font=FONT_SMALL,
+                 width=22
+                 ).pack(side="left", padx=4)
 
     def _labeled_combo(self, parent, label, var, values):
         row = tk.Frame(parent, bg=BG_PANEL)
@@ -1226,10 +1268,10 @@ class DMXLightingEditor:
         for w in self._saved_colors_frame.winfo_children():
             w.destroy()
         colors = self._color_palette_store.saved_colors[:16]
-        row = tk.Frame(self._saved_colors_frame, bg=BG_PANEL)
+        row = tk.Frame(self._saved_colors_frame, bg=BG_DARK)
         row.pack(fill="x")
         for i, hex_c in enumerate(colors[:16]):
-            c = tk.Canvas(row, width=28, height=28, bg=hex_c,
+            c = tk.Canvas(row, width=22, height=22, bg=hex_c,
                           highlightthickness=1, highlightbackground=BORDER_COLOR,
                           cursor="hand2")
             c.pack(side="left", padx=1)
@@ -1549,9 +1591,45 @@ class DMXLightingEditor:
 
     def _filter_by_game(self, game: str):
         self._active_filter = game
-        for key, btn in self._game_filter_buttons.items():
-            btn.configure(bg=BTN_GREEN if key == game else BG_MEDIUM)
+        # Update dropdown if it exists
+        if hasattr(self, '_game_filter_combo'):
+            display = self._game_dropdown_rmap.get(game, game.upper())
+            self._game_filter_combo.set(display)
         self._refresh_scene_list()
+
+    def _on_game_dropdown_changed(self, event=None):
+        display = self._game_filter_var.get()
+        key = self._game_dropdown_map.get(display, "global")
+        self._active_filter = key
+        self._refresh_scene_list()
+
+    def _on_preset_dropdown_changed(self, event=None):
+        """Apply the selected named preset color to the current palette slot."""
+        name = self._preset_var.get()
+        for preset in COLOR_PRESETS:
+            if preset["name"] == name:
+                hex_c = preset["hex"]
+                # Update swatch indicator
+                if hasattr(self, '_preset_color_swatch'):
+                    self._preset_color_swatch.configure(bg=hex_c)
+                self._pick_preset_color(hex_c)
+                break
+
+    def _new_scene(self):
+        """Create a new scene file via dialog."""
+        name = simpledialog.askstring(
+            "New Scene", "Enter name for the new scene:",
+            initialvalue="New Scene",
+            parent=self._container
+        )
+        if not name or not name.strip():
+            return
+        scene = DMXScene()
+        scene.name = name.strip()
+        self._library.add(scene)
+        self._library.save()
+        self._load_scene(scene)
+        self._center_status_var.set(f"Created: {scene.name}")
 
     def _on_search_changed(self, *args):
         self._refresh_scene_list()
@@ -1909,24 +1987,37 @@ class DMXLightingEditor:
 
         help_text = (
             "LEFT PANEL\n"
-            "  • Select a game filter to narrow the scene list.\n"
+            "  • Game dropdown narrows the scene list to a specific game.\n"
             "  • Sort by Name, Category, or Game using sort buttons.\n"
             "  • Search bar filters scenes by name.\n"
-            "  • Click a scene to load it into the editor.\n\n"
-            "CENTER — TOP\n"
+            "  • Click a scene to load it into the editor.\n"
+            "  • COPY duplicates the scene. DEL removes it.\n\n"
+            "TOP BAR\n"
+            "  • NEW — create a new scene (opens name dialog).\n"
+            "  • SAVE — overwrite current scene.  SAVE AS — create copy.\n"
+            "  • TEST SCENE — briefly apply and revert.\n"
+            "  • APPLY — set as the active scene immediately.\n\n"
+            "CENTER — TOP ROW\n"
             "  • Fixture Grid shows 16 stage fixtures (2×8) with assigned colors.\n"
             "  • ALL / NONE buttons select or clear all fixtures.\n"
-            "  • Click a fixture to toggle its selection.\n"
             "  • ▶ COLOR cycles colors, REVERSE/SHIFT/MIRROR manipulate assignments.\n"
-            "  • INT slider adjusts intensity for selected fixtures.\n"
-            "  • MOD ALL sets all palette slots to the current color.\n"
-            "  • Assign the scene to a quick-launch button (right-click for options).\n"
-            "  • Playback bar: |◀ rewind, ▶ play, ▶▶ speed up, ⟳ toggle loop.\n\n"
-            "CENTER — SETTINGS (2 columns below)\n"
-            "  • Left: Trigger Settings + Fixture Target + Triggers side by side.\n"
-            "  • Right: Saved Colors, Lighting Effect (pattern/speed/fade/blending).\n"
-            "  • Color Palette + Named Presets are to the right of Fixture Targets.\n"
-            "  • Transition Rules, DMX Settings, Safety are on the Console Setup page.\n\n"
+            "  • Color Palette: 8 slots, CUSTOM opens HSV wheel, WARM/COOL shift.\n"
+            "  • Presets dropdown picks named colors. Saved colors inline.\n"
+            "  • Lighting Effect: pattern, speed, fade, blending, saturation, direction.\n\n"
+            "CENTER — PLAYBACK + TIMELINE\n"
+            "  • |◀ rewind, ▶ play, ▶▶ speed up, ⟳ toggle loop.\n"
+            "  • Event Timeline shows game flow stages.\n"
+            "  • Gradient bar shows 16-bar palette preview.\n\n"
+            "CENTER — SCENE PREVIEW\n"
+            "  • 20-step preview. MOD ALL sets all palette slots to current color.\n\n"
+            "CENTER — ASSIGN SCENE TO BUTTON\n"
+            "  • SCORE, INTRO, GAMEPLAY, START, TEST + 6 blanks.\n"
+            "  • Right-click for behavior and action options.\n\n"
+            "CENTER — SETTINGS\n"
+            "  • Trigger Settings: Name, Type, Game, Apply Mode, Priority.\n"
+            "  • Fixture Target: Bank, Range, Groups.\n"
+            "  • Triggers: Checkboxes + behavior mode per event.\n"
+            "  • Transition Rules, DMX Settings, Safety on Console Setup page.\n\n"
             "KEYBOARD SHORTCUTS\n"
             "  • Ctrl+S — Save scene\n"
             "  • Ctrl+D — Duplicate scene\n"
@@ -1934,11 +2025,8 @@ class DMXLightingEditor:
             "  • Escape — Close editor\n\n"
             "BOTTOM BAR\n"
             "  • PREVIEW — visual-only preview (no DMX output).\n"
-            "  • GO LIVE — push scene to real fixtures (toggleable).\n\n"
-            "TOP BAR\n"
-            "  • SAVE — overwrite current scene.  SAVE AS — create new.\n"
-            "  • TEST SCENE — briefly apply and revert.\n"
-            "  • APPLY — set as the active scene immediately.\n"
+            "  • GO LIVE — push scene to real fixtures (toggleable).\n"
+            "  • Editor version shown next to HELP button.\n"
         )
         text_w.insert("1.0", help_text)
         text_w.configure(state="disabled")
