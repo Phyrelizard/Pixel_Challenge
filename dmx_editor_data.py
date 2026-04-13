@@ -194,6 +194,8 @@ class DMXScene:
                 "auto_expire": 2.0,
             },
             "button_assignment": None,
+            "button_behavior": "press = activate",
+            "button_action": "quick scene recall",
             "safety": {
                 "max_brightness": 100,        # percentage (0–100)
                 "strobe_cap": 80,             # percentage (0–100); max strobe intensity
@@ -214,7 +216,8 @@ class DMXScene:
             # Top-level scalar fields
             for key in ("name", "category", "game", "mode_filter", "enabled",
                         "locked", "priority", "triggers", "trigger_behavior",
-                        "button_assignment", "trigger_behavior_map", "fixture_roles",
+                        "button_assignment", "button_behavior", "button_action",
+                        "trigger_behavior_map", "fixture_roles",
                         "user_slot_names"):
                 setattr(self, key, data.get(key, defaults.get(key)))
             # Nested dicts — merge with defaults so missing sub-keys are filled
@@ -247,6 +250,8 @@ class DMXScene:
             "safety": dict(self.safety),
             "fixture_roles": dict(self.fixture_roles),
             "button_assignment": self.button_assignment,
+            "button_behavior": getattr(self, "button_behavior", "press = activate"),
+            "button_action": getattr(self, "button_action", "quick scene recall"),
             "user_slot_names": list(getattr(self, "user_slot_names", None) or [""] * 6),
         }
 

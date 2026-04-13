@@ -391,6 +391,7 @@ class DMXLightingEditor:
         self._palette             = ["#FF4400"] * 8
         self._fixture_colors      = ["#FF4400"] * 16   # per-fixture independent colors
         self._active_fixture      = 0                   # currently selected fixture index
+        self._active_bank         = 0                   # currently selected bank (0-3)
         self._hsv_visible         = False
         self._user_slot_names     = [""] * 6            # editable assign-button labels
         self._user_slot_colors    = list(USER_SLOT_COLORS)
@@ -402,6 +403,7 @@ class DMXLightingEditor:
         self._preview_speed = 500  # ms per frame
         self._preview_loop = False
         self._preview_frame = 0
+        self._step_colors = ["#330022"] * 20  # per-step editable colors
         self._sort_mode = "name"
         self._trigger_copy_buffer = {}  # {trigger_event: behavior_mode}
 
@@ -999,6 +1001,7 @@ class DMXLightingEditor:
             c.pack(side="left", padx=1)
             c.create_text(18, 14, text=str(i + 1), fill=FG_WHITE,
                           font=("Arial", 10), tags="num")
+            c.bind("<Button-1>", lambda e, idx=i: self._on_step_clicked(idx))
             self._step_canvases.append(c)
 
         # ============================================================
@@ -1397,6 +1400,14 @@ class DMXLightingEditor:
             self._fixture_colors = [
                 self._palette[i % len(self._palette)] for i in range(16)
             ]
+        # Load per-step colors if available, else derive from palette
+        stored_sc = self._current_scene.colors.get("step_colors", None)
+        if stored_sc and len(stored_sc) >= 20:
+            self._step_colors = list(stored_sc[:20])
+        else:
+            self._step_colors = [
+                self._palette[i % len(self._palette)] for i in range(20)
+            ]
         # Load user slot names / colors if present
         self._user_slot_names = list(
             getattr(self._current_scene, "user_slot_names", None) or [""] * 6
@@ -1430,6 +1441,7 @@ class DMXLightingEditor:
         self._dirty = False
         self._update_fixture_grid()
         self._update_palette_display()
+        self._update_step_display()
         self._select_palette_slot(0)
         self._validate_current_scene()
         # Refresh user slot button labels
@@ -1484,6 +1496,7 @@ class DMXLightingEditor:
         s.fixture_target["groups"]    = [g for g, v in self._group_vars.items() if v.get()]
         s.colors["palette"]           = list(self._palette)
         s.colors["fixture_colors"]    = list(self._fixture_colors)
+        s.colors["step_colors"]       = list(self._step_colors)
         s.colors["blending"]          = int(self.blending_var.get())
         s.colors["saturation"]        = int(self.saturation_var.get())
         s.pattern["type"]             = self.pattern_var.get()
@@ -1521,6 +1534,11 @@ class DMXLightingEditor:
         }
         # User slot names for assign buttons
         s.user_slot_names = list(self._user_slot_names)
+        # Button assignment, behavior, action
+        if self._current_scene:
+            s.button_assignment = getattr(self._current_scene, "button_assignment", None)
+            s.button_behavior = getattr(self._current_scene, "button_behavior", "press = activate")
+            s.button_action = getattr(self._current_scene, "button_action", "quick scene recall")
         return s
 
     def _save_scene(self):
@@ -1866,8 +1884,26 @@ class DMXLightingEditor:
         hex_c = _rgb_to_hex(self._r_var.get(), self._g_var.get(), self._b_var.get())
         self._palette = [hex_c] * 8
         self._fixture_colors = [hex_c] * 16
+        self._step_colors = [hex_c] * 20
         self._update_palette_display()
         self._update_fixture_grid()
+        self._update_step_display()
+
+    def _on_step_clicked(self, step_index: int):
+        """Click a step canvas to paint it with the current palette slot color."""
+        color = self._palette[self._selected_slot] if self._selected_slot < len(self._palette) else "#FF0000"
+        self._step_colors[step_index] = color
+        c = self._step_canvases[step_index]
+        c.configure(bg=color, highlightbackground=FG_GOLD)
+        c.itemconfig("num", fill=_contrasting_fg(color))
+        self._mark_dirty()
+
+    def _update_step_display(self):
+        """Refresh all step canvas backgrounds from _step_colors."""
+        for i, c in enumerate(self._step_canvases):
+            color = self._step_colors[i] if i < len(self._step_colors) else "#330022"
+            c.configure(bg=color, highlightbackground=BORDER_COLOR)
+            c.itemconfig("num", fill=_contrasting_fg(color))
 
     def _assign_to_button(self, label: str):
         if self._current_scene:
@@ -1905,8 +1941,30 @@ class DMXLightingEditor:
     # ------------------------------------------------------------------
 
     def _select_bank(self, idx: int):
+        """Select a bank and update fixture range to match."""
+        self._active_bank = idx
         for i, btn in enumerate(self._bank_buttons):
             btn.configure(bg=BTN_BLUE if i == idx else BG_MEDIUM)
+        # Update range dropdown to match bank
+        bank_ranges = ["1-4", "5-8", "9-12", "13-16"]
+        if idx < len(bank_ranges):
+            self._range_var.set(bank_ranges[idx])
+        # Highlight fixtures in this bank, deselect others
+        start = idx * 4
+        end = start + 4
+        for i, c in enumerate(self._fixture_canvases):
+            if start <= i < end:
+                color = self._fixture_colors[i] if i < len(self._fixture_colors) else "#330022"
+                c.configure(bg=color, highlightbackground=FG_GOLD)
+            else:
+                color = self._fixture_colors[i] if i < len(self._fixture_colors) else "#110011"
+                c.configure(bg=color, highlightbackground=BORDER_COLOR)
+
+    def _get_bank_fixture_range(self) -> tuple:
+        """Return (start, end) fixture indices for the active bank."""
+        bank = getattr(self, '_active_bank', 0)
+        start = bank * 4
+        return (start, min(start + 4, 16))
 
     def _select_all_fixtures(self):
         for i in range(len(self._fixture_canvases)):
@@ -2156,14 +2214,14 @@ class DMXLightingEditor:
                                 activebackground=BTN_PURPLE, activeforeground=FG_WHITE)
         for beh in ["press = activate", "press again = deactivate", "hold = temporary", "double-click = alternate"]:
             behavior_menu.add_command(label=beh,
-                                      command=lambda b=beh: self._center_status_var.set(f"Behavior: {b}"))
+                                      command=lambda b=beh: self._set_button_behavior(b))
         menu.add_cascade(label="Behavior", menu=behavior_menu)
         action_menu = tk.Menu(menu, tearoff=0, bg=BG_MEDIUM, fg=FG_WHITE,
                               activebackground=BTN_PURPLE, activeforeground=FG_WHITE)
         for act in ["quick scene recall", "momentary flash", "toggle wash",
                     "trigger effect", "run sequence"]:
             action_menu.add_command(label=act,
-                                    command=lambda a=act: self._center_status_var.set(f"Action: {a}"))
+                                    command=lambda a=act: self._set_button_action(a))
         menu.add_cascade(label="Action Type", menu=action_menu)
         menu.add_separator()
         menu.add_command(label="Unassign",
@@ -2172,6 +2230,20 @@ class DMXLightingEditor:
             menu.tk_popup(event.x_root, event.y_root)
         finally:
             menu.grab_release()
+
+    def _set_button_behavior(self, behavior: str):
+        """Set the button behavior on the current scene and mark dirty."""
+        if self._current_scene:
+            self._current_scene.button_behavior = behavior
+            self._center_status_var.set(f"Behavior: {behavior}")
+            self._mark_dirty()
+
+    def _set_button_action(self, action: str):
+        """Set the button action type on the current scene and mark dirty."""
+        if self._current_scene:
+            self._current_scene.button_action = action
+            self._center_status_var.set(f"Action: {action}")
+            self._mark_dirty()
 
     def _set_sort_mode(self, mode: str):
         self._sort_mode = mode
