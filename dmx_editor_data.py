@@ -205,6 +205,7 @@ class DMXScene:
             },
             "trigger_behavior_map": {},
             "fixture_roles": {},
+            "user_slot_names": ["", "", "", "", "", ""],
         }
 
     def __init__(self, data: dict = None):
@@ -213,8 +214,9 @@ class DMXScene:
             # Top-level scalar fields
             for key in ("name", "category", "game", "mode_filter", "enabled",
                         "locked", "priority", "triggers", "trigger_behavior",
-                        "button_assignment", "trigger_behavior_map", "fixture_roles"):
-                setattr(self, key, data.get(key, defaults[key]))
+                        "button_assignment", "trigger_behavior_map", "fixture_roles",
+                        "user_slot_names"):
+                setattr(self, key, data.get(key, defaults.get(key)))
             # Nested dicts — merge with defaults so missing sub-keys are filled
             for key in ("fixture_target", "colors", "pattern", "transitions",
                         "dmx_settings", "safety"):
@@ -245,6 +247,7 @@ class DMXScene:
             "safety": dict(self.safety),
             "fixture_roles": dict(self.fixture_roles),
             "button_assignment": self.button_assignment,
+            "user_slot_names": list(getattr(self, "user_slot_names", None) or [""] * 6),
         }
 
     def copy(self) -> "DMXScene":

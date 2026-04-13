@@ -3115,7 +3115,7 @@ class PixelChallengeConsole:
         # --- (a2) Second row of blank placeholder buttons for future assignment ---
         slot_row = tk.Frame(dmx_body, bg="#17071f")
         slot_row.pack(fill="x", pady=(0, 4))
-        slot_colors = ["#2a1a4a", "#1a2a4a", "#1a4a2a", "#4a2a1a", "#4a1a2a", "#2a4a1a"]
+        slot_colors = ["#FF6600", "#00BBFF", "#FF3399", "#00DD66", "#FFCC00", "#AA44FF"]
         for i, bg_col in enumerate(slot_colors, start=1):
             tk.Button(slot_row, text="", width=6,
                       command=lambda n=i: self.log(f"DMX Slot {n} (unassigned)"),

@@ -385,7 +385,13 @@ class DMXLightingEditor:
         self._active_filter       = "global"
         self._selected_slot       = 0
         self._palette             = ["#FF4400"] * 8
+        self._fixture_colors      = ["#FF4400"] * 16   # per-fixture independent colors
+        self._active_fixture      = 0                   # currently selected fixture index
         self._hsv_visible         = False
+        self._user_slot_names     = [""] * 6            # editable assign-button labels
+        self._user_slot_colors    = [
+            "#FF6600", "#00BBFF", "#FF3399", "#00DD66", "#FFCC00", "#AA44FF"
+        ]
         self._scene_row_widgets   = {}
         self._undo_snapshot: DMXScene | None = None
         self._dirty = False
@@ -845,6 +851,11 @@ class DMXLightingEditor:
 
         # HSV wheel (collapsible)
         self._hsv_frame = tk.Frame(color_outer, bg=BG_DEEP)
+        hsv_top = tk.Frame(self._hsv_frame, bg=BG_DEEP)
+        hsv_top.pack(fill="x", padx=4, pady=(2, 0))
+        tk.Button(hsv_top, text="✕ CLOSE", bg=BTN_RED, fg=FG_WHITE,
+                  font=FONT_SMALL, relief="raised", bd=2, cursor="hand2",
+                  command=self._toggle_hsv).pack(side="right", padx=2)
         self._color_wheel = HSVColorWheel(
             self._hsv_frame, size=180, callback=self._on_wheel_color
         )
@@ -1000,21 +1011,24 @@ class DMXLightingEditor:
         assign_row = tk.Frame(assign_frame, bg=BG_DARK)
         assign_row.pack(fill="x", pady=3, padx=4)
 
+        # Dynamic colors matching console DMX control slot buttons
+        _user_slot_colors = self._user_slot_colors
         assign_slots = [
             ("SCORE",    BTN_GRAY),
             ("INTRO",    BTN_BLUE),
             ("GAMEPLAY", BTN_BLUE),
             ("START",    BTN_GREEN),
             ("TEST",     BTN_ORANGE),
-            ("\u2014",   BG_MEDIUM),
-            ("\u2014",   BG_MEDIUM),
-            ("\u2014",   BG_MEDIUM),
-            ("\u2014",   BG_MEDIUM),
-            ("\u2014",   BG_MEDIUM),
-            ("\u2014",   BG_MEDIUM),
         ]
+        # Add the 6 user-assignable slots with dynamic colors
+        for i in range(6):
+            name = self._user_slot_names[i] if i < len(self._user_slot_names) and self._user_slot_names[i] else "\u2014"
+            color = _user_slot_colors[i] if i < len(_user_slot_colors) else BG_MEDIUM
+            assign_slots.append((name, color))
+
         self._assign_buttons = []
-        for label, color in assign_slots:
+        self._user_slot_btn_indices = []  # track indices of editable buttons
+        for slot_idx, (label, color) in enumerate(assign_slots):
             b = tk.Button(
                 assign_row, text=label, bg=color, fg=FG_WHITE,
                 font=FONT_SMALL, relief="raised", bd=2, cursor="hand2",
@@ -1022,6 +1036,11 @@ class DMXLightingEditor:
             )
             b.pack(side="left", padx=2, expand=True, fill="x")
             b.bind("<Button-3>", lambda e, l=label: self._show_assign_context_menu(e, l))
+            self._assign_buttons.append(b)
+            if slot_idx >= 5:  # the 6 user slots (indices 5-10)
+                user_idx = slot_idx - 5
+                b.bind("<Double-Button-1>", lambda e, ui=user_idx: self._rename_user_slot(ui))
+                self._user_slot_btn_indices.append(slot_idx)
             self._assign_buttons.append(b)
 
         # ============================================================
@@ -1127,11 +1146,10 @@ class DMXLightingEditor:
                   font=FONT_SMALL, relief="raised", bd=2, cursor="hand2",
                   command=self._on_reconfigure).pack(side="left", padx=2, expand=True, fill="x")
 
-        # ---- Triggers (right sub-col) ----
+        # ---- Triggers (right sub-col — no separate header, part of TRIGGER SETTINGS) ----
         trig_frame = tk.Frame(inner, bg=BG_PANEL)
         trig_frame.pack(side="left", fill="both", padx=(2, 0))
 
-        self._section(trig_frame, "TRIGGERS")
         trig_scroll_outer, _, trig_inner, _ = _make_scrollable_frame(trig_frame, bg=BG_PANEL)
         trig_scroll_outer.pack(fill="both", expand=True, padx=4, pady=2)
 
@@ -1194,7 +1212,7 @@ class DMXLightingEditor:
 
         # Editor version label
         tk.Label(
-            parent, text="v1.4.0", bg=BG_DEEP, fg="#888888",
+            parent, text="v1.5.0", bg=BG_DEEP, fg="#888888",
             font=FONT_SMALL
         ).pack(side="right", padx=(0, 4), pady=6)
 
@@ -1369,6 +1387,21 @@ class DMXLightingEditor:
         self._palette = list(self._current_scene.colors.get("palette", ["#FF0000"] * 8))
         while len(self._palette) < 8:
             self._palette.append("#000000")
+        # Build per-fixture colors: use stored fixture_colors if available, else
+        # spread the 8-slot palette across 16 fixtures
+        stored_fc = self._current_scene.colors.get("fixture_colors", None)
+        if stored_fc and len(stored_fc) >= 16:
+            self._fixture_colors = list(stored_fc[:16])
+        else:
+            self._fixture_colors = [
+                self._palette[i % len(self._palette)] for i in range(16)
+            ]
+        # Load user slot names / colors if present
+        self._user_slot_names = list(
+            getattr(self._current_scene, "user_slot_names", None) or [""] * 6
+        )
+        while len(self._user_slot_names) < 6:
+            self._user_slot_names.append("")
 
         if not self._vars_ready:
             return
@@ -1398,6 +1431,8 @@ class DMXLightingEditor:
         self._update_palette_display()
         self._select_palette_slot(0)
         self._validate_current_scene()
+        # Refresh user slot button labels
+        self._refresh_user_slot_buttons()
 
         # Populate transition vars
         t = scene.transitions
@@ -1447,6 +1482,7 @@ class DMXLightingEditor:
         s.fixture_target["range"]     = self._range_var.get()
         s.fixture_target["groups"]    = [g for g, v in self._group_vars.items() if v.get()]
         s.colors["palette"]           = list(self._palette)
+        s.colors["fixture_colors"]    = list(self._fixture_colors)
         s.colors["blending"]          = int(self.blending_var.get())
         s.colors["saturation"]        = int(self.saturation_var.get())
         s.pattern["type"]             = self.pattern_var.get()
@@ -1482,6 +1518,8 @@ class DMXLightingEditor:
             for ev, var in self._trigger_behavior_vars.items()
             if self._trigger_vars[ev].get()
         }
+        # User slot names for assign buttons
+        s.user_slot_names = list(self._user_slot_names)
         return s
 
     def _save_scene(self):
@@ -1639,9 +1677,8 @@ class DMXLightingEditor:
     # ------------------------------------------------------------------
 
     def _update_fixture_grid(self):
-        palette = self._palette
         for i, c in enumerate(self._fixture_canvases):
-            color = palette[i % len(palette)] if palette else "#220022"
+            color = self._fixture_colors[i] if i < len(self._fixture_colors) else "#220022"
             try:
                 c.configure(bg=color)
                 c.itemconfig("num", fill=_contrasting_fg(color))
@@ -1649,15 +1686,18 @@ class DMXLightingEditor:
                 pass
 
     def _toggle_fixture(self, idx: int):
-        current_bg = self._fixture_canvases[idx].cget("bg")
-        palette = self._palette
-        target = palette[idx % len(palette)] if palette else "#330022"
-        if current_bg == target:
-            self._fixture_canvases[idx].configure(bg="#110011",
-                                                   highlightbackground=BORDER_COLOR)
-        else:
-            self._fixture_canvases[idx].configure(bg=target,
-                                                   highlightbackground=FG_GOLD)
+        """Select a fixture for color editing. Gold border = active."""
+        self._active_fixture = idx
+        # Update highlights: gold for active, normal for others
+        for i, c in enumerate(self._fixture_canvases):
+            c.configure(highlightbackground=FG_GOLD if i == idx else BORDER_COLOR)
+        # Load the fixture's current color into the RGB sliders and wheel
+        color = self._fixture_colors[idx] if idx < len(self._fixture_colors) else "#000000"
+        r, g, b = _hex_to_rgb(color)
+        self._r_var.set(r)
+        self._g_var.set(g)
+        self._b_var.set(b)
+        self._color_wheel.set_color(r, g, b)
 
     # ------------------------------------------------------------------
     # Palette / color
@@ -1699,8 +1739,12 @@ class DMXLightingEditor:
 
     def _apply_rgb_to_slot(self, r, g, b):
         hex_c = _rgb_to_hex(r, g, b)
+        # Update the palette slot
         if self._selected_slot < len(self._palette):
             self._palette[self._selected_slot] = hex_c
+        # Also apply to the active fixture independently
+        if self._active_fixture < len(self._fixture_colors):
+            self._fixture_colors[self._active_fixture] = hex_c
         self._update_palette_display()
         self._update_fixture_grid()
 
@@ -1713,6 +1757,9 @@ class DMXLightingEditor:
 
     def _reset_palette_slot(self):
         self._palette[self._selected_slot] = "#000000"
+        # Also reset the active fixture color
+        if self._active_fixture < len(self._fixture_colors):
+            self._fixture_colors[self._active_fixture] = "#000000"
         self._update_palette_display()
         self._update_fixture_grid()
 
@@ -1814,9 +1861,10 @@ class DMXLightingEditor:
             self._pb_state_label.configure(text="⏹ Stopped")
 
     def _mod_all(self):
-        """Apply the current slot color to all palette slots."""
+        """Apply the current slot color to all palette slots and all fixtures."""
         hex_c = _rgb_to_hex(self._r_var.get(), self._g_var.get(), self._b_var.get())
         self._palette = [hex_c] * 8
+        self._fixture_colors = [hex_c] * 16
         self._update_palette_display()
         self._update_fixture_grid()
 
@@ -1824,6 +1872,32 @@ class DMXLightingEditor:
         if self._current_scene:
             self._current_scene.button_assignment = label
             self._center_status_var.set(f"Assigned to: {label}")
+
+    def _rename_user_slot(self, user_idx: int):
+        """Double-click handler: rename one of the 6 user-assignable slots."""
+        current = self._user_slot_names[user_idx] if user_idx < len(self._user_slot_names) else ""
+        name = simpledialog.askstring(
+            "Rename Slot", f"Enter name for slot {user_idx + 1}:",
+            initialvalue=current, parent=self._container
+        )
+        if name is None:
+            return
+        self._user_slot_names[user_idx] = name.strip()
+        # Update the button text
+        btn_idx = self._user_slot_btn_indices[user_idx]
+        display = name.strip() if name.strip() else "\u2014"
+        self._assign_buttons[btn_idx].configure(text=display)
+        self._mark_dirty()
+
+    def _refresh_user_slot_buttons(self):
+        """Update the 6 user-assignable button labels from _user_slot_names."""
+        if not hasattr(self, '_user_slot_btn_indices'):
+            return
+        for i, btn_idx in enumerate(self._user_slot_btn_indices):
+            name = self._user_slot_names[i] if i < len(self._user_slot_names) else ""
+            display = name if name else "\u2014"
+            if btn_idx < len(self._assign_buttons):
+                self._assign_buttons[btn_idx].configure(text=display)
 
     # ------------------------------------------------------------------
     # Bank / fixture selection
@@ -1835,8 +1909,7 @@ class DMXLightingEditor:
 
     def _select_all_fixtures(self):
         for i in range(len(self._fixture_canvases)):
-            palette = self._palette
-            color = palette[i % len(palette)] if palette else "#330022"
+            color = self._fixture_colors[i] if i < len(self._fixture_colors) else "#330022"
             self._fixture_canvases[i].configure(bg=color,
                                                  highlightbackground=FG_GOLD)
 
@@ -1850,27 +1923,33 @@ class DMXLightingEditor:
         for i, c in enumerate(self._fixture_canvases):
             if c.cget("highlightbackground") == FG_GOLD:
                 next_color = palette[(i + 1) % len(palette)]
+                self._fixture_colors[i] = next_color
                 c.configure(bg=next_color)
                 c.itemconfig("num", fill=_contrasting_fg(next_color))
 
     def _fixture_reverse(self):
-        """Reverse the palette assignment order on all fixtures."""
+        """Reverse the color assignment order on all fixtures."""
+        self._fixture_colors = list(reversed(self._fixture_colors))
         self._palette = list(reversed(self._palette))
         self._update_fixture_grid()
         self._update_palette_display()
 
     def _fixture_shift_left(self):
         """Shift fixture color assignment one position left."""
+        if self._fixture_colors:
+            self._fixture_colors = self._fixture_colors[1:] + [self._fixture_colors[0]]
+            self._update_fixture_grid()
         if self._palette:
             self._palette = self._palette[1:] + [self._palette[0]]
-            self._update_fixture_grid()
             self._update_palette_display()
 
     def _fixture_shift_right(self):
         """Shift fixture color assignment one position right."""
+        if self._fixture_colors:
+            self._fixture_colors = [self._fixture_colors[-1]] + self._fixture_colors[:-1]
+            self._update_fixture_grid()
         if self._palette:
             self._palette = [self._palette[-1]] + self._palette[:-1]
-            self._update_fixture_grid()
             self._update_palette_display()
 
     def _fixture_mirror(self):
@@ -1879,7 +1958,8 @@ class DMXLightingEditor:
         half = n // 2
         for i in range(half):
             if i < len(self._fixture_canvases) and (i + half) < len(self._fixture_canvases):
-                color = self._fixture_canvases[i].cget("bg")
+                color = self._fixture_colors[i]
+                self._fixture_colors[i + half] = color
                 self._fixture_canvases[i + half].configure(bg=color)
                 self._fixture_canvases[i + half].itemconfig("num", fill=_contrasting_fg(color))
 
@@ -2014,9 +2094,11 @@ class DMXLightingEditor:
             "  • SCORE, INTRO, GAMEPLAY, START, TEST + 6 blanks.\n"
             "  • Right-click for behavior and action options.\n\n"
             "CENTER — SETTINGS\n"
-            "  • Trigger Settings: Name, Type, Game, Apply Mode, Priority.\n"
-            "  • Fixture Target: Bank, Range, Groups.\n"
-            "  • Triggers: Checkboxes + behavior mode per event.\n"
+            "  • TRIGGER SETTINGS: Name, Type, Game, Apply Mode, Priority,\n"
+            "    Fixture Target, and trigger checkboxes — all in one section.\n"
+            "  • Click a fixture to select it, then pick a color — each fixture\n"
+            "    is independently colored (no automatic mirroring).\n"
+            "  • Double-click a user slot button to rename it.\n"
             "  • Transition Rules, DMX Settings, Safety on Console Setup page.\n\n"
             "KEYBOARD SHORTCUTS\n"
             "  • Ctrl+S — Save scene\n"
