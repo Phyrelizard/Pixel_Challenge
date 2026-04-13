@@ -2050,7 +2050,8 @@ class DMXLightingEditor:
         self._center_status_var.set(f"Applied: {self.scene_name_var.get()}")
         if self._dmx_service and self._current_scene:
             try:
-                self._dmx_service.apply_scene(self._current_scene)
+                scene = self._collect_scene_data()
+                self._dmx_service.apply_scene_data(scene)
             except Exception:
                 pass
 
@@ -2058,7 +2059,8 @@ class DMXLightingEditor:
         self._center_status_var.set("⚡ Testing scene…")
         if self._dmx_service and self._current_scene:
             try:
-                self._dmx_service.test_scene(self._current_scene)
+                scene = self._collect_scene_data()
+                self._dmx_service.test_scene(scene)
             except Exception:
                 pass
 

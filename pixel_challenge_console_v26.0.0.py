@@ -418,6 +418,48 @@ class DMXService:
         self.current_scene = scene_name
         self._send_dmx_frame()
 
+    def apply_scene_data(self, scene_obj):
+        """Apply a DMXScene object directly (from the editor) to fixtures.
+
+        Reads fixture_colors from scene_obj.colors and maps them onto
+        the physical fixtures, then sends a DMX frame.
+        """
+        colors = getattr(scene_obj, "colors", {})
+        fc = colors.get("fixture_colors", colors.get("palette", []))
+        for i in range(self.num_fixtures):
+            if fc:
+                hex_c = fc[i % len(fc)]
+            else:
+                hex_c = "#000000"
+            r, g, b = _hex_to_rgb(hex_c)
+            self.fixture_states[i] = {
+                "r": r, "g": g, "b": b, "strobe": 0,
+                "dimmer": self.brightness,
+            }
+        name = getattr(scene_obj, "name", "editor")
+        self.current_scene = name
+        self._send_dmx_frame()
+
+    def test_scene(self, scene_obj):
+        """Send a DMXScene object to fixtures immediately (one-shot preview).
+
+        Same as apply_scene_data but does not update current_scene,
+        so the console can revert afterward.
+        """
+        colors = getattr(scene_obj, "colors", {})
+        fc = colors.get("fixture_colors", colors.get("palette", []))
+        for i in range(self.num_fixtures):
+            if fc:
+                hex_c = fc[i % len(fc)]
+            else:
+                hex_c = "#000000"
+            r, g, b = _hex_to_rgb(hex_c)
+            self.fixture_states[i] = {
+                "r": r, "g": g, "b": b, "strobe": 0,
+                "dimmer": self.brightness,
+            }
+        self._send_dmx_frame()
+
     def get_scene_names(self) -> list:
         """Return list of available scene names."""
         return list(self.scenes.keys())
@@ -1346,20 +1388,28 @@ class PixelChallengeConsole:
             if os.path.isfile(DMX_SCENES_FILE):
                 with open(DMX_SCENES_FILE, "r", encoding="utf-8") as fh:
                     raw = json.load(fh)
+                loaded = 0
                 for item in raw:
                     name = item.get("name", "")
                     if not name:
                         continue
-                    # Convert editor scene format to DMXService scene format
-                    colors = item.get("colors", {})
-                    fc = colors.get("fixture_colors", colors.get("palette", []))
-                    fixtures = []
-                    for i in range(self.dmx.num_fixtures):
-                        hex_c = fc[i % len(fc)] if fc else "#000000"
-                        r, g, b = _hex_to_rgb(hex_c)
-                        fixtures.append({"r": r, "g": g, "b": b, "strobe": 0, "dimmer": 255})
-                    self.dmx.scenes[name] = {"fixtures": fixtures}
-                self.log(f"Loaded {len(raw)} user scene(s) from dmx_scenes.json")
+                    try:
+                        # Convert editor scene format to DMXService scene format
+                        colors = item.get("colors", {})
+                        fc = colors.get("fixture_colors", colors.get("palette", []))
+                        fixtures = []
+                        for i in range(self.dmx.num_fixtures):
+                            if fc:
+                                hex_c = fc[i % len(fc)]
+                            else:
+                                hex_c = "#000000"
+                            r, g, b = _hex_to_rgb(hex_c)
+                            fixtures.append({"r": r, "g": g, "b": b, "strobe": 0, "dimmer": 255})
+                        self.dmx.scenes[name] = {"fixtures": fixtures}
+                        loaded += 1
+                    except Exception as e:
+                        self.log(f"DMX: Skipped scene '{name}': {e}")
+                self.log(f"Loaded {loaded} user scene(s) from dmx_scenes.json")
         except Exception as e:
             self.log(f"DMX: Could not load user scenes: {e}")
 
