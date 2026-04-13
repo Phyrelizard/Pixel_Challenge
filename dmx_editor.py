@@ -1909,6 +1909,7 @@ class DMXLightingEditor:
         if self._current_scene:
             self._current_scene.button_assignment = label
             self._center_status_var.set(f"Assigned to: {label}")
+            self._mark_dirty()
 
     def _rename_user_slot(self, user_idx: int):
         """Double-click handler: rename one of the 6 user-assignable slots."""

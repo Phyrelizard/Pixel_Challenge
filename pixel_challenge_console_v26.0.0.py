@@ -461,6 +461,43 @@ class DMXService:
             print(f"DMXService send error: {e}")
 
     # ------------------------------------------------------------------
+    # Animated results presets
+    # ------------------------------------------------------------------
+    def animate_step(self, preset_name: str, step: int):
+        """Compute one animation frame for a results preset and send to fixtures."""
+        n = self.num_fixtures
+        if preset_name == "rainbow_rotate":
+            for i in range(n):
+                hue = ((i / max(n, 1)) + step * 0.05) % 1.0
+                r, g, b = hsv_rgb(hue, 1.0, 1.0)
+                self.fixture_states[i] = {"r": r, "g": g, "b": b, "strobe": 0, "dimmer": self.brightness}
+        elif preset_name == "color_strobe":
+            # Alternate all fixtures between random bright colors with strobe
+            palette = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0),
+                       (255, 0, 255), (0, 255, 255), (255, 255, 255)]
+            color = palette[step % len(palette)]
+            strobe = 120 if step % 2 == 0 else 0
+            for i in range(n):
+                self.fixture_states[i] = {
+                    "r": color[0], "g": color[1], "b": color[2],
+                    "strobe": strobe, "dimmer": self.brightness
+                }
+        elif preset_name == "chase_random":
+            # One fixture lit at a time, cycling through with random colors
+            active = step % max(n, 1)
+            for i in range(n):
+                if i == active:
+                    hue = (step * 0.13 + i * 0.25) % 1.0
+                    r, g, b = hsv_rgb(hue, 1.0, 1.0)
+                    self.fixture_states[i] = {"r": r, "g": g, "b": b, "strobe": 0, "dimmer": self.brightness}
+                else:
+                    self.fixture_states[i] = {"r": 0, "g": 0, "b": 0, "strobe": 0, "dimmer": 0}
+        else:
+            return
+        self.current_scene = preset_name
+        self._send_dmx_frame()
+
+    # ------------------------------------------------------------------
     def _build_default_scenes(self) -> dict:
         """Build built-in scene presets."""
         n = self.num_fixtures
@@ -658,6 +695,11 @@ class PixelChallengeConsole:
         self.dmx_speed = tk.IntVar(value=50)
         self.dmx_brightness = tk.IntVar(value=63)
         self.dmx_mode = tk.StringVar(value="auto")  # blackout, gameplay, results, wash, test, manual
+
+        # DMX animation state (v26.5.1)
+        self._dmx_anim_timer = None
+        self._dmx_anim_preset = None
+        self._dmx_anim_step = 0
 
         # DMX hardware/service settings (v25.3.0)
         self.dmx_universe_num = tk.IntVar(value=9)
@@ -1261,6 +1303,7 @@ class PixelChallengeConsole:
 
     def _on_dmx_scene_selected(self, event=None):
         """Handle scene dropdown selection — apply chosen scene via DMXService."""
+        self._stop_dmx_animation()
         name = self.dmx_scene.get()
         if self.dmx and name:
             self.dmx.apply_scene(name)
@@ -1283,6 +1326,7 @@ class PixelChallengeConsole:
 
     def _on_dmx_slot_pressed(self, slot_index: int):
         """Handle user-assignable slot button press — apply the assigned scene."""
+        self._stop_dmx_animation()
         if not hasattr(self, '_dmx_slot_scenes') or slot_index >= len(self._dmx_slot_scenes):
             self.log(f"DMX Slot {slot_index + 1} (unassigned)")
             return
@@ -1359,6 +1403,70 @@ class PixelChallengeConsole:
             return
         scene_names = self.dmx.get_scene_names() if self.dmx else []
         self._dmx_scene_combo.configure(values=scene_names)
+
+    # ------------------------------------------------------------------
+    # DMX animation control (v26.5.1)
+    # ------------------------------------------------------------------
+
+    def _start_dmx_animation(self, preset_name: str):
+        """Start a looping DMX animation preset (results effects)."""
+        self._stop_dmx_animation()
+        self._dmx_anim_preset = preset_name
+        self._dmx_anim_step = 0
+        self.log(f"DMX animation started: {preset_name}")
+        self._dmx_anim_tick()
+
+    def _stop_dmx_animation(self):
+        """Stop the current DMX animation if running."""
+        if self._dmx_anim_timer is not None:
+            try:
+                self.root.after_cancel(self._dmx_anim_timer)
+            except Exception:
+                pass
+            self._dmx_anim_timer = None
+        self._dmx_anim_preset = None
+
+    def _dmx_anim_tick(self):
+        """Run one animation frame and schedule the next."""
+        if self._dmx_anim_preset is None or not self.dmx:
+            return
+        self.dmx.animate_step(self._dmx_anim_preset, self._dmx_anim_step)
+        self._dmx_anim_step += 1
+        self.refresh_dmx_fixture_cards()
+        # Speed slider (0-100) maps to interval: 100=fast(50ms) 0=slow(500ms)
+        speed = self.dmx_speed.get()
+        interval = max(50, 500 - speed * 4)
+        self._dmx_anim_timer = self.root.after(interval, self._dmx_anim_tick)
+
+    def _on_dmx_results_preset(self, preset_name: str):
+        """Handle results preset button press."""
+        if self._dmx_anim_preset == preset_name:
+            # Toggle off
+            self._stop_dmx_animation()
+            self.log(f"DMX animation stopped: {preset_name}")
+        else:
+            self._start_dmx_animation(preset_name)
+
+    def _on_dmx_override_fixture(self, fixture_index: int, fixture_label: str):
+        """Handle OVERRIDE button on a fixture card — open color chooser."""
+        from tkinter import colorchooser
+        self._stop_dmx_animation()
+        result = colorchooser.askcolor(title=f"Override {fixture_label}")
+        if result and result[0]:
+            r, g, b = [int(c) for c in result[0]]
+            if self.dmx:
+                self.dmx.set_fixture_color(fixture_index, r, g, b)
+                self.refresh_dmx_fixture_cards()
+                self.log(f"DMX Override {fixture_label}: #{r:02x}{g:02x}{b:02x}")
+
+    def _on_dmx_preview(self):
+        """Preview current scene dropdown selection on fixtures."""
+        name = self.dmx_scene.get()
+        if name and self.dmx:
+            self._stop_dmx_animation()
+            self.dmx.apply_scene(name)
+            self.refresh_dmx_fixture_cards()
+            self.log(f"DMX Preview: {name}")
 
     def refresh_dmx_fixture_cards(self):
         """Update fixture card swatches from current DMX fixture_states."""
@@ -3175,27 +3283,32 @@ class PixelChallengeConsole:
         quick_row.pack(fill="x", pady=(4, 4))
 
         def _dmx_blackout():
+            self._stop_dmx_animation()
             if self.dmx:
                 self.dmx.blackout()
             self.refresh_dmx_fixture_cards()
 
         def _dmx_gameplay():
+            self._stop_dmx_animation()
             if self.dmx:
                 self.dmx.apply_scene("gameplay_blue")
             self.refresh_dmx_fixture_cards()
 
         def _dmx_results():
+            self._stop_dmx_animation()
             if self.dmx:
                 self.dmx.apply_scene("results_white")
             self.refresh_dmx_fixture_cards()
 
         def _dmx_wash():
+            self._stop_dmx_animation()
             if self.dmx:
                 self.dmx.apply_scene("warm_amber")
             self.refresh_dmx_fixture_cards()
 
         def _dmx_test():
             """Cycle red→green→blue→white, 1 second each, then restore previous scene."""
+            self._stop_dmx_animation()
             if not self.dmx:
                 return
             prev = self.dmx.current_scene
@@ -3296,7 +3409,7 @@ class PixelChallengeConsole:
         tk.Label(status_left, text=f" | UNIVERSE: {universe_num} | FIXTURES: {num_fix} x {ch_per}CH",
                  bg="#17071f", fg="#cccccc", font=("Arial", 12, "bold")).pack(side="left")
         tk.Button(status_row, text="PREVIEW...",
-                  command=lambda: self.log("DMX Preview (placeholder)"),
+                  command=self._on_dmx_preview,
                   bg="#555555", fg="white", activebackground="#555555", activeforeground="white",
                   relief="raised", bd=1, font=("Arial", 12, "bold"),
                   padx=10, pady=4, cursor="hand2").pack(side="right", padx=(10, 0))
@@ -3338,12 +3451,17 @@ class PixelChallengeConsole:
         rp_frame.pack(side="left", padx=(0, 8), fill="both", expand=True)
         tk.Label(rp_frame, text="RESULTS PRESETS", bg="#1a0a2e", fg="white",
                  font=("Arial", 12, "bold")).pack(pady=(6, 4), padx=10)
-        for rp_label in ["Rainbow Rotate", "Color Strobe", "Chase Random"]:
+        rp_presets = [
+            ("Rainbow Rotate", "rainbow_rotate"),
+            ("Color Strobe",   "color_strobe"),
+            ("Chase Random",   "chase_random"),
+        ]
+        for rp_label, rp_key in rp_presets:
             tk.Button(rp_frame, text=rp_label, bg="#3b2d8b", fg="white",
                       activebackground="#3b2d8b", activeforeground="white",
                       relief="raised", bd=1, font=("Arial", 11, "bold"),
                       padx=10, pady=5, cursor="hand2",
-                      command=lambda l=rp_label: self.log(f"DMX Results {l} (placeholder)")
+                      command=lambda k=rp_key: self._on_dmx_results_preset(k)
                       ).pack(fill="x", padx=6, pady=3)
         tk.Frame(rp_frame, bg="#1a0a2e", height=6).pack()
 
@@ -3397,7 +3515,7 @@ class PixelChallengeConsole:
                       activebackground="#2ea62e", activeforeground="white",
                       relief="raised", bd=1, font=("Arial", 11, "bold"),
                       padx=6, pady=4, cursor="hand2",
-                      command=lambda l=label: self.log(f"DMX Override {l} (placeholder)")
+                      command=lambda i=idx, l=label: self._on_dmx_override_fixture(i, l)
                       ).pack(pady=(6, 8), padx=6, fill="x")
 
         # --- (d) Scene row (full width, tall) ---
