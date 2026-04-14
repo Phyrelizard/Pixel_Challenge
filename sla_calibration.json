@@ -1,8 +1,8 @@
 {
   "version": 1,
   "dot_dash": {
-    "sample_count": 139,
-    "last_calibrated": 1775595849.4357386,
+    "sample_count": 140,
+    "last_calibrated": 1776161029.5240633,
     "reaction_times_ms": [
       556.0,
       494.0,
@@ -141,7 +141,8 @@
       18.0,
       146.0,
       3333.0,
-      1420.0
+      1420.0,
+      210.0
     ],
     "accuracies": [
       0.93,
@@ -282,11 +283,12 @@
       0.98,
       0.99,
       0.99,
-      0.87
+      0.87,
+      0.93
     ],
     "thresholds": {
       "reaction_expert_ms": 50.6,
-      "reaction_beginner_ms": 904.8000000000003,
+      "reaction_beginner_ms": 1360.0000000000002,
       "accuracy_expert": 1.0,
       "accuracy_beginner": 0.849
     },

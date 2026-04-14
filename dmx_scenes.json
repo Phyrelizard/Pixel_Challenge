@@ -82,7 +82,9 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "Gold Victory",
@@ -167,7 +169,9 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "Team Sync",
@@ -251,7 +255,9 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "Lava Pulse",
@@ -335,7 +341,9 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "Red Alert",
@@ -420,7 +428,9 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "Amber Blaze",
@@ -505,7 +515,9 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "Green Chase Up",
@@ -590,7 +602,9 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "Yellow Flash",
@@ -674,7 +688,9 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "Yellow Flash test",
@@ -803,7 +819,9 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "Cool Blue Static",
@@ -902,7 +920,9 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "Yellow Flash (Copy)",
@@ -1013,7 +1033,9 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "New test Scene",
@@ -1095,7 +1117,9 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "Green Chase Up (Copy)",
@@ -1254,7 +1278,9 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "Rainbow Wave",
@@ -1387,7 +1413,9 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "New test Scene 2",
@@ -1512,7 +1540,9 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "Cool Blue Static (Copy)",
@@ -1651,7 +1681,9 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "Rainbow Wave (Copy)",
@@ -1844,7 +1876,9 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "Fire Burst (Copy)",
@@ -1929,7 +1963,9 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "Gold Victory (Copy)",
@@ -2014,7 +2050,9 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "Gold Victory (Copy) 2",
@@ -2177,7 +2215,9 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "New test Scene 3",
@@ -2322,7 +2362,9 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "Gold Victory (Copy) 3",
@@ -2485,170 +2527,9 @@
       "",
       "",
       ""
-    ]
-  },
-  {
-    "name": "Gold Victory (Copy) 3 2",
-    "category": "gameplay",
-    "game": "surround",
-    "mode_filter": "any",
-    "enabled": true,
-    "locked": false,
-    "priority": "normal",
-    "fixture_target": {
-      "bank": 1,
-      "range": "1-4",
-      "groups": [
-        "L1",
-        "L2",
-        "L3",
-        "L4",
-        "L8"
-      ],
-      "link_mode": "linked"
-    },
-    "colors": {
-      "palette": [
-        "#ff0000",
-        "#ffcc00",
-        "#ffaa00",
-        "#060066",
-        "#ffe066",
-        "#ffdd44",
-        "#ffbb00",
-        "#fff0aa"
-      ],
-      "mode": "palette_cycle",
-      "brightness": 100,
-      "saturation": 90,
-      "blending": 20,
-      "fixture_colors": [
-        "#ff0000",
-        "#cae5ff",
-        "#060066",
-        "#ff0000",
-        "#ffffff",
-        "#ffffff",
-        "#060066",
-        "#060066",
-        "#060066",
-        "#060066",
-        "#060066",
-        "#060066",
-        "#060066",
-        "#ffdd44",
-        "#ffbb00",
-        "#fff0aa"
-      ],
-      "step_colors": [
-        "#ffd700",
-        "#ffd700",
-        "#ffffff",
-        "#ffffff",
-        "#ffffff",
-        "#ffffff",
-        "#060066",
-        "#060066",
-        "#060066",
-        "#060066",
-        "#060066",
-        "#060066",
-        "#060066",
-        "#ffdd44",
-        "#ffbb00",
-        "#fff0aa",
-        "#ffd700",
-        "#ffcc00",
-        "#ffaa00",
-        "#ffffff"
-      ]
-    },
-    "pattern": {
-      "type": "strobe",
-      "speed": 70,
-      "fade_time": 0.9,
-      "direction": 90,
-      "loop": true
-    },
-    "transitions": {
-      "fade_in": 0.5,
-      "fade_out": 1.0,
-      "crossfade": true,
-      "auto_expire": 0.0,
-      "return_to_default": true,
-      "return_to_default_time": 2.5,
-      "delay_before_start": 0.0
-    },
-    "triggers": [
-      "checkin_opened",
-      "player_joined",
-      "checkin_locked",
-      "intro_started",
-      "results_shown",
-      "scoreboard_shown"
     ],
-    "trigger_behavior": "loop",
-    "trigger_behavior_map": {
-      "checkin_opened": {
-        "mode": "loop",
-        "priority": "normal",
-        "duration": 0
-      },
-      "player_joined": {
-        "mode": "loop",
-        "priority": "normal",
-        "duration": 0
-      },
-      "checkin_locked": {
-        "mode": "loop",
-        "priority": "normal",
-        "duration": 0
-      },
-      "intro_started": {
-        "mode": "loop",
-        "priority": "normal",
-        "duration": 0
-      },
-      "results_shown": {
-        "mode": "loop",
-        "priority": "normal",
-        "duration": 0
-      },
-      "scoreboard_shown": {
-        "mode": "loop",
-        "priority": "normal",
-        "duration": 0
-      }
-    },
-    "dmx_settings": {
-      "channels": "master_rgb",
-      "universe": 5,
-      "size": 4,
-      "blackout_time": 0.35,
-      "auto_expire": 2.0,
-      "return_to_default_time": 2.5
-    },
-    "safety": {
-      "max_brightness": 100,
-      "strobe_cap": 80,
-      "safe_startup": true,
-      "fallback_scene": "",
-      "idle_timeout": 300,
-      "test_brightness_limit": 80,
-      "global_master": 100
-    },
-    "fixture_roles": {},
-    "button_assignment": "\u2014",
-    "button_behavior": "press = activate",
-    "button_action": "quick scene recall",
-    "user_slot_names": [
-      "button",
-      "",
-      "",
-      "",
-      "",
-      ""
-    ]
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "surround intro black",
@@ -2781,7 +2662,9 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
   },
   {
     "name": "surround checkin",
@@ -2932,6 +2815,155 @@
       "",
       "",
       ""
-    ]
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
+  },
+  {
+    "name": "testscene",
+    "category": "gameplay",
+    "game": "global",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": [
+        "L1",
+        "L2",
+        "L3",
+        "L4",
+        "L8"
+      ],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": [
+        "#000000",
+        "#FF8800",
+        "#FFCC00",
+        "#8678e0",
+        "#FFAA00",
+        "#FFE400",
+        "#FF0000",
+        "#FF6600"
+      ],
+      "mode": "palette_cycle",
+      "brightness": 100,
+      "saturation": 90,
+      "blending": 20,
+      "fixture_colors": [
+        "#ff0000",
+        "#cae5ff",
+        "#060066",
+        "#8678e0",
+        "#000000",
+        "#000000",
+        "#000000",
+        "#000000",
+        "#000000",
+        "#000000",
+        "#000000",
+        "#000000",
+        "#000000",
+        "#000000",
+        "#000000",
+        "#000000"
+      ],
+      "step_colors": [
+        "#FF4400",
+        "#FF8800",
+        "#FFCC00",
+        "#FF2200",
+        "#FFAA00",
+        "#FFE400",
+        "#FF0000",
+        "#FF6600",
+        "#FF4400",
+        "#FF8800",
+        "#FFCC00",
+        "#FF2200",
+        "#FFAA00",
+        "#FFE400",
+        "#FF0000",
+        "#FF6600",
+        "#FF4400",
+        "#FF8800",
+        "#FFCC00",
+        "#FF2200"
+      ]
+    },
+    "pattern": {
+      "type": "chase",
+      "speed": 200,
+      "fade_time": 0.35,
+      "direction": 90,
+      "loop": true
+    },
+    "transitions": {
+      "fade_in": 0.5,
+      "fade_out": 1.0,
+      "crossfade": true,
+      "auto_expire": 0.0,
+      "return_to_default": true,
+      "return_to_default_time": 2.5,
+      "delay_before_start": 0.0
+    },
+    "triggers": [
+      "player_joined",
+      "checkin_locked",
+      "results_shown"
+    ],
+    "trigger_behavior": "loop",
+    "trigger_behavior_map": {
+      "player_joined": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      },
+      "checkin_locked": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      },
+      "results_shown": {
+        "mode": "loop",
+        "priority": "normal",
+        "duration": 0
+      }
+    },
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0.35,
+      "auto_expire": 2.0,
+      "return_to_default_time": 2.5
+    },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "fallback_scene": "",
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100
+    },
+    "fixture_roles": {},
+    "button_assignment": null,
+    "button_behavior": "press = activate",
+    "button_action": "quick scene recall",
+    "user_slot_names": [
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": true
   }
 ]

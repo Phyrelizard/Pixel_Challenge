@@ -28,6 +28,7 @@ from dmx_editor_data import (
     COLOR_PRESETS, TRIGGER_EVENTS, TRIGGER_LABELS,
     SCENE_CATEGORIES, GAME_FILTERS, PATTERN_TYPES,
     TRIGGER_BEHAVIOR_MODES, FIXTURE_ROLES,
+    END_TRIGGER_COLORS, END_TRIGGER_COLOR_MAP,
 )
 
 # ---------------------------------------------------------------------------
@@ -52,7 +53,7 @@ BTN_GRAY      = "#555555"
 BTN_YELLOW    = "#cccc00"
 SEL_BG        = "#3a1b53"
 
-EDITOR_VERSION = "v1.5.0"
+EDITOR_VERSION = "v1.6.0"
 SCROLLBAR_WIDTH = 30
 USER_SLOT_COLORS = ["#FF6600", "#00BBFF", "#FF3399", "#00DD66", "#FFCC00", "#AA44FF"]
 
@@ -371,6 +372,7 @@ class DMXLightingEditor:
         saved_colors_file="dmx_saved_colors.json",
         on_close_callback=None,
         on_reconfigure_callback=None,
+        on_scene_applied_callback=None,
         game_list=None,
         current_game=None,
         current_scene_name=None,
@@ -383,6 +385,7 @@ class DMXLightingEditor:
         self._saved_colors_file   = saved_colors_file
         self._on_close_callback   = on_close_callback
         self._on_reconfigure_cb   = on_reconfigure_callback
+        self._on_scene_applied_cb = on_scene_applied_callback
         self._game_list           = game_list or list(GAME_FILTERS)
         self._current_game        = current_game or "global"
         self._initial_scene_name  = current_scene_name
@@ -556,6 +559,9 @@ class DMXLightingEditor:
         self.safety_idle_timeout_var     = tk.IntVar(value=300)
         # Fixture intensity (for control row)
         self.fixture_intensity_var       = tk.DoubleVar(value=100.0)
+        # End trigger color / fade vars
+        self.end_trigger_color_var       = tk.StringVar(value="BLACK")
+        self.end_trigger_fade_var        = tk.BooleanVar(value=False)
         # Track dirty state on any variable change
         for v in (self.scene_name_var, self.scene_type_var, self.scene_game_var,
                   self.scene_apply_mode_var, self.scene_priority_var,
@@ -1107,6 +1113,28 @@ class DMXLightingEditor:
                        activebackground=BG_PANEL, font=FONT_SMALL
                        ).pack(side="left", padx=4)
 
+        # End Trigger Color row
+        etc_row = tk.Frame(ts_frame, bg=BG_PANEL)
+        etc_row.pack(fill="x", padx=8, pady=2)
+        tk.Label(etc_row, text="End Trigger Color:", bg=BG_PANEL, fg=FG_LABEL,
+                 font=FONT_SMALL).pack(side="left")
+        self._end_trigger_swatch = tk.Canvas(
+            etc_row, width=24, height=24,
+            bg=END_TRIGGER_COLOR_MAP.get(self.end_trigger_color_var.get(), "#000000"),
+            highlightthickness=1, highlightbackground=BORDER_COLOR
+        )
+        self._end_trigger_swatch.pack(side="left", padx=(4, 2))
+        etc_combo = ttk.Combobox(
+            etc_row, textvariable=self.end_trigger_color_var,
+            values=END_TRIGGER_COLORS, state="readonly", width=8
+        )
+        etc_combo.pack(side="left", padx=(0, 6))
+        etc_combo.bind("<<ComboboxSelected>>", self._on_end_trigger_color_changed)
+        tk.Checkbutton(etc_row, text="Fade To", variable=self.end_trigger_fade_var,
+                       bg=BG_PANEL, fg=FG_WHITE, selectcolor=BG_MEDIUM,
+                       activebackground=BG_PANEL, font=FONT_SMALL
+                       ).pack(side="left", padx=2)
+
         # Fixture Target compact
         self._section(ts_frame, "FIXTURE TARGET")
         bank_row = tk.Frame(ts_frame, bg=BG_PANEL)
@@ -1525,6 +1553,14 @@ class DMXLightingEditor:
             mode = entry.get("mode", "loop") if isinstance(entry, dict) else (entry or "loop")
             var.set(mode if mode in TRIGGER_BEHAVIOR_MODES else "loop")
 
+        # End trigger color / fade
+        etc = getattr(scene, "end_trigger_color", "BLACK")
+        if etc not in END_TRIGGER_COLORS:
+            etc = "BLACK"
+        self.end_trigger_color_var.set(etc)
+        self.end_trigger_fade_var.set(bool(getattr(scene, "end_trigger_fade", False)))
+        self._end_trigger_swatch.configure(bg=END_TRIGGER_COLOR_MAP.get(etc, "#000000"))
+
         # Refresh list highlight
         self._refresh_scene_list()
 
@@ -1585,6 +1621,9 @@ class DMXLightingEditor:
             s.button_assignment = getattr(self._current_scene, "button_assignment", None)
             s.button_behavior = getattr(self._current_scene, "button_behavior", "press = activate")
             s.button_action = getattr(self._current_scene, "button_action", "quick scene recall")
+        # End trigger color / fade
+        s.end_trigger_color = self.end_trigger_color_var.get()
+        s.end_trigger_fade  = bool(self.end_trigger_fade_var.get())
         return s
 
     def _save_scene(self):
@@ -1658,6 +1697,12 @@ class DMXLightingEditor:
             orig = self._library.get(self._current_scene.name)
             if orig:
                 self._load_scene(orig)
+
+    def _on_end_trigger_color_changed(self, event=None):
+        color_name = self.end_trigger_color_var.get()
+        hex_color = END_TRIGGER_COLOR_MAP.get(color_name, "#000000")
+        self._end_trigger_swatch.configure(bg=hex_color)
+        self._mark_dirty()
 
     def _toggle_lock(self):
         if self._current_scene:
@@ -2114,6 +2159,8 @@ class DMXLightingEditor:
             try:
                 scene = self._collect_scene_data()
                 self._dmx_service.apply_scene_data(scene)
+                if self._on_scene_applied_cb:
+                    self._on_scene_applied_cb()
             except Exception:
                 pass
 
@@ -2123,6 +2170,8 @@ class DMXLightingEditor:
             try:
                 scene = self._collect_scene_data()
                 self._dmx_service.test_scene(scene)
+                if self._on_scene_applied_cb:
+                    self._on_scene_applied_cb()
             except Exception:
                 pass
 
