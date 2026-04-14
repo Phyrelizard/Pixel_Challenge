@@ -31,6 +31,16 @@ PRIORITY_LEVELS = ["low", "normal", "high", "critical"]
 
 TRIGGER_BEHAVIOR_MODES = ["play_once", "loop", "interrupt", "queue", "blend"]
 
+END_TRIGGER_COLORS = ["RED", "GREEN", "BLUE", "BLACK", "WHITE"]
+
+END_TRIGGER_COLOR_MAP = {
+    "RED":   "#ff0000",
+    "GREEN": "#00ff00",
+    "BLUE":  "#0000ff",
+    "BLACK": "#000000",
+    "WHITE": "#ffffff",
+}
+
 FIXTURE_ROLES = [
     "stage_wash", "player_accent", "crowd_wash", "back_wall",
     "effect_lights", "warning", "ambient", "feature",
@@ -208,6 +218,8 @@ class DMXScene:
             "trigger_behavior_map": {},
             "fixture_roles": {},
             "user_slot_names": ["", "", "", "", "", ""],
+            "end_trigger_color": "BLACK",   # color name from END_TRIGGER_COLORS to use when trigger ends
+            "end_trigger_fade": False,        # whether to fade to end_trigger_color when trigger ends
         }
 
     def __init__(self, data: dict = None):
@@ -218,7 +230,7 @@ class DMXScene:
                         "locked", "priority", "triggers", "trigger_behavior",
                         "button_assignment", "button_behavior", "button_action",
                         "trigger_behavior_map", "fixture_roles",
-                        "user_slot_names"):
+                        "user_slot_names", "end_trigger_color", "end_trigger_fade"):
                 setattr(self, key, data.get(key, defaults.get(key)))
             # Nested dicts — merge with defaults so missing sub-keys are filled
             for key in ("fixture_target", "colors", "pattern", "transitions",
@@ -253,6 +265,8 @@ class DMXScene:
             "button_behavior": getattr(self, "button_behavior", "press = activate"),
             "button_action": getattr(self, "button_action", "quick scene recall"),
             "user_slot_names": list(getattr(self, "user_slot_names", None) or [""] * 6),
+            "end_trigger_color": getattr(self, "end_trigger_color", "BLACK"),
+            "end_trigger_fade": getattr(self, "end_trigger_fade", False),
         }
 
     def copy(self) -> "DMXScene":

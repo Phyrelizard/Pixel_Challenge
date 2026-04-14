@@ -1,5 +1,19 @@
 
 
+v26.6.0
+ 1. DMX Editor: Added "End Trigger With Color" dropdown (RED, GREEN, BLUE, BLACK, WHITE) to Trigger Settings
+ 2. DMX Editor: Added "Fade To" checkbox — enables a quick fade to the selected end-trigger color
+ 3. DMX Editor: New fields persisted in scene JSON (end_trigger_color, end_trigger_fade)
+ 4. DMX Editor version updated to v1.6.0
+ 5. Console: Pattern effects now animate at runtime (pulse, chase, sweep, strobe, bounce, alternating, palette_cycle, random_flash, fade_loop, sparkle, breathing, wave_center, wave_lr, wave_player, build_up, explosion)
+ 6. Console: Scene pattern data preserved when loading from dmx_scenes.json (no longer flattened to static)
+ 7. Console: Scene animation loop (_scene_anim_tick) drives animate_scene_step() with speed-slider-controlled intervals
+ 8. Console: Selected DMX theme now applied on gameplay start (was previously ignored)
+ 9. Console: Editor TEST/APPLY buttons now trigger animation preview via on_scene_applied_callback
+ 10. Console version updated to v26.6.0
+ 11. Syntax check all files pass
+
+
 CONSOLE 
 v26.5.5
 
