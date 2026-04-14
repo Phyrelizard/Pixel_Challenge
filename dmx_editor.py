@@ -1117,7 +1117,8 @@ class DMXLightingEditor:
         tk.Label(etc_row, text="End Trigger Color:", bg=BG_PANEL, fg=FG_LABEL,
                  font=FONT_SMALL).pack(side="left")
         self._end_trigger_swatch = tk.Canvas(
-            etc_row, width=24, height=24, bg=END_TRIGGER_COLOR_MAP["BLACK"],
+            etc_row, width=24, height=24,
+            bg=END_TRIGGER_COLOR_MAP.get(self.end_trigger_color_var.get(), "#000000"),
             highlightthickness=1, highlightbackground=BORDER_COLOR
         )
         self._end_trigger_swatch.pack(side="left", padx=(4, 2))

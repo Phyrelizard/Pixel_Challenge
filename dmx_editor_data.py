@@ -218,8 +218,8 @@ class DMXScene:
             "trigger_behavior_map": {},
             "fixture_roles": {},
             "user_slot_names": ["", "", "", "", "", ""],
-            "end_trigger_color": "BLACK",
-            "end_trigger_fade": False,
+            "end_trigger_color": "BLACK",   # color name from END_TRIGGER_COLORS to use when trigger ends
+            "end_trigger_fade": False,        # whether to fade to end_trigger_color when trigger ends
         }
 
     def __init__(self, data: dict = None):
