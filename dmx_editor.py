@@ -372,6 +372,7 @@ class DMXLightingEditor:
         saved_colors_file="dmx_saved_colors.json",
         on_close_callback=None,
         on_reconfigure_callback=None,
+        on_scene_applied_callback=None,
         game_list=None,
         current_game=None,
         current_scene_name=None,
@@ -384,6 +385,7 @@ class DMXLightingEditor:
         self._saved_colors_file   = saved_colors_file
         self._on_close_callback   = on_close_callback
         self._on_reconfigure_cb   = on_reconfigure_callback
+        self._on_scene_applied_cb = on_scene_applied_callback
         self._game_list           = game_list or list(GAME_FILTERS)
         self._current_game        = current_game or "global"
         self._initial_scene_name  = current_scene_name
@@ -2157,6 +2159,8 @@ class DMXLightingEditor:
             try:
                 scene = self._collect_scene_data()
                 self._dmx_service.apply_scene_data(scene)
+                if self._on_scene_applied_cb:
+                    self._on_scene_applied_cb()
             except Exception:
                 pass
 
@@ -2166,6 +2170,8 @@ class DMXLightingEditor:
             try:
                 scene = self._collect_scene_data()
                 self._dmx_service.test_scene(scene)
+                if self._on_scene_applied_cb:
+                    self._on_scene_applied_cb()
             except Exception:
                 pass
 

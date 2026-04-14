@@ -401,7 +401,11 @@ class DMXService:
         self._send_dmx_frame()
 
     def apply_scene(self, scene_name: str):
-        """Apply a named scene (built-in or custom)."""
+        """Apply a named scene (built-in or custom).
+
+        If the scene contains pattern data (non-static), store it in
+        _active_scene_data so animate_scene_step() can drive the effect.
+        """
         scene = self.scenes.get(scene_name)
         if not scene:
             return
@@ -416,6 +420,16 @@ class DMXService:
                 state = {"r": 0, "g": 0, "b": 0, "strobe": 0, "dimmer": 0}
             self.fixture_states[i] = state
         self.current_scene = scene_name
+        # Check for pattern data — store for animation if non-static
+        pattern = scene.get("pattern")
+        if pattern and isinstance(pattern, dict) and pattern.get("type", "static") != "static":
+            self._active_scene_data = {
+                "colors": scene.get("colors", []),
+                "pattern": pattern.get("type", "static"),
+                "speed": pattern.get("speed", 100),
+            }
+        else:
+            self._active_scene_data = None
         self._send_dmx_frame()
 
     def apply_scene_data(self, scene_obj):
@@ -514,6 +528,10 @@ class DMXService:
                 "r": r, "g": g, "b": b, "strobe": strobe_val,
                 "dimmer": clamp8(dimmer_val),
             }
+        # Store pattern info for animated playback via animate_scene_step
+        self._active_scene_data = {
+            "colors": fc, "pattern": pat_type, "speed": speed,
+        }
         self._send_dmx_frame()
 
     def animate_scene_step(self, step: int):
@@ -583,6 +601,34 @@ class DMXService:
                 import math
                 phase = (step * 0.08) % (2 * math.pi)
                 dimmer_val = int(self.brightness * (0.3 + 0.7 * (0.5 + 0.5 * math.sin(phase))))
+            elif pat_type == "wave_center":
+                import math
+                center = n / 2
+                dist = abs(i - center)
+                phase = (step * 0.2 - dist * 0.5) % (2 * math.pi)
+                dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
+            elif pat_type == "wave_lr":
+                import math
+                phase = (step * 0.2 - i * 0.4) % (2 * math.pi)
+                dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
+            elif pat_type == "wave_player":
+                import math
+                phase = (step * 0.15 + i * 0.6) % (2 * math.pi)
+                dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
+            elif pat_type == "build_up":
+                # Progressively light fixtures from first to last
+                lit_count = min((step % (n + 4)), n)
+                dimmer_val = self.brightness if i < lit_count else 0
+            elif pat_type == "explosion":
+                import math
+                # All off, then sudden flash, then fade out
+                cycle = step % 20
+                if cycle < 2:
+                    dimmer_val = self.brightness
+                elif cycle < 10:
+                    dimmer_val = int(self.brightness * max(0, 1.0 - (cycle - 2) / 8.0))
+                else:
+                    dimmer_val = 0
             self.fixture_states[i] = {
                 "r": r, "g": g, "b": b, "strobe": strobe_val,
                 "dimmer": clamp8(dimmer_val),
@@ -871,6 +917,10 @@ class PixelChallengeConsole:
         self._dmx_anim_timer = None
         self._dmx_anim_preset = None
         self._dmx_anim_step = 0
+
+        # DMX scene pattern animation state (v26.6.0)
+        self._scene_anim_timer = None
+        self._scene_anim_step = 0
 
         # DMX hardware/service settings (v25.3.0)
         self.dmx_universe_num = tk.IntVar(value=9)
@@ -1475,9 +1525,11 @@ class PixelChallengeConsole:
     def _on_dmx_scene_selected(self, event=None):
         """Handle scene dropdown selection — apply chosen scene via DMXService."""
         self._stop_dmx_animation()
+        self._stop_scene_animation()
         name = self.dmx_scene.get()
         if self.dmx and name:
             self.dmx.apply_scene(name)
+            self._start_scene_animation()
             self.refresh_dmx_fixture_cards()
             self.log(f"DMX scene applied: {name}")
 
@@ -1498,12 +1550,14 @@ class PixelChallengeConsole:
     def _on_dmx_slot_pressed(self, slot_index: int):
         """Handle user-assignable slot button press — apply the assigned scene."""
         self._stop_dmx_animation()
+        self._stop_scene_animation()
         if not hasattr(self, '_dmx_slot_scenes') or slot_index >= len(self._dmx_slot_scenes):
             self.log(f"DMX Slot {slot_index + 1} (unassigned)")
             return
         scene_name = self._dmx_slot_scenes[slot_index]
         if scene_name and self.dmx:
             self.dmx.apply_scene(scene_name)
+            self._start_scene_animation()
             self.refresh_dmx_fixture_cards()
             self.log(f"DMX Slot {slot_index + 1} applied: {scene_name}")
         else:
@@ -1534,7 +1588,14 @@ class PixelChallengeConsole:
                                 hex_c = "#000000"
                             r, g, b = _hex_to_rgb(hex_c)
                             fixtures.append({"r": r, "g": g, "b": b, "strobe": 0, "dimmer": 255})
-                        self.dmx.scenes[name] = {"fixtures": fixtures}
+                        scene_entry = {"fixtures": fixtures}
+                        # Preserve pattern data so effects animate at runtime
+                        pattern = item.get("pattern", {})
+                        pat_type = pattern.get("type", "static") if isinstance(pattern, dict) else "static"
+                        if pat_type != "static":
+                            scene_entry["pattern"] = dict(pattern)
+                            scene_entry["colors"] = list(fc) if fc else []
+                        self.dmx.scenes[name] = scene_entry
                         loaded += 1
                     except Exception as e:
                         self.log(f"DMX: Skipped scene '{name}': {e}")
@@ -1590,6 +1651,7 @@ class PixelChallengeConsole:
     def _start_dmx_animation(self, preset_name: str):
         """Start a looping DMX animation preset (results effects)."""
         self._stop_dmx_animation()
+        self._stop_scene_animation()
         self._dmx_anim_preset = preset_name
         self._dmx_anim_step = 0
         self.log(f"DMX animation started: {preset_name}")
@@ -1626,6 +1688,44 @@ class PixelChallengeConsole:
         else:
             self._start_dmx_animation(preset_name)
 
+    # ------------------------------------------------------------------
+    # Scene pattern animation (v26.6.0)
+    # ------------------------------------------------------------------
+
+    def _start_scene_animation(self):
+        """Start animating the active scene pattern effect (pulse, chase, etc.)."""
+        self._stop_scene_animation()
+        if not self.dmx or not getattr(self.dmx, "_active_scene_data", None):
+            return
+        pat = self.dmx._active_scene_data.get("pattern", "static")
+        if pat == "static":
+            return
+        self._scene_anim_step = 0
+        self.log(f"DMX scene animation started: {pat}")
+        self._scene_anim_tick()
+
+    def _stop_scene_animation(self):
+        """Stop the current scene pattern animation if running."""
+        if self._scene_anim_timer is not None:
+            try:
+                self.root.after_cancel(self._scene_anim_timer)
+            except Exception:
+                pass
+            self._scene_anim_timer = None
+
+    def _scene_anim_tick(self):
+        """Run one scene pattern animation frame and schedule the next."""
+        if not self.dmx or not getattr(self.dmx, "_active_scene_data", None):
+            self._scene_anim_timer = None
+            return
+        self.dmx.animate_scene_step(self._scene_anim_step)
+        self._scene_anim_step += 1
+        self.refresh_dmx_fixture_cards()
+        # Speed slider (0-100) maps to interval: 100=fast(50ms) 0=slow(500ms)
+        speed = self.dmx_speed.get()
+        interval = max(50, 500 - speed * 4)
+        self._scene_anim_timer = self.root.after(interval, self._scene_anim_tick)
+
     def _on_dmx_override_fixture(self, fixture_index: int, fixture_label: str):
         """Handle OVERRIDE button on a fixture card — open color chooser."""
         from tkinter import colorchooser
@@ -1643,7 +1743,9 @@ class PixelChallengeConsole:
         name = self.dmx_scene.get()
         if name and self.dmx:
             self._stop_dmx_animation()
+            self._stop_scene_animation()
             self.dmx.apply_scene(name)
+            self._start_scene_animation()
             self.refresh_dmx_fixture_cards()
             self.log(f"DMX Preview: {name}")
         # Toggle preview button visual state
@@ -2883,7 +2985,19 @@ class PixelChallengeConsole:
         """Called after countdown completes to actually start the game"""
         self.set_state(HostState.GAME_RUNNING, f"Game started: {self.selected_game.get()}")
         self.viewer.show_game_active()
-        
+
+        # Apply the user-selected DMX scene for gameplay (v26.6.0)
+        if self.dmx:
+            selected = self.dmx_scene.get()
+            if selected and selected in self.dmx.scenes:
+                self.dmx.apply_scene(selected)
+                self._start_scene_animation()
+                self.log(f"DMX gameplay scene applied: {selected}")
+            else:
+                # Fallback to built-in gameplay preset
+                self.dmx.apply_scene("gameplay_blue")
+            self.refresh_dmx_fixture_cards()
+
         # Signal game to transition from READY to RUNNING
         if self.game_manager.is_running():
             self.game_manager.signal_start()
@@ -2902,6 +3016,8 @@ class PixelChallengeConsole:
         
         # Stop background music with fade-out (same as normal game end)
         self.stop_music()
+        # Stop any scene pattern animation (v26.6.0)
+        self._stop_scene_animation()
         
         if self.game_manager.is_running():
             self.game_manager.abort_game()
@@ -3500,24 +3616,28 @@ class PixelChallengeConsole:
 
         def _dmx_blackout():
             self._stop_dmx_animation()
+            self._stop_scene_animation()
             if self.dmx:
                 self.dmx.blackout()
             self.refresh_dmx_fixture_cards()
 
         def _dmx_gameplay():
             self._stop_dmx_animation()
+            self._stop_scene_animation()
             if self.dmx:
                 self.dmx.apply_scene("gameplay_blue")
             self.refresh_dmx_fixture_cards()
 
         def _dmx_results():
             self._stop_dmx_animation()
+            self._stop_scene_animation()
             if self.dmx:
                 self.dmx.apply_scene("results_white")
             self.refresh_dmx_fixture_cards()
 
         def _dmx_wash():
             self._stop_dmx_animation()
+            self._stop_scene_animation()
             if self.dmx:
                 self.dmx.apply_scene("warm_amber")
             self.refresh_dmx_fixture_cards()
@@ -3525,6 +3645,7 @@ class PixelChallengeConsole:
         def _dmx_test():
             """Cycle red→green→blue→white, 1 second each, then restore previous scene."""
             self._stop_dmx_animation()
+            self._stop_scene_animation()
             if not self.dmx:
                 return
             prev = self.dmx.current_scene
@@ -3809,6 +3930,7 @@ class PixelChallengeConsole:
             saved_colors_file=DMX_SAVED_COLORS_FILE,
             on_close_callback=self.on_editor_closed,
             on_reconfigure_callback=self.open_dmx_hw_config_from_editor,
+            on_scene_applied_callback=self._on_editor_scene_applied,
             game_list=self.games.list_names(),
             current_game=self.selected_game.get(),
             current_scene_name=active_scene,
@@ -3828,6 +3950,13 @@ class PixelChallengeConsole:
         self._load_slot_assignments()
         self.refresh_dmx_fixture_cards()
         self.log("DMX Editor closed — scenes reloaded.")
+
+    def _on_editor_scene_applied(self):
+        """Called when the editor applies or tests a scene — start animation if needed."""
+        self._stop_dmx_animation()
+        self._stop_scene_animation()
+        self._start_scene_animation()
+        self.refresh_dmx_fixture_cards()
 
     def open_dmx_hw_config_from_editor(self):
         """Open the DMX Hardware Configuration from within the editor (v25.5.0).
