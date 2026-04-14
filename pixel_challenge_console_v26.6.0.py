@@ -1522,15 +1522,20 @@ class PixelChallengeConsole:
             self.dmx.set_brightness(pct)
         self.refresh_dmx_fixture_cards()
 
-    def _on_dmx_scene_selected(self, event=None):
-        """Handle scene dropdown selection — apply chosen scene via DMXService."""
+    def _apply_scene_with_animation(self, scene_name: str):
+        """Apply a named DMX scene and start pattern animation if applicable."""
         self._stop_dmx_animation()
         self._stop_scene_animation()
-        name = self.dmx_scene.get()
-        if self.dmx and name:
-            self.dmx.apply_scene(name)
+        if self.dmx and scene_name:
+            self.dmx.apply_scene(scene_name)
             self._start_scene_animation()
             self.refresh_dmx_fixture_cards()
+
+    def _on_dmx_scene_selected(self, event=None):
+        """Handle scene dropdown selection — apply chosen scene via DMXService."""
+        name = self.dmx_scene.get()
+        self._apply_scene_with_animation(name)
+        if name:
             self.log(f"DMX scene applied: {name}")
 
     def _on_dmx_speed_changed(self, value):
@@ -1549,16 +1554,12 @@ class PixelChallengeConsole:
 
     def _on_dmx_slot_pressed(self, slot_index: int):
         """Handle user-assignable slot button press — apply the assigned scene."""
-        self._stop_dmx_animation()
-        self._stop_scene_animation()
         if not hasattr(self, '_dmx_slot_scenes') or slot_index >= len(self._dmx_slot_scenes):
             self.log(f"DMX Slot {slot_index + 1} (unassigned)")
             return
         scene_name = self._dmx_slot_scenes[slot_index]
         if scene_name and self.dmx:
-            self.dmx.apply_scene(scene_name)
-            self._start_scene_animation()
-            self.refresh_dmx_fixture_cards()
+            self._apply_scene_with_animation(scene_name)
             self.log(f"DMX Slot {slot_index + 1} applied: {scene_name}")
         else:
             self.log(f"DMX Slot {slot_index + 1} (unassigned)")
@@ -1742,11 +1743,7 @@ class PixelChallengeConsole:
         """Preview current scene dropdown selection on fixtures, with active-state toggle."""
         name = self.dmx_scene.get()
         if name and self.dmx:
-            self._stop_dmx_animation()
-            self._stop_scene_animation()
-            self.dmx.apply_scene(name)
-            self._start_scene_animation()
-            self.refresh_dmx_fixture_cards()
+            self._apply_scene_with_animation(name)
             self.log(f"DMX Preview: {name}")
         # Toggle preview button visual state
         if hasattr(self, '_rp_preview_active'):
@@ -2990,13 +2987,12 @@ class PixelChallengeConsole:
         if self.dmx:
             selected = self.dmx_scene.get()
             if selected and selected in self.dmx.scenes:
-                self.dmx.apply_scene(selected)
-                self._start_scene_animation()
+                self._apply_scene_with_animation(selected)
                 self.log(f"DMX gameplay scene applied: {selected}")
             else:
                 # Fallback to built-in gameplay preset
                 self.dmx.apply_scene("gameplay_blue")
-            self.refresh_dmx_fixture_cards()
+                self.refresh_dmx_fixture_cards()
 
         # Signal game to transition from READY to RUNNING
         if self.game_manager.is_running():
@@ -3622,25 +3618,13 @@ class PixelChallengeConsole:
             self.refresh_dmx_fixture_cards()
 
         def _dmx_gameplay():
-            self._stop_dmx_animation()
-            self._stop_scene_animation()
-            if self.dmx:
-                self.dmx.apply_scene("gameplay_blue")
-            self.refresh_dmx_fixture_cards()
+            self._apply_scene_with_animation("gameplay_blue")
 
         def _dmx_results():
-            self._stop_dmx_animation()
-            self._stop_scene_animation()
-            if self.dmx:
-                self.dmx.apply_scene("results_white")
-            self.refresh_dmx_fixture_cards()
+            self._apply_scene_with_animation("results_white")
 
         def _dmx_wash():
-            self._stop_dmx_animation()
-            self._stop_scene_animation()
-            if self.dmx:
-                self.dmx.apply_scene("warm_amber")
-            self.refresh_dmx_fixture_cards()
+            self._apply_scene_with_animation("warm_amber")
 
         def _dmx_test():
             """Cycle red→green→blue→white, 1 second each, then restore previous scene."""
