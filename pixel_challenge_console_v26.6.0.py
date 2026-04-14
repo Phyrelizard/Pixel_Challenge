@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v26.6.0
+Pixel Challenge Host Console v26.7.0
 
 """
 
@@ -27,7 +27,7 @@ from games.base import PlayerConfig
 from sla import SLAStore, SLACalibration
 from dmx_editor import DMXLightingEditor
 
-VERSION_LABEL = "v26.6.0"
+VERSION_LABEL = "v26.7.0"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 DEFAULT_FALCON_IP = "192.168.2.113"
@@ -1608,21 +1608,29 @@ class PixelChallengeConsole:
         """Load slot button assignments from dmx_scenes.json button_assignment data."""
         self._dmx_slot_scenes = [""] * 6
         self._dmx_slot_names = [""] * 6
-        slot_labels = ["SCORE", "INTRO", "GAMEPLAY", "START", "TEST"]  # fixed buttons (not slots)
+        self._dmx_fixed_scenes = {}  # maps fixed labels (SCORE, INTRO, etc.) → scene name
+        fixed_labels = {"SCORE", "INTRO", "GAMEPLAY", "START", "TEST"}
         try:
             if os.path.isfile(DMX_SCENES_FILE):
                 with open(DMX_SCENES_FILE, "r", encoding="utf-8") as fh:
                     raw = json.load(fh)
                 for item in raw:
                     assignment = item.get("button_assignment")
-                    if not assignment or assignment in slot_labels:
+                    if not assignment:
+                        continue
+                    scene_name = item.get("name", "")
+                    if not scene_name:
+                        continue
+                    # Fixed button assignment (SCORE, INTRO, etc.)
+                    if assignment in fixed_labels:
+                        self._dmx_fixed_scenes[assignment] = scene_name
                         continue
                     # Check if assignment matches a user slot name or user slot index
                     slot_names = item.get("user_slot_names", [""] * 6)
                     for si in range(6):
                         sn = slot_names[si] if si < len(slot_names) else ""
                         if sn and assignment == sn:
-                            self._dmx_slot_scenes[si] = item.get("name", "")
+                            self._dmx_slot_scenes[si] = scene_name
                             self._dmx_slot_names[si] = sn
                             break
         except Exception:
@@ -2770,9 +2778,14 @@ class PixelChallengeConsole:
                     self.log(f"Game complete! Winner: Player {result.winner_player_id}")
                     self.record_score_history(result)
                     payload = self.build_scoreboard_payload(result, title="Final Results")
-                    # Apply DMX results scene (v25.3.0)
+                    # Apply DMX results scene — use SCORE-assigned scene or fallback (v26.7.0)
                     if self.dmx:
-                        self.dmx.apply_scene("results_white")
+                        score_scene = getattr(self, '_dmx_fixed_scenes', {}).get("SCORE", "")
+                        if score_scene and score_scene in self.dmx.scenes:
+                            self._apply_scene_with_animation(score_scene)
+                            self.log(f"DMX results scene: {score_scene}")
+                        else:
+                            self.dmx.apply_scene("results_white")
                         self.refresh_dmx_fixture_cards()
                     self.show_scoreboard_temporarily(seconds=30, payload=payload, final=True)
                 else:

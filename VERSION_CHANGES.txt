@@ -1,5 +1,16 @@
 
 
+v26.7.0
+ 1. Console: Post-game results now uses SCORE-assigned DMX scene from editor instead of hard-coded white strobe
+ 2. Console: Fixed button assignments (SCORE, INTRO, GAMEPLAY, START, TEST) now loaded from dmx_scenes.json
+ 3. DMX Editor: Replaced 8 numbered palette slots with 10 basic quick-pick color tiles (R,G,B,Y,C,M,O,P,W,K)
+ 4. DMX Editor: Clicking quick-pick color applies directly to active fixture and palette slot
+ 5. DMX Editor: Removed playback controls row (rewind, play, fast-forward, loop buttons + event timeline + gradient bar)
+ 6. DMX Editor: Removed all playback animation code (_pb_rewind, _pb_play, _pb_fast, _pb_loop, _run_preview_tick, _update_preview_frame, _stop_preview, _draw_gradient_bar)
+ 7. DMX Editor version updated to v1.7.0
+ 8. Console version updated to v26.7.0
+ 9. Syntax check all files pass
+
 v26.6.0
  1. DMX Editor: Added "End Trigger With Color" dropdown (RED, GREEN, BLUE, BLACK, WHITE) to Trigger Settings
  2. DMX Editor: Added "Fade To" checkbox — enables a quick fade to the selected end-trigger color
