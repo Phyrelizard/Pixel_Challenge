@@ -1,6 +1,37 @@
 
 
 CONSOLE 
+v26.5.5
+
+Changes Made
+1. Effects dropdown now works (pixel_challenge_console_v26.0.0.py)
+
+DMXService.apply_scene_data() and test_scene() now read scene_obj.pattern["type"] and apply the effect (strobe sets strobe channel, pulse/chase/sweep/bounce/alternating modulate dimmers)
+Added animate_scene_step() method for continuous animation of patterns (chase moves active fixture, pulse oscillates, sweep slides, etc.)
+Supports: static, strobe, pulse, chase, sweep, bounce, alternating, palette_cycle, random_flash, fade_loop, sparkle, breathing
+2. Saved colors right-click context menu (dmx_editor.py)
+
+Right-click on any saved color tile shows popup with: Copy, Paste Before (inserts before selected tile), Delete
+Paste disabled when nothing copied; capacity capped at 16
+3. Scene Preview buttons fixed (dmx_editor.py)
+
+PREVIEW SELECTED: Now applies step colors (non-empty ones) to fixture targets cyclically
+GO LIVE: Fixed to use _collect_scene_data() + apply_scene_data() instead of broken apply_scene(DMXScene_obj) call
+4a. Idle wash color chooser (pixel_challenge_console_v26.0.0.py)
+
+Click the swatch or CHANGE COLOR button → opens color picker dialog
+Updates swatch, label, and the warm_amber scene definition in DMXService
+APPLY WASH sends the chosen color to all fixtures
+4b. Layout swap + border + preview button (pixel_challenge_console_v26.0.0.py)
+
+Swapped: now GAMEPLAY PRESETS | IDLE WASH | RESULTS PRESETS
+Results Presets has solid 2px border with highlight
+PREVIEW button moved inside the bordered section with green active-state indicator
+5. Editor scene highlight on open (dmx_editor.py + pixel_challenge_console_v26.0.0.py)
+
+Editor now accepts current_scene_name parameter
+Console passes dmx.current_scene to editor
+Editor auto-selects and highlights matching scene in the left pane
 
 v26.5.2
  Phase 1: Console DMX control quick wins (scene dropdown, slot buttons, speed slider, bank buttons)

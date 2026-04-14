@@ -523,6 +523,29 @@
           ]
         }
       }
+    },
+    {
+      "session_id": "2026-04-13_23-35-03",
+      "timestamp": 1776149603.3038518,
+      "players": {
+        "1": {
+          "games_played": 1,
+          "final_sla": 1,
+          "samples": [
+            {
+              "game_key": "dot_dash",
+              "timestamp": 1776149214.0771582,
+              "metrics": {
+                "accuracy": 0.92,
+                "reaction_time_sec": 3.951,
+                "completion_time_sec": 50.0,
+                "score": 0
+              },
+              "calculated_sla": 1
+            }
+          ]
+        }
+      }
     }
   ]
 }
