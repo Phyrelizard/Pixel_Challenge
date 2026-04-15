@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v26.7.0
+Pixel Challenge Host Console v27.1.0
 
 """
 
@@ -27,7 +27,7 @@ from games.base import PlayerConfig
 from sla import SLAStore, SLACalibration
 from dmx_editor import DMXLightingEditor
 
-VERSION_LABEL = "v26.7.0"
+VERSION_LABEL = "v27.1.0"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 DEFAULT_FALCON_IP = "192.168.2.113"
@@ -1495,7 +1495,7 @@ class PixelChallengeConsole:
         except Exception as e:
             self.log(f"save_dmx_profiles error: {e}")
 
-    def _default_visualizer_assignments(self) -> dict:
+    def _build_default_visualizer_assignments(self) -> dict:
         return {
             "Gameplay": {"effect": "Fire Burst", "apply_to": "All Fixtures"},
             "Bonus": {"effect": "Gold Victory", "apply_to": "Top Fixtures"},
@@ -1515,7 +1515,7 @@ class PixelChallengeConsole:
                     "game": game,
                     "profile_name": "Default Small Rig",
                     "layout_id": "small_rig_8_fixture",
-                    "assignments": self._default_visualizer_assignments(),
+                    "assignments": self._build_default_visualizer_assignments(),
                 }
                 for game in ("dot_dash", "pixel_pop", "surround", "ascend", "global")
             ]
@@ -1603,7 +1603,7 @@ class PixelChallengeConsole:
 
     def _target_fixture_indexes(self, target_name: str) -> list[int]:
         layouts = self.visualizer_layouts.get("layouts", []) if isinstance(self.visualizer_layouts, dict) else []
-        targets = layouts[0].get("targets", {}) if layouts else {}
+        targets = layouts[0].get("targets", {}) if layouts and isinstance(layouts[0], dict) else {}
         fixture_ids = targets.get(target_name, [])
         indexes = []
         for fid in fixture_ids:
@@ -1616,8 +1616,26 @@ class PixelChallengeConsole:
                     pass
         return indexes
 
-    def fire_dmx_cue(self, element, action="on"):
-        """Resolve game profile element->effect->target and execute DMX output."""
+    def _apply_scene_to_target(self, scene_name: str, target_name: str):
+        """Apply a scene and mask fixtures outside the selected visualizer target."""
+        self._apply_scene_with_animation(scene_name)
+        if not target_name or target_name == "All Fixtures":
+            return
+        included = set(self._target_fixture_indexes(target_name))
+        if not included:
+            return
+        self._stop_scene_animation()
+        for i in range(self.dmx.num_fixtures):
+            if i not in included:
+                self.dmx.set_fixture_color(i, 0, 0, 0)
+                self.dmx.set_fixture_strobe(i, 0)
+
+    def fire_dmx_cue(self, element: str, action: str = "on"):
+        """Resolve gameplay visual cue to DMX scene output.
+
+        element: named profile element (e.g. Gameplay, Bonus, Danger, Overlay 1-4).
+        action: cue action state; only 'on', 'start', and 'trigger' execute output.
+        """
         if action not in {"on", "start", "trigger"}:
             return
         if not self.dmx:
@@ -1636,15 +1654,7 @@ class PixelChallengeConsole:
         if not scene_name:
             self.log(f"DMX visual cue unresolved: {element} -> {effect_name}")
             return
-        self._apply_scene_with_animation(scene_name)
-        if target_name and target_name != "All Fixtures":
-            included = set(self._target_fixture_indexes(target_name))
-            if included:
-                self._stop_scene_animation()
-                for i in range(self.dmx.num_fixtures):
-                    if i not in included:
-                        self.dmx.fixture_states[i] = {"r": 0, "g": 0, "b": 0, "strobe": 0, "dimmer": 0}
-                self.dmx._send_dmx_frame()
+        self._apply_scene_to_target(scene_name, target_name)
         self.refresh_dmx_fixture_cards()
         self.log(f"DMX cue fired: {element}/{action} -> {scene_name} [{target_name}]")
 
@@ -2935,7 +2945,7 @@ class PixelChallengeConsole:
                     self.log(f"Game complete! Winner: Player {result.winner_player_id}")
                     self.record_score_history(result)
                     payload = self.build_scoreboard_payload(result, title="Final Results")
-                    # Apply DMX results scene — use SCORE-assigned scene or fallback (v26.7.0)
+                    # Apply DMX results scene — use SCORE-assigned scene or fallback (v27.1.0)
                     if self.dmx:
                         score_scene = getattr(self, '_dmx_fixed_scenes', {}).get("SCORE", "")
                         if score_scene and score_scene in self.dmx.scenes:

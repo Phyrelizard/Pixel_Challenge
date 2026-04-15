@@ -9,6 +9,9 @@ import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 
 VISUALIZER_VERSION = "v1.1.0"
+ALL_FIXTURES_TARGET = "All Fixtures"
+FIXTURE_HIT_WIDTH = 14
+FIXTURE_HIT_HEIGHT = 12
 
 
 class DMXLightingEditor:
@@ -40,8 +43,8 @@ class DMXLightingEditor:
         self.current_game = current_game or (self.game_list[0] if self.game_list else "Splash")
         self.current_scene_name = current_scene_name
 
-        scene_base = os.path.dirname(os.path.abspath(self.scenes_file)) if self.scenes_file else os.path.dirname(os.path.abspath(__file__))
-        if not os.path.isdir(scene_base):
+        scene_base = os.path.dirname(os.path.abspath(self.scenes_file)) if self.scenes_file else ""
+        if not scene_base or not os.path.isdir(scene_base):
             scene_base = os.path.dirname(os.path.abspath(__file__))
         self.visualizer_profiles_file = os.path.join(scene_base, "dmx_visualizer_profiles.json")
         self.visualizer_layouts_file = os.path.join(scene_base, "dmx_visualizer_layouts.json")
@@ -105,7 +108,7 @@ class DMXLightingEditor:
 
         self.game_var = tk.StringVar(value=self.current_game)
         self.profile_name_var = tk.StringVar(value=self.active_profile.get("profile_name", "Default Small Rig"))
-        self.apply_target_var = tk.StringVar(value=self._current_assignment().get("apply_to", "All Fixtures"))
+        self.apply_target_var = tk.StringVar(value=self._current_assignment().get("apply_to", ALL_FIXTURES_TARGET))
 
         self._build_ui()
         self._refresh_effect_list()
@@ -254,11 +257,11 @@ class DMXLightingEditor:
 
     def _default_assignments(self):
         defaults = {
-            "Gameplay": {"effect": "Ocean Pulse", "apply_to": "All Fixtures"},
+            "Gameplay": {"effect": "Ocean Pulse", "apply_to": ALL_FIXTURES_TARGET},
             "Bonus": {"effect": "Gold Victory", "apply_to": "Top Fixtures"},
-            "Danger": {"effect": "Red Alert", "apply_to": "All Fixtures"},
-            "Special": {"effect": "Rainbow Wave", "apply_to": "All Fixtures"},
-            "Randomizer": {"effect": "Color Roulette", "apply_to": "All Fixtures"},
+            "Danger": {"effect": "Red Alert", "apply_to": ALL_FIXTURES_TARGET},
+            "Special": {"effect": "Rainbow Wave", "apply_to": ALL_FIXTURES_TARGET},
+            "Randomizer": {"effect": "Color Roulette", "apply_to": ALL_FIXTURES_TARGET},
             "Overlay 1": {"effect": "Amber Glow", "apply_to": "Top Left Pair"},
             "Overlay 2": {"effect": "Sapphire Wave", "apply_to": "Top Right Pair"},
             "Overlay 3": {"effect": "Neon Rush", "apply_to": "Left Wash Group"},
@@ -322,10 +325,18 @@ class DMXLightingEditor:
         self.profiles_data.setdefault("profiles", []).append(profile)
         return profile
 
+    def _selected_element_name(self) -> str:
+        if not self.elements:
+            return ""
+        if self.element_listbox and self.element_listbox.curselection():
+            return self.elements[self.element_listbox.curselection()[0]]
+        return self.elements[0]
+
     def _current_assignment(self):
         assignments = self.active_profile.setdefault("assignments", {})
-        element = self.elements[self.element_listbox.curselection()[0]] if self.element_listbox and self.element_listbox.curselection() else self.elements[0]
-        assignments.setdefault(element, {"effect": self.effects[0]["name"] if self.effects else "", "apply_to": "All Fixtures"})
+        element = self._selected_element_name()
+        default_effect = self.effects[0]["name"] if self.effects else ""
+        assignments.setdefault(element, {"effect": default_effect, "apply_to": ALL_FIXTURES_TARGET})
         return assignments[element]
 
     # ------------------------------------------------------------------
@@ -428,7 +439,7 @@ class DMXLightingEditor:
         self.element_listbox.selection_clear(0, "end")
         self.element_listbox.selection_set(idx)
         assignment = self._current_assignment()
-        self.apply_target_var.set(assignment.get("apply_to", "All Fixtures"))
+        self.apply_target_var.set(assignment.get("apply_to", ALL_FIXTURES_TARGET))
         effect_name = assignment.get("effect", "")
         if effect_name:
             names = [e["name"] for e in self.effects]
@@ -456,7 +467,7 @@ class DMXLightingEditor:
         effect = self.effects[self.effect_listbox.curselection()[0]]
         assignment = self._current_assignment()
         assignment["effect"] = effect["name"]
-        assignment["apply_to"] = self.apply_target_var.get() or "All Fixtures"
+        assignment["apply_to"] = self.apply_target_var.get() or ALL_FIXTURES_TARGET
         self.hover_effect_name = effect["name"]
         self._preview_dmx_effect(effect["name"])
 
@@ -554,7 +565,7 @@ class DMXLightingEditor:
                 return
             line = lst.get(lst.curselection()[0])
             key = line.split(":", 1)[0]
-            if key == "All Fixtures":
+            if key == ALL_FIXTURES_TARGET:
                 return
             self.targets.pop(key, None)
             self.layout["targets"] = self.targets
@@ -629,9 +640,9 @@ class DMXLightingEditor:
             self.canvas.create_text(x, y + 22, text=fid, fill="white", font=("Arial", 10, "bold"))
 
         self.canvas.create_text(
-            w / 2,
+            w // 2,
             h - 36,
-            text="left click fixture to rotate, hold left click to drag, right click for options.",
+            text="Left click fixture to rotate, hold left click to drag, right click for options.",
             fill="#c7d2df",
             font=("Arial", 11),
         )
@@ -641,7 +652,7 @@ class DMXLightingEditor:
         for fixture in self.fixtures:
             fx = fixture.get("x", 0)
             fy = fixture.get("y", 0)
-            if (fx - 14) <= x <= (fx + 14) and (fy - 12) <= y <= (fy + 12):
+            if (fx - FIXTURE_HIT_WIDTH) <= x <= (fx + FIXTURE_HIT_WIDTH) and (fy - FIXTURE_HIT_HEIGHT) <= y <= (fy + FIXTURE_HIT_HEIGHT):
                 return fixture
         return None
 
@@ -657,8 +668,10 @@ class DMXLightingEditor:
         dy = abs(event.y - self.drag_start[1])
         if dx + dy > 4:
             self.dragging = True
-            self.drag_fixture["x"] = max(20, min(event.x, max(self.canvas.winfo_width() - 20, 20)))
-            self.drag_fixture["y"] = max(20, min(event.y, max(self.canvas.winfo_height() - 60, 20)))
+            max_x = max(self.canvas.winfo_width() - 20, 20)
+            max_y = max(self.canvas.winfo_height() - 60, 20)
+            self.drag_fixture["x"] = max(20, min(event.x, max_x))
+            self.drag_fixture["y"] = max(20, min(event.y, max_y))
             self._draw_layout()
 
     def _on_canvas_release(self, event):
