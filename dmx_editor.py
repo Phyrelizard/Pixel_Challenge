@@ -134,8 +134,11 @@ class DMXLightingEditor:
                     pass
                 self.preview_timer = None
             self.window.destroy()
+        self.preview_timer = None
         self.window = None
         self.canvas = None
+        self.effect_listbox = None
+        self.element_listbox = None
 
     def run(self):
         self.show()
@@ -749,11 +752,11 @@ class DMXLightingEditor:
             self.preview_timer = None
             return
         try:
-            self.preview_phase += 0.35
-            self._draw_layout()
-            if self._embedded and not self.window.winfo_exists():
+            if not self.window.winfo_exists():
                 self.preview_timer = None
                 return
+            self.preview_phase += 0.35
+            self._draw_layout()
             self.preview_timer = self.window.after(110, self._animate_preview)
         except Exception:
             self.preview_timer = None
