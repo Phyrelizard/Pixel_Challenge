@@ -401,7 +401,7 @@ class DMXLightingEditor:
         elem_wrap = tk.Frame(list_row, bg="#242b35")
         elem_wrap.pack(side="left", fill="both", expand=True, padx=(0, 8))
         tk.Label(elem_wrap, text="Element", bg="#242b35", fg="#cfd8e3", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 4))
-        self.element_listbox = tk.Listbox(elem_wrap, bg="#111820", fg="#e9f0ff", selectbackground="#8ec5ff", selectforeground="#0a1a2b", activestyle="none", font=("Arial", 12), relief="flat")
+        self.element_listbox = tk.Listbox(elem_wrap, bg="#111820", fg="#e9f0ff", selectbackground="#8ec5ff", selectforeground="#0a1a2b", activestyle="none", font=("Arial", 12), relief="flat", exportselection=False)
         elem_scroll = tk.Scrollbar(elem_wrap, command=self.element_listbox.yview, width=26)
         self.element_listbox.configure(yscrollcommand=elem_scroll.set)
         self.element_listbox.pack(side="left", fill="both", expand=True)
@@ -413,7 +413,7 @@ class DMXLightingEditor:
         effect_wrap = tk.Frame(list_row, bg="#242b35")
         effect_wrap.pack(side="left", fill="both", expand=True, padx=(8, 0))
         tk.Label(effect_wrap, text="Effect", bg="#242b35", fg="#cfd8e3", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 4))
-        self.effect_listbox = tk.Listbox(effect_wrap, bg="#111820", fg="#e9f0ff", selectbackground="#8ec5ff", selectforeground="#0a1a2b", activestyle="none", font=("Arial", 12), relief="flat")
+        self.effect_listbox = tk.Listbox(effect_wrap, bg="#111820", fg="#e9f0ff", selectbackground="#8ec5ff", selectforeground="#0a1a2b", activestyle="none", font=("Arial", 12), relief="flat", exportselection=False)
         eff_scroll = tk.Scrollbar(effect_wrap, command=self.effect_listbox.yview, width=26)
         self.effect_listbox.configure(yscrollcommand=eff_scroll.set)
         self.effect_listbox.pack(side="left", fill="both", expand=True)
@@ -656,19 +656,18 @@ class DMXLightingEditor:
         effect_name = self.hover_effect_name or assignment.get("effect", "")
         color = self._effect_color(effect_name)
 
-        # Draw beams then fixtures
+        # Draw beams then fixtures — wide dispersal fan shape
         for fixture in self.fixtures:
             x = fixture.get("x", 0)
             y = fixture.get("y", 0)
             angle = self._fixture_angle(fixture.get("direction", "down"))
-            tip_x = x + math.cos(angle) * 180
-            tip_y = y + math.sin(angle) * 180
-            spread = 38
-            left_angle = angle + math.radians(16)
-            right_angle = angle - math.radians(16)
-            p2 = (x + math.cos(left_angle) * spread, y + math.sin(left_angle) * spread)
-            p3 = (x + math.cos(right_angle) * spread, y + math.sin(right_angle) * spread)
-            self.canvas.create_polygon(x, y, p2[0], p2[1], tip_x, tip_y, p3[0], p3[1], fill=color, stipple="gray50", outline="")
+            beam_length = 180
+            half_spread = math.radians(35)
+            left_angle = angle - half_spread
+            right_angle = angle + half_spread
+            p_left = (x + math.cos(left_angle) * beam_length, y + math.sin(left_angle) * beam_length)
+            p_right = (x + math.cos(right_angle) * beam_length, y + math.sin(right_angle) * beam_length)
+            self.canvas.create_polygon(x, y, p_left[0], p_left[1], p_right[0], p_right[1], fill=color, stipple="gray50", outline="")
 
         for fixture in self.fixtures:
             x = fixture.get("x", 0)
@@ -719,6 +718,8 @@ class DMXLightingEditor:
             cur = self.drag_fixture.get("direction", "down")
             idx = self.directions.index(cur) if cur in self.directions else 0
             self.drag_fixture["direction"] = self.directions[(idx + 1) % len(self.directions)]
+        self.layout["fixtures"] = self.fixtures
+        self._save_layouts()
         self._draw_layout()
 
     def _on_canvas_right_click(self, event):
@@ -735,17 +736,23 @@ class DMXLightingEditor:
         cur = fixture.get("direction", "down")
         idx = self.directions.index(cur) if cur in self.directions else 0
         fixture["direction"] = self.directions[(idx + 1) % len(self.directions)]
+        self.layout["fixtures"] = self.fixtures
+        self._save_layouts()
         self._draw_layout()
 
     def _reset_fixture_position(self, fixture):
         saved = self.default_fixture_positions.get(fixture.get("id"), {})
         fixture["x"] = saved.get("x", fixture.get("x"))
         fixture["y"] = saved.get("y", fixture.get("y"))
+        self.layout["fixtures"] = self.fixtures
+        self._save_layouts()
         self._draw_layout()
 
     def _reset_fixture_direction(self, fixture):
         saved = self.default_fixture_positions.get(fixture.get("id"), {})
         fixture["direction"] = saved.get("direction", "down")
+        self.layout["fixtures"] = self.fixtures
+        self._save_layouts()
         self._draw_layout()
 
     def _preview_dmx_effect(self, effect_name):
