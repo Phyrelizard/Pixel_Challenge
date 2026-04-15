@@ -213,6 +213,14 @@ class ConsoleHostAPI:
         except Exception as e:
             self.log(f"dmx_blackout error: {e}")
 
+    def visual_event(self, element: str, action: str = "on") -> None:
+        """Report a gameplay visual element to the console for DMX profile resolution."""
+        try:
+            if hasattr(self.console, 'fire_dmx_cue'):
+                self.console.fire_dmx_cue(element, action)
+        except Exception as e:
+            self.log(f"visual_event error: {e}")
+
     def dmx_set_strobe(self, speed: int) -> None:
         """Set strobe speed on all DMX fixtures. 0=off, 16-255=speed."""
         try:

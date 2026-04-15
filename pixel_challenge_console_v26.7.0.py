@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v26.7.0
+Pixel Challenge Host Console v27.1.0
 
 """
 
@@ -27,7 +27,7 @@ from games.base import PlayerConfig
 from sla import SLAStore, SLACalibration
 from dmx_editor import DMXLightingEditor
 
-VERSION_LABEL = "v26.7.0"
+VERSION_LABEL = "v27.1.0"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 DEFAULT_FALCON_IP = "192.168.2.113"
@@ -41,6 +41,8 @@ GAMES_ROOT = "/home/ledgame/easter_game/games"
 DMX_PROFILES_FILE = "/home/ledgame/easter_game/dmx_fixture_profiles.json"
 DMX_SCENES_FILE = "/home/ledgame/easter_game/dmx_scenes.json"
 DMX_SAVED_COLORS_FILE = "/home/ledgame/easter_game/dmx_saved_colors.json"
+DMX_VISUALIZER_PROFILES_FILE = "/home/ledgame/easter_game/dmx_visualizer_profiles.json"
+DMX_VISUALIZER_LAYOUTS_FILE = "/home/ledgame/easter_game/dmx_visualizer_layouts.json"
 
 # Game module versions are now read from GameMeta.version in each game module
 
@@ -1054,6 +1056,8 @@ class PixelChallengeConsole:
         # Load fixture profiles and create DMX service (v25.3.0)
         self.dmx_profiles = self.load_dmx_profiles()
         self.dmx = self._create_dmx_service()
+        self.visualizer_profiles = self.load_visualizer_profiles()
+        self.visualizer_layouts = self.load_visualizer_layouts()
         # Swatch canvas references updated by refresh_dmx_fixture_cards()
         self.dmx_fixture_swatches = []
 
@@ -1490,6 +1494,169 @@ class PixelChallengeConsole:
                 json.dump(self.dmx_profiles, f, indent=2)
         except Exception as e:
             self.log(f"save_dmx_profiles error: {e}")
+
+    def _build_default_visualizer_assignments(self) -> dict:
+        return {
+            "Gameplay": {"effect": "Fire Burst", "apply_to": "All Fixtures"},
+            "Bonus": {"effect": "Gold Victory", "apply_to": "Top Fixtures"},
+            "Danger": {"effect": "Red Alert", "apply_to": "All Fixtures"},
+            "Special": {"effect": "Rainbow Wave", "apply_to": "All Fixtures"},
+            "Randomizer": {"effect": "Ocean Pulse", "apply_to": "All Fixtures"},
+            "Overlay 1": {"effect": "Amber Glow", "apply_to": "Top Left Pair"},
+            "Overlay 2": {"effect": "Sapphire Wave", "apply_to": "Top Right Pair"},
+            "Overlay 3": {"effect": "Neon Rush", "apply_to": "Left Wash Group"},
+            "Overlay 4": {"effect": "Crimson Storm", "apply_to": "Right Wash Group"},
+        }
+
+    def load_visualizer_profiles(self) -> dict:
+        default = {
+            "profiles": [
+                {
+                    "game": game,
+                    "profile_name": "Default Small Rig",
+                    "layout_id": "small_rig_8_fixture",
+                    "assignments": self._build_default_visualizer_assignments(),
+                }
+                for game in ("dot_dash", "pixel_pop", "surround", "ascend", "global")
+            ]
+        }
+        try:
+            if not os.path.exists(DMX_VISUALIZER_PROFILES_FILE):
+                os.makedirs(os.path.dirname(DMX_VISUALIZER_PROFILES_FILE), exist_ok=True)
+                with open(DMX_VISUALIZER_PROFILES_FILE, "w", encoding="utf-8") as f:
+                    json.dump(default, f, indent=2)
+                return default
+            with open(DMX_VISUALIZER_PROFILES_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict) and isinstance(data.get("profiles"), list):
+                return data
+        except Exception as e:
+            self.log(f"load_visualizer_profiles error: {e}")
+        return default
+
+    def load_visualizer_layouts(self) -> dict:
+        default = {
+            "layouts": [
+                {
+                    "layout_id": "small_rig_8_fixture",
+                    "name": "Default Small Rig",
+                    "fixtures": [
+                        {"id": "F1", "type": "wash", "x": 80, "y": 580, "direction": "left"},
+                        {"id": "F2", "type": "wash", "x": 80, "y": 420, "direction": "left"},
+                        {"id": "F3", "type": "top", "x": 250, "y": 100, "direction": "down"},
+                        {"id": "F4", "type": "top", "x": 370, "y": 100, "direction": "down"},
+                        {"id": "F5", "type": "top", "x": 490, "y": 100, "direction": "down"},
+                        {"id": "F6", "type": "top", "x": 610, "y": 100, "direction": "down"},
+                        {"id": "F7", "type": "wash", "x": 780, "y": 420, "direction": "right"},
+                        {"id": "F8", "type": "wash", "x": 780, "y": 580, "direction": "right"},
+                    ],
+                    "targets": {
+                        "All Fixtures": ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"],
+                        "Left Wash Group": ["F1", "F2"],
+                        "Right Wash Group": ["F7", "F8"],
+                        "Top Fixtures": ["F3", "F4", "F5", "F6"],
+                        "Top Left Pair": ["F3", "F4"],
+                        "Top Right Pair": ["F5", "F6"],
+                    },
+                }
+            ]
+        }
+        try:
+            if not os.path.exists(DMX_VISUALIZER_LAYOUTS_FILE):
+                os.makedirs(os.path.dirname(DMX_VISUALIZER_LAYOUTS_FILE), exist_ok=True)
+                with open(DMX_VISUALIZER_LAYOUTS_FILE, "w", encoding="utf-8") as f:
+                    json.dump(default, f, indent=2)
+                return default
+            with open(DMX_VISUALIZER_LAYOUTS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict) and isinstance(data.get("layouts"), list):
+                return data
+        except Exception as e:
+            self.log(f"load_visualizer_layouts error: {e}")
+        return default
+
+    def _visualizer_profile_for_game(self, game_key: str) -> dict | None:
+        if not isinstance(self.visualizer_profiles, dict):
+            return None
+        profiles = self.visualizer_profiles.get("profiles", [])
+        for item in profiles:
+            if item.get("game") == game_key:
+                return item
+        for item in profiles:
+            if item.get("game") == "global":
+                return item
+        return None
+
+    def _resolve_scene_name_for_effect(self, effect_name: str) -> str | None:
+        if not self.dmx or not effect_name:
+            return None
+        if effect_name in self.dmx.scenes:
+            return effect_name
+        target_norm = effect_name.lower().strip()
+        for name in self.dmx.scenes.keys():
+            if name.lower().strip() == target_norm:
+                return name
+        for name in self.dmx.scenes.keys():
+            if target_norm in name.lower() or name.lower() in target_norm:
+                return name
+        return None
+
+    def _target_fixture_indexes(self, target_name: str) -> list[int]:
+        layouts = self.visualizer_layouts.get("layouts", []) if isinstance(self.visualizer_layouts, dict) else []
+        targets = layouts[0].get("targets", {}) if layouts and isinstance(layouts[0], dict) else {}
+        fixture_ids = targets.get(target_name, [])
+        indexes = []
+        for fid in fixture_ids:
+            if isinstance(fid, str) and fid.upper().startswith("F"):
+                try:
+                    idx = int(fid[1:]) - 1
+                    if idx >= 0:
+                        indexes.append(idx)
+                except Exception:
+                    pass
+        return indexes
+
+    def _apply_scene_to_target(self, scene_name: str, target_name: str):
+        """Apply a scene and mask fixtures outside the selected visualizer target."""
+        self._apply_scene_with_animation(scene_name)
+        if not target_name or target_name == "All Fixtures":
+            return
+        included = set(self._target_fixture_indexes(target_name))
+        if not included:
+            return
+        self._stop_scene_animation()
+        for i in range(self.dmx.num_fixtures):
+            if i not in included:
+                self.dmx.set_fixture_color(i, 0, 0, 0)
+                self.dmx.set_fixture_strobe(i, 0)
+
+    def fire_dmx_cue(self, element: str, action: str = "on"):
+        """Resolve gameplay visual cue to DMX scene output.
+
+        element: named profile element (e.g. Gameplay, Bonus, Danger, Overlay 1-4).
+        action: cue action state; only 'on', 'start', and 'trigger' execute output.
+        """
+        if action not in {"on", "start", "trigger"}:
+            return
+        if not self.dmx:
+            return
+        game_key = self.current_game_key()
+        profile = self._visualizer_profile_for_game(game_key)
+        if not profile:
+            return
+        assignments = profile.get("assignments", {})
+        mapping = assignments.get(element) or assignments.get(str(element).strip())
+        if not mapping:
+            return
+        effect_name = mapping.get("effect", "")
+        target_name = mapping.get("apply_to", "All Fixtures")
+        scene_name = self._resolve_scene_name_for_effect(effect_name)
+        if not scene_name:
+            self.log(f"DMX visual cue unresolved: {element} -> {effect_name}")
+            return
+        self._apply_scene_to_target(scene_name, target_name)
+        self.refresh_dmx_fixture_cards()
+        self.log(f"DMX cue fired: {element}/{action} -> {scene_name} [{target_name}]")
 
     def get_active_profile(self) -> "dict | None":
         """Get the currently selected fixture profile dict (including channel_map)."""
@@ -2778,7 +2945,7 @@ class PixelChallengeConsole:
                     self.log(f"Game complete! Winner: Player {result.winner_player_id}")
                     self.record_score_history(result)
                     payload = self.build_scoreboard_payload(result, title="Final Results")
-                    # Apply DMX results scene — use SCORE-assigned scene or fallback (v26.7.0)
+                    # Apply DMX results scene — use SCORE-assigned scene or fallback (v27.1.0)
                     if self.dmx:
                         score_scene = getattr(self, '_dmx_fixed_scenes', {}).get("SCORE", "")
                         if score_scene and score_scene in self.dmx.scenes:
@@ -3010,6 +3177,9 @@ class PixelChallengeConsole:
         # Signal game to transition from READY to RUNNING
         if self.game_manager.is_running():
             self.game_manager.signal_start()
+
+        # Visualizer cue handoff for gameplay start
+        self.fire_dmx_cue("Gameplay", "on")
         
         self.game_tick_active = True
         self.root.after(33, self.game_tick)
@@ -3065,6 +3235,7 @@ class PixelChallengeConsole:
     # =========================================================================
     def on_game_selected(self, event=None):
         game_name = self.selected_game.get()
+        self.visualizer_profiles = self.load_visualizer_profiles()
         self.current_intro_index = -1
         self.cancel_viewer_return()
         self.show_selected_game_splash()
@@ -3943,6 +4114,8 @@ class PixelChallengeConsole:
                 pass
         # Reload user scenes into DMXService and refresh UI
         self._load_user_scenes_into_dmx()
+        self.visualizer_profiles = self.load_visualizer_profiles()
+        self.visualizer_layouts = self.load_visualizer_layouts()
         self._refresh_dmx_scene_combo()
         self._load_slot_assignments()
         self.refresh_dmx_fixture_cards()
