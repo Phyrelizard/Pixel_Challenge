@@ -56,6 +56,7 @@ class DMXLightingEditor:
         self.directions = ["up", "up-right", "right", "down-right", "down", "down-left", "left", "up-left"]
 
         self.window = None
+        self._embedded = False
         self.canvas = None
         self.effect_listbox = None
         self.element_listbox = None
@@ -88,16 +89,24 @@ class DMXLightingEditor:
     # ------------------------------------------------------------------
     def show(self):
         if self.window and self.window.winfo_exists():
-            self.window.deiconify()
+            if not self._embedded:
+                self.window.deiconify()
             self.window.lift()
             self.window.focus_force()
             return
 
-        self.window = tk.Toplevel(self.parent) if self.parent else tk.Tk()
-        self.window.title("DMX Visualizer")
-        self.window.geometry("1500x900")
+        self._embedded = self.parent is not None
+        if self._embedded:
+            self.window = tk.Frame(self.parent, bg="#1e242d")
+            self.window.place(relx=0, rely=0, relwidth=1, relheight=1)
+            self.window.lift()
+            self.window.focus_force()
+        else:
+            self.window = tk.Tk()
+            self.window.title("DMX Visualizer")
+            self.window.geometry("1500x900")
+            self.window.protocol("WM_DELETE_WINDOW", self._on_close)
         self.window.configure(bg="#1e242d")
-        self.window.protocol("WM_DELETE_WINDOW", self._on_close)
 
         style = ttk.Style(self.window)
         try:
@@ -106,9 +115,10 @@ class DMXLightingEditor:
             pass
         style.configure("Viz.TCombobox", fieldbackground="#2b3440", background="#2b3440", foreground="white")
 
-        self.game_var = tk.StringVar(value=self.current_game)
-        self.profile_name_var = tk.StringVar(value=self.active_profile.get("profile_name", "Default Small Rig"))
-        self.apply_target_var = tk.StringVar(value=self._current_assignment().get("apply_to", ALL_FIXTURES_TARGET))
+        var_master = self.parent if self._embedded else self.window
+        self.game_var = tk.StringVar(master=var_master, value=self.current_game)
+        self.profile_name_var = tk.StringVar(master=var_master, value=self.active_profile.get("profile_name", "Default Small Rig"))
+        self.apply_target_var = tk.StringVar(master=var_master, value=self._current_assignment().get("apply_to", ALL_FIXTURES_TARGET))
 
         self._build_ui()
         self._refresh_effect_list()
@@ -124,11 +134,12 @@ class DMXLightingEditor:
                     pass
                 self.preview_timer = None
             self.window.destroy()
-            self.window = None
+        self.window = None
+        self.canvas = None
 
     def run(self):
         self.show()
-        if self.window and isinstance(self.window, tk.Tk):
+        if not self._embedded and self.window:
             self.window.mainloop()
 
     # ------------------------------------------------------------------
@@ -353,6 +364,18 @@ class DMXLightingEditor:
 
         tk.Label(left, text="CONFIGURATION", bg="#242b35", fg="white", font=("Arial", 18, "bold")).pack(pady=(14, 18))
         tk.Label(right, text="LAYOUT PREVIEW", bg="#202833", fg="white", font=("Arial", 18, "bold")).pack(pady=(14, 18))
+        if self._embedded:
+            close_btn = tk.Button(
+                right,
+                text="✕ CLOSE",
+                bg="#4a1a1a",
+                fg="white",
+                activebackground="#6e2b2b",
+                relief="flat",
+                font=("Arial", 12, "bold"),
+                command=self._on_close,
+            )
+            close_btn.pack(anchor="ne", padx=18, pady=(0, 4))
 
         # Game
         tk.Label(left, text="Game", bg="#242b35", fg="#cfd8e3", anchor="w", font=("Arial", 12, "bold")).pack(fill="x", padx=20)
@@ -722,9 +745,18 @@ class DMXLightingEditor:
                     pass
 
     def _animate_preview(self):
-        self.preview_phase += 0.35
-        self._draw_layout()
-        self.preview_timer = self.window.after(110, self._animate_preview)
+        if not self.window or not self.canvas:
+            self.preview_timer = None
+            return
+        try:
+            self.preview_phase += 0.35
+            self._draw_layout()
+            if self._embedded and not self.window.winfo_exists():
+                self.preview_timer = None
+                return
+            self.preview_timer = self.window.after(110, self._animate_preview)
+        except Exception:
+            self.preview_timer = None
 
 
 if __name__ == "__main__":
