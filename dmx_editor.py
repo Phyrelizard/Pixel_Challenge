@@ -57,6 +57,7 @@ class DMXLightingEditor:
 
         self.window = None
         self._embedded = False
+        self._syncing = False
         self.canvas = None
         self.effect_listbox = None
         self.element_listbox = None
@@ -135,6 +136,7 @@ class DMXLightingEditor:
                 self.preview_timer = None
             self.window.destroy()
         self.preview_timer = None
+        self._syncing = False
         self.window = None
         self.canvas = None
         self.effect_listbox = None
@@ -458,10 +460,13 @@ class DMXLightingEditor:
         self._sync_element_selection(self.element_listbox.curselection()[0] if self.element_listbox.curselection() else 0)
 
     def _on_element_selected(self, event=None):
+        if self._syncing:
+            return
         idx = self.element_listbox.curselection()[0] if self.element_listbox.curselection() else 0
         self._sync_element_selection(idx)
 
     def _sync_element_selection(self, idx):
+        self._syncing = True
         self.element_listbox.selection_clear(0, "end")
         self.element_listbox.selection_set(idx)
         assignment = self._current_assignment()
@@ -476,6 +481,11 @@ class DMXLightingEditor:
                 self.effect_listbox.see(e_idx)
                 self.hover_effect_name = effect_name
         self._draw_layout()
+        if self.window:
+            self.window.after_idle(self._end_sync)
+
+    def _end_sync(self):
+        self._syncing = False
 
     def _refresh_effect_list(self):
         self.effect_listbox.delete(0, "end")
@@ -488,6 +498,8 @@ class DMXLightingEditor:
             self.hover_effect_name = self.effects[idx]["name"]
 
     def _on_effect_selected(self, event=None):
+        if self._syncing:
+            return
         if not self.effect_listbox.curselection():
             return
         effect = self.effects[self.effect_listbox.curselection()[0]]
