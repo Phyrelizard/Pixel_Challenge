@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v26.3.0
+Pixel Challenge Host Console v25.4.0
 
 """
 
@@ -26,7 +26,7 @@ from games.base import PlayerConfig
 # SLA System (v21.8.0)
 from sla import SLAStore, SLACalibration
 
-VERSION_LABEL = "v26.3.0"
+VERSION_LABEL = "v25.4.0"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 DEFAULT_FALCON_IP = "192.168.2.113"
@@ -38,8 +38,6 @@ ASSETS_DIR = "/home/ledgame/easter_game/assets"
 SETTINGS_FILE = "/home/ledgame/easter_game/attract_theme_maps.json"
 GAMES_ROOT = "/home/ledgame/easter_game/games"
 DMX_PROFILES_FILE = "/home/ledgame/easter_game/dmx_fixture_profiles.json"
-DMX_SCENES_FILE = "/home/ledgame/easter_game/dmx_scenes.json"
-DMX_SAVED_COLORS_FILE = "/home/ledgame/easter_game/dmx_saved_colors.json"
 
 # Game module versions are now read from GameMeta.version in each game module
 
@@ -3096,12 +3094,16 @@ class PixelChallengeConsole:
                 self.refresh_dmx_fixture_cards()
             ))
 
+        def _dmx_edit():
+            self.log("DMX Edit (coming in future version)")
+
         quick_btn_defs = [
             ("BLACKOUT", "#444444", _dmx_blackout),
             ("GAMEPLAY", "#3b2d8b", _dmx_gameplay),
             ("RESULTS",  "#2ea62e", _dmx_results),
             ("WASH",     "#1a8a6a", _dmx_wash),
             ("TEST",     "#cccc00", _dmx_test),
+            ("EDIT",     "#555555", _dmx_edit),
         ]
         for label, color, cmd in quick_btn_defs:
             fg = "black" if label == "TEST" else "white"
@@ -3121,15 +3123,6 @@ class PixelChallengeConsole:
                       bg=bg_col, fg="white", activebackground=bg_col, activeforeground="white",
                       relief="raised", bd=2, font=("Arial", 12, "bold"),
                       padx=10, pady=6, cursor="hand2").pack(side="left", padx=3, fill="x", expand=True)
-
-        # --- (a3) EDITOR button row ---
-        editor_row = tk.Frame(dmx_body, bg="#17071f")
-        editor_row.pack(fill="x", pady=(0, 6))
-        tk.Button(editor_row, text="EDITOR",
-                  command=self.open_dmx_editor,
-                  bg="#9440ff", fg="white", activebackground="#7a32d4", activeforeground="white",
-                  relief="raised", bd=3, font=("Arial", 14, "bold"),
-                  padx=20, pady=8, cursor="hand2").pack(fill="x", padx=3)
 
         # --- (b) Bank navigation row ---
         bank_row = tk.Frame(dmx_body, bg="#17071f")
@@ -3327,45 +3320,6 @@ class PixelChallengeConsole:
                  troughcolor="#071a30", highlightthickness=0,
                  font=("Arial", 10, "bold"), length=190,
                  command=self.on_dmx_brightness_changed).pack(fill="x", padx=(0, 8))
-
-    def open_dmx_editor(self):
-        """Open the full-screen DMX Lighting Theme Editor (v25.5.0)."""
-        from dmx_editor import DMXLightingEditor
-        self.editor = DMXLightingEditor(
-            parent=self.root,
-            dmx_service=self.dmx,
-            falcon_service=self.falcon,
-            profiles=self.dmx_profiles,
-            scenes_file=DMX_SCENES_FILE,
-            saved_colors_file=DMX_SAVED_COLORS_FILE,
-            on_close_callback=self.on_editor_closed,
-            on_reconfigure_callback=self.open_dmx_hw_config_from_editor,
-            game_list=self.games.list_names(),
-            current_game=self.selected_game.get(),
-        )
-        self.editor.show()
-
-    def on_editor_closed(self):
-        """Called when the DMX editor is closed — restore normal console view."""
-        if hasattr(self, "editor") and self.editor is not None:
-            try:
-                self.editor.hide()
-            except Exception:
-                pass
-        self.log("DMX Editor closed.")
-
-    def open_dmx_hw_config_from_editor(self):
-        """Open DMX Hardware Configuration from within the editor."""
-        def _on_setup_close():
-            self.close_setup_window()
-            if hasattr(self, "editor") and self.editor is not None:
-                try:
-                    self.editor.show()
-                except Exception:
-                    pass
-        self.open_setup_window()
-        if self.setup_window and self.setup_window.winfo_exists():
-            self.setup_window.protocol("WM_DELETE_WINDOW", _on_setup_close)
 
     def build_audio_area(self, parent):
         """Build the AUDIO MIXER panel — extracted from build_dmx_audio_area (v24.0.0)."""

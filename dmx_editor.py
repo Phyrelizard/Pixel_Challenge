@@ -53,7 +53,7 @@ BTN_GRAY      = "#555555"
 BTN_YELLOW    = "#cccc00"
 SEL_BG        = "#3a1b53"
 
-EDITOR_VERSION = "v1.6.0"
+EDITOR_VERSION = "v1.7.0"
 SCROLLBAR_WIDTH = 30
 USER_SLOT_COLORS = ["#FF6600", "#00BBFF", "#FF3399", "#00DD66", "#FFCC00", "#AA44FF"]
 
@@ -403,11 +403,6 @@ class DMXLightingEditor:
         self._scene_row_widgets   = {}
         self._undo_snapshot: DMXScene | None = None
         self._dirty = False
-        self._preview_playing = False
-        self._preview_timer_id = None
-        self._preview_speed = 500  # ms per frame
-        self._preview_loop = False
-        self._preview_frame = 0
         self._step_colors = ["#330022"] * 20  # per-step editable colors
         self._sort_mode = "name"
         self._trigger_copy_buffer = {}  # {trigger_event: behavior_mode}
@@ -843,15 +838,23 @@ class DMXLightingEditor:
 
         slot_row = tk.Frame(color_outer, bg=BG_DARK)
         slot_row.pack(fill="x", padx=6, pady=(2, 2))
+        # 10 basic quick-pick color tiles
+        QUICK_COLORS = [
+            ("#FF0000", "R"), ("#00FF00", "G"), ("#0000FF", "B"),
+            ("#FFFF00", "Y"), ("#00FFFF", "C"), ("#FF00FF", "M"),
+            ("#FF8800", "O"), ("#8800FF", "P"), ("#FFFFFF", "W"),
+            ("#000000", "K"),
+        ]
         self.palette_slot_btns = []
-        for i in range(8):
-            c = tk.Canvas(slot_row, width=34, height=34,
-                          bg=self._palette[i], highlightthickness=2,
+        for hex_c, label in QUICK_COLORS:
+            fg = "#000000" if hex_c in ("#FFFFFF", "#FFFF00", "#00FF00", "#00FFFF") else FG_WHITE
+            c = tk.Canvas(slot_row, width=30, height=30,
+                          bg=hex_c, highlightthickness=2,
                           highlightbackground=BORDER_COLOR, cursor="hand2")
-            c.pack(side="left", padx=2)
-            c.create_text(17, 17, text=str(i + 1), fill=FG_WHITE,
-                          font=("Arial", 11, "bold"), tags="num")
-            c.bind("<Button-1>", lambda e, i=i: self._select_palette_slot(i))
+            c.pack(side="left", padx=1)
+            c.create_text(15, 15, text=label, fill=fg,
+                          font=("Arial", 10, "bold"), tags="num")
+            c.bind("<Button-1>", lambda e, h=hex_c: self._pick_quick_color(h))
             self.palette_slot_btns.append(c)
 
         palette_ctrl = tk.Frame(color_outer, bg=BG_DARK)
@@ -948,54 +951,7 @@ class DMXLightingEditor:
             sc.pack(side="left", padx=(0, 4))
 
         # ============================================================
-        # ROW 2: Playback controls + Event Timeline + gradient bar
-        # ============================================================
-        pb_frame = tk.Frame(parent, bg=BG_DARK)
-        pb_frame.pack(fill="x", padx=12, pady=2)
-        for sym, cmd in [
-            ("|\u25c0", self._pb_rewind),
-            ("\u25b6",  self._pb_play),
-            ("\u25b6\u25b6", self._pb_fast),
-            ("\u27f3",  self._pb_loop),
-        ]:
-            tk.Button(pb_frame, text=sym, bg=BG_MEDIUM, fg=FG_WHITE,
-                      font=FONT_LABEL, relief="raised", bd=2,
-                      cursor="hand2", padx=8, command=cmd
-                      ).pack(side="left", padx=3)
-
-        self._pb_state_label = tk.Label(pb_frame, text="\u23f9 Stopped",
-                                          bg=BG_DARK, fg=FG_LABEL, font=FONT_SMALL)
-        self._pb_state_label.pack(side="left", padx=6)
-
-        # Event Timeline — shows game flow stages
-        tl_frame = tk.LabelFrame(
-            pb_frame, text=" EVENT TIMELINE ", bg=BG_DARK, fg=FG_GOLD,
-            font=("Arial", 11, "bold"), highlightthickness=1,
-            highlightbackground=BORDER_COLOR
-        )
-        tl_frame.pack(side="left", padx=(8, 4))
-        self._timeline_labels = []
-        timeline_stages = [
-            "ATTRACT", "CHECK-IN", "INTRO", "COUNTDOWN",
-            "GAMEPLAY", "RESULTS", "IDLE",
-        ]
-        for stage in timeline_stages:
-            lbl = tk.Label(
-                tl_frame, text=stage, bg=BG_MEDIUM, fg=FG_WHITE,
-                font=("Arial", 10), relief="raised", padx=4, pady=1
-            )
-            lbl.pack(side="left", padx=1, pady=2)
-            self._timeline_labels.append(lbl)
-
-        self._grad_canvas = tk.Canvas(
-            pb_frame, height=28, bg="#220033",
-            highlightthickness=1, highlightbackground=BORDER_COLOR
-        )
-        self._grad_canvas.pack(side="left", fill="x", expand=True, padx=6)
-        self._draw_gradient_bar()
-
-        # ============================================================
-        # ROW 3: Scene Preview (1-20)
+        # ROW 2: Scene Preview (1-20)
         # ============================================================
         preview_frame = tk.LabelFrame(
             parent, text=" SCENE PREVIEW ", bg=BG_DARK, fg=FG_GOLD,
@@ -1814,9 +1770,7 @@ class DMXLightingEditor:
     # ------------------------------------------------------------------
 
     def _update_palette_display(self):
-        for i, c in enumerate(self.palette_slot_btns):
-            color = self._palette[i] if i < len(self._palette) else "#000000"
-            c.configure(bg=color)
+        # Quick-pick tiles have static colors — no update needed for palette_slot_btns
         for i, c in enumerate(self._effect_swatches):
             color = self._palette[i] if i < len(self._palette) else "#000000"
             c.configure(bg=color)
@@ -1881,94 +1835,22 @@ class DMXLightingEditor:
         self._color_wheel.set_color(r, g, b)
         self._apply_rgb_to_slot(r, g, b)
 
+    def _pick_quick_color(self, hex_color: str):
+        """Apply a quick-pick color to the current palette slot and active fixture."""
+        r, g, b = _hex_to_rgb(hex_color)
+        self._r_var.set(r)
+        self._g_var.set(g)
+        self._b_var.set(b)
+        self._color_wheel.set_color(r, g, b)
+        self._apply_rgb_to_slot(r, g, b)
+        self._mark_dirty()
+
     def _save_current_color(self):
         hex_c = _rgb_to_hex(self._r_var.get(), self._g_var.get(), self._b_var.get())
         if hasattr(self._color_palette_store, "add_saved"):
             self._color_palette_store.add_saved(hex_c)
             self._color_palette_store.save_saved()
         self._build_saved_colors()
-
-    # ------------------------------------------------------------------
-    # Playback animation
-    # ------------------------------------------------------------------
-
-    def _pb_rewind(self):
-        self._stop_preview()
-        self._preview_frame = 0
-        self._update_preview_frame()
-        if hasattr(self, "_pb_state_label"):
-            self._pb_state_label.configure(text="⏮ Frame 1")
-
-    def _pb_play(self):
-        if self._preview_playing:
-            self._stop_preview()
-        else:
-            self._preview_playing = True
-            if hasattr(self, "_pb_state_label"):
-                self._pb_state_label.configure(text="▶ Playing")
-            self._run_preview_tick()
-
-    def _pb_fast(self):
-        self._preview_speed = max(100, self._preview_speed // 2)
-        if hasattr(self, "_pb_state_label"):
-            self._pb_state_label.configure(text=f"⏩ {1000 // self._preview_speed}fps")
-
-    def _pb_loop(self):
-        self._preview_loop = not self._preview_loop
-        indicator = "⟳ Loop ON" if self._preview_loop else "⟳ Loop OFF"
-        if hasattr(self, "_pb_state_label"):
-            self._pb_state_label.configure(text=indicator)
-
-    def _run_preview_tick(self):
-        if not self._preview_playing:
-            return
-        self._update_preview_frame()
-        num_steps = len(self._step_canvases)
-        self._preview_frame += 1
-        if self._preview_frame >= num_steps:
-            if self._preview_loop:
-                self._preview_frame = 0
-            else:
-                self._stop_preview()
-                return
-        self._preview_timer_id = self._container.after(self._preview_speed, self._run_preview_tick)
-
-    def _update_preview_frame(self):
-        """Animate the fixture grid and step canvases for current preview frame."""
-        n_steps = len(self._step_canvases)
-        n_fixtures = len(self._fixture_canvases)
-        palette = self._palette or ["#FF4400"] * 8
-        frame = self._preview_frame % n_steps
-        # Highlight current step
-        for i, c in enumerate(self._step_canvases):
-            if i == frame:
-                c.configure(bg=FG_GOLD, highlightbackground=FG_GOLD)
-                c.itemconfig("num", fill="#000000")
-            else:
-                c.configure(bg="#330022", highlightbackground=BORDER_COLOR)
-                c.itemconfig("num", fill=FG_WHITE)
-        # Shift palette on fixture grid based on frame
-        shifted = palette[frame % len(palette):] + palette[:frame % len(palette)]
-        for i, c in enumerate(self._fixture_canvases):
-            color = shifted[i % len(shifted)]
-            try:
-                c.configure(bg=color)
-                c.itemconfig("num", fill=_contrasting_fg(color))
-            except Exception:
-                pass
-        self._draw_gradient_bar()
-
-    def _stop_preview(self):
-        self._preview_playing = False
-        self._preview_speed = 500
-        if self._preview_timer_id is not None:
-            try:
-                self._container.after_cancel(self._preview_timer_id)
-            except Exception:
-                pass
-            self._preview_timer_id = None
-        if hasattr(self, "_pb_state_label"):
-            self._pb_state_label.configure(text="⏹ Stopped")
 
     def _mod_all(self):
         """Apply the current slot color to all palette slots and all fixtures."""
@@ -2119,11 +2001,7 @@ class DMXLightingEditor:
     # ------------------------------------------------------------------
 
     def _preview_selected(self):
-        """Animate the step colors across fixture targets in the editor preview."""
-        if self._preview_playing:
-            self._stop_preview()
-            self._center_status_var.set("Preview stopped.")
-            return
+        """Apply the step colors across fixture targets in the editor preview."""
         # Apply the step colors to fixture grid as a visual preview
         step_colors = [c for c in self._step_colors if c != "#330022"]
         if not step_colors:
@@ -2200,25 +2078,6 @@ class DMXLightingEditor:
             self.validation_label.configure(text="✔ Scene OK", fg=FG_GREEN)
 
     # ------------------------------------------------------------------
-    # Gradient bar
-    # ------------------------------------------------------------------
-
-    def _draw_gradient_bar(self):
-        self._grad_canvas.update_idletasks()
-        w = self._grad_canvas.winfo_width() or 200
-        h = 28
-        palette = self._palette
-        if not palette:
-            return
-        self._grad_canvas.delete("all")
-        # Double the palette to 16 bars for the gradient display
-        bars = (palette * 3)[:16]
-        seg = max(1, w // len(bars))
-        for i, hex_c in enumerate(bars):
-            x0 = i * seg
-            x1 = x0 + seg if i < len(bars) - 1 else w
-            self._grad_canvas.create_rectangle(x0, 0, x1, h, fill=hex_c, outline="")
-
     # ------------------------------------------------------------------
     # Help overlay
     # ------------------------------------------------------------------
@@ -2400,7 +2259,6 @@ class DMXLightingEditor:
                 parent=self._container
             ):
                 return
-        self._stop_preview()
         self._library.save()
         self.hide()
         if self._on_close_callback:

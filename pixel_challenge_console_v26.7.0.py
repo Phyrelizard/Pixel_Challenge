@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v26.5.2
+Pixel Challenge Host Console v26.7.0
 
 """
 
@@ -25,8 +25,9 @@ from game_manager import GameManager
 from games.base import PlayerConfig
 # SLA System (v21.8.0)
 from sla import SLAStore, SLACalibration
+from dmx_editor import DMXLightingEditor
 
-VERSION_LABEL = "v26.5.2"
+VERSION_LABEL = "v26.7.0"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 DEFAULT_FALCON_IP = "192.168.2.113"
@@ -68,6 +69,14 @@ COLOR_MAP = {
 
 def clamp8(v: float) -> int:
     return max(0, min(255, int(v)))
+
+
+def _hex_to_rgb(hex_color: str) -> tuple:
+    """Convert '#RRGGBB' hex string to (r, g, b) ints."""
+    hex_color = hex_color.lstrip("#")
+    if len(hex_color) != 6:
+        return (0, 0, 0)
+    return (int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16))
 
 
 def scale_color(rgb, factor: float):
@@ -392,7 +401,11 @@ class DMXService:
         self._send_dmx_frame()
 
     def apply_scene(self, scene_name: str):
-        """Apply a named scene (built-in or custom)."""
+        """Apply a named scene (built-in or custom).
+
+        If the scene contains pattern data (non-static), store it in
+        _active_scene_data so animate_scene_step() can drive the effect.
+        """
         scene = self.scenes.get(scene_name)
         if not scene:
             return
@@ -407,6 +420,219 @@ class DMXService:
                 state = {"r": 0, "g": 0, "b": 0, "strobe": 0, "dimmer": 0}
             self.fixture_states[i] = state
         self.current_scene = scene_name
+        # Check for pattern data — store for animation if non-static
+        pattern = scene.get("pattern")
+        if pattern and isinstance(pattern, dict) and pattern.get("type", "static") != "static":
+            self._active_scene_data = {
+                "colors": scene.get("colors", []),
+                "pattern": pattern.get("type", "static"),
+                "speed": pattern.get("speed", 100),
+            }
+        else:
+            self._active_scene_data = None
+        self._send_dmx_frame()
+
+    def apply_scene_data(self, scene_obj):
+        """Apply a DMXScene object directly (from the editor) to fixtures.
+
+        Reads fixture_colors from scene_obj.colors and maps them onto
+        the physical fixtures, then sends a DMX frame.
+        Applies pattern effects (strobe, pulse, etc.) when pattern type is not 'static'.
+        """
+        colors = getattr(scene_obj, "colors", {})
+        fc = colors.get("fixture_colors", colors.get("palette", []))
+        pattern = getattr(scene_obj, "pattern", {})
+        pat_type = pattern.get("type", "static") if isinstance(pattern, dict) else "static"
+        speed = pattern.get("speed", 100) if isinstance(pattern, dict) else 100
+
+        for i in range(self.num_fixtures):
+            if fc:
+                hex_c = fc[i % len(fc)]
+            else:
+                hex_c = "#000000"
+            r, g, b = _hex_to_rgb(hex_c)
+            strobe_val = 0
+            dimmer_val = self.brightness
+            # Apply pattern effect
+            if pat_type == "strobe":
+                strobe_val = max(16, min(255, speed))
+            elif pat_type == "pulse":
+                # Pulse: scale dimmer with a sine wave approximation
+                import math
+                phase = (i / max(self.num_fixtures, 1)) * 2 * math.pi
+                dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
+            elif pat_type == "chase":
+                # Chase: only first fixture fully on, rest dimmed
+                dimmer_val = self.brightness if i == 0 else int(self.brightness * 0.1)
+            elif pat_type == "sweep":
+                # Sweep: gradient across fixtures
+                ratio = i / max(self.num_fixtures - 1, 1)
+                dimmer_val = int(self.brightness * ratio)
+            elif pat_type == "bounce":
+                # Bounce: bright at ends, dim in middle
+                mid = self.num_fixtures / 2
+                dist = abs(i - mid) / max(mid, 1)
+                dimmer_val = int(self.brightness * dist)
+            elif pat_type == "alternating":
+                dimmer_val = self.brightness if i % 2 == 0 else int(self.brightness * 0.15)
+            self.fixture_states[i] = {
+                "r": r, "g": g, "b": b, "strobe": strobe_val,
+                "dimmer": clamp8(dimmer_val),
+            }
+        name = getattr(scene_obj, "name", "editor")
+        self.current_scene = name
+        # Store pattern info for animated playback via animate_scene_step
+        self._active_scene_data = {
+            "colors": fc, "pattern": pat_type, "speed": speed,
+        }
+        self._send_dmx_frame()
+
+    def test_scene(self, scene_obj):
+        """Send a DMXScene object to fixtures immediately (one-shot preview).
+
+        Same as apply_scene_data but does not update current_scene,
+        so the console can revert afterward.
+        """
+        colors = getattr(scene_obj, "colors", {})
+        fc = colors.get("fixture_colors", colors.get("palette", []))
+        pattern = getattr(scene_obj, "pattern", {})
+        pat_type = pattern.get("type", "static") if isinstance(pattern, dict) else "static"
+        speed = pattern.get("speed", 100) if isinstance(pattern, dict) else 100
+
+        for i in range(self.num_fixtures):
+            if fc:
+                hex_c = fc[i % len(fc)]
+            else:
+                hex_c = "#000000"
+            r, g, b = _hex_to_rgb(hex_c)
+            strobe_val = 0
+            dimmer_val = self.brightness
+            if pat_type == "strobe":
+                strobe_val = max(16, min(255, speed))
+            elif pat_type == "pulse":
+                import math
+                phase = (i / max(self.num_fixtures, 1)) * 2 * math.pi
+                dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
+            elif pat_type == "chase":
+                dimmer_val = self.brightness if i == 0 else int(self.brightness * 0.1)
+            elif pat_type == "sweep":
+                ratio = i / max(self.num_fixtures - 1, 1)
+                dimmer_val = int(self.brightness * ratio)
+            elif pat_type == "bounce":
+                mid = self.num_fixtures / 2
+                dist = abs(i - mid) / max(mid, 1)
+                dimmer_val = int(self.brightness * dist)
+            elif pat_type == "alternating":
+                dimmer_val = self.brightness if i % 2 == 0 else int(self.brightness * 0.15)
+            self.fixture_states[i] = {
+                "r": r, "g": g, "b": b, "strobe": strobe_val,
+                "dimmer": clamp8(dimmer_val),
+            }
+        # Store pattern info for animated playback via animate_scene_step
+        self._active_scene_data = {
+            "colors": fc, "pattern": pat_type, "speed": speed,
+        }
+        self._send_dmx_frame()
+
+    def animate_scene_step(self, step: int):
+        """Compute one animation frame for the active scene pattern and send to fixtures.
+
+        Call this repeatedly from a timer to animate patterns like chase, pulse, sweep.
+        """
+        data = getattr(self, "_active_scene_data", None)
+        if not data:
+            return
+        fc = data.get("colors", [])
+        pat_type = data.get("pattern", "static")
+        if pat_type == "static":
+            return  # no animation needed
+        n = self.num_fixtures
+        for i in range(n):
+            if fc:
+                hex_c = fc[i % len(fc)]
+            else:
+                hex_c = "#000000"
+            r, g, b = _hex_to_rgb(hex_c)
+            strobe_val = 0
+            dimmer_val = self.brightness
+            if pat_type == "strobe":
+                strobe_val = max(16, min(255, data.get("speed", 100)))
+                # Alternate strobe on/off each step
+                if step % 2 == 1:
+                    dimmer_val = 0
+            elif pat_type == "pulse":
+                import math
+                phase = (step * 0.15 + i * 0.3) % (2 * math.pi)
+                dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
+            elif pat_type == "chase":
+                active = step % max(n, 1)
+                dimmer_val = self.brightness if i == active else int(self.brightness * 0.05)
+            elif pat_type == "sweep":
+                pos = step % max(n, 1)
+                dist = abs(i - pos)
+                falloff = max(0, 1.0 - dist / max(n * 0.3, 1))
+                dimmer_val = int(self.brightness * falloff)
+            elif pat_type == "bounce":
+                half = max(n, 1)
+                pos = step % (2 * half)
+                if pos >= half:
+                    pos = 2 * half - pos - 1
+                dist = abs(i - pos)
+                falloff = max(0, 1.0 - dist / max(n * 0.3, 1))
+                dimmer_val = int(self.brightness * falloff)
+            elif pat_type == "alternating":
+                flip = step % 2
+                dimmer_val = self.brightness if (i + flip) % 2 == 0 else int(self.brightness * 0.1)
+            elif pat_type == "palette_cycle":
+                shifted_idx = (i + step) % len(fc) if fc else 0
+                hex_c = fc[shifted_idx] if fc else "#000000"
+                r, g, b = _hex_to_rgb(hex_c)
+            elif pat_type == "random_flash":
+                import random
+                dimmer_val = self.brightness if random.random() > 0.6 else 0
+            elif pat_type == "fade_loop":
+                import math
+                phase = (step * 0.1) % (2 * math.pi)
+                dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
+            elif pat_type == "sparkle":
+                import random
+                dimmer_val = self.brightness if random.random() > 0.8 else int(self.brightness * 0.1)
+            elif pat_type == "breathing":
+                import math
+                phase = (step * 0.08) % (2 * math.pi)
+                dimmer_val = int(self.brightness * (0.3 + 0.7 * (0.5 + 0.5 * math.sin(phase))))
+            elif pat_type == "wave_center":
+                import math
+                center = n / 2
+                dist = abs(i - center)
+                phase = (step * 0.2 - dist * 0.5) % (2 * math.pi)
+                dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
+            elif pat_type == "wave_lr":
+                import math
+                phase = (step * 0.2 - i * 0.4) % (2 * math.pi)
+                dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
+            elif pat_type == "wave_player":
+                import math
+                phase = (step * 0.15 + i * 0.6) % (2 * math.pi)
+                dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
+            elif pat_type == "build_up":
+                # Progressively light fixtures from first to last
+                lit_count = min((step % (n + 4)), n)
+                dimmer_val = self.brightness if i < lit_count else 0
+            elif pat_type == "explosion":
+                import math
+                # All off, then sudden flash, then fade out
+                cycle = step % 20
+                if cycle < 2:
+                    dimmer_val = self.brightness
+                elif cycle < 10:
+                    dimmer_val = int(self.brightness * max(0, 1.0 - (cycle - 2) / 8.0))
+                else:
+                    dimmer_val = 0
+            self.fixture_states[i] = {
+                "r": r, "g": g, "b": b, "strobe": strobe_val,
+                "dimmer": clamp8(dimmer_val),
+            }
         self._send_dmx_frame()
 
     def get_scene_names(self) -> list:
@@ -450,6 +676,43 @@ class DMXService:
             self.falcon.sender[self.universe].dmx_data = bytes(buf)
         except Exception as e:
             print(f"DMXService send error: {e}")
+
+    # ------------------------------------------------------------------
+    # Animated results presets
+    # ------------------------------------------------------------------
+    def animate_step(self, preset_name: str, step: int):
+        """Compute one animation frame for a results preset and send to fixtures."""
+        n = self.num_fixtures
+        if preset_name == "rainbow_rotate":
+            for i in range(n):
+                hue = ((i / max(n, 1)) + step * 0.05) % 1.0
+                r, g, b = hsv_rgb(hue, 1.0, 1.0)
+                self.fixture_states[i] = {"r": r, "g": g, "b": b, "strobe": 0, "dimmer": self.brightness}
+        elif preset_name == "color_strobe":
+            # Alternate all fixtures between random bright colors with strobe
+            palette = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0),
+                       (255, 0, 255), (0, 255, 255), (255, 255, 255)]
+            color = palette[step % len(palette)]
+            strobe = 120 if step % 2 == 0 else 0
+            for i in range(n):
+                self.fixture_states[i] = {
+                    "r": color[0], "g": color[1], "b": color[2],
+                    "strobe": strobe, "dimmer": self.brightness
+                }
+        elif preset_name == "chase_random":
+            # One fixture lit at a time, cycling through with random colors
+            active = step % max(n, 1)
+            for i in range(n):
+                if i == active:
+                    hue = (step * 0.13 + i * 0.25) % 1.0
+                    r, g, b = hsv_rgb(hue, 1.0, 1.0)
+                    self.fixture_states[i] = {"r": r, "g": g, "b": b, "strobe": 0, "dimmer": self.brightness}
+                else:
+                    self.fixture_states[i] = {"r": 0, "g": 0, "b": 0, "strobe": 0, "dimmer": 0}
+        else:
+            return
+        self.current_scene = preset_name
+        self._send_dmx_frame()
 
     # ------------------------------------------------------------------
     def _build_default_scenes(self) -> dict:
@@ -650,6 +913,15 @@ class PixelChallengeConsole:
         self.dmx_brightness = tk.IntVar(value=63)
         self.dmx_mode = tk.StringVar(value="auto")  # blackout, gameplay, results, wash, test, manual
 
+        # DMX animation state (v26.5.1)
+        self._dmx_anim_timer = None
+        self._dmx_anim_preset = None
+        self._dmx_anim_step = 0
+
+        # DMX scene pattern animation state (v26.6.0)
+        self._scene_anim_timer = None
+        self._scene_anim_step = 0
+
         # DMX hardware/service settings (v25.3.0)
         self.dmx_universe_num = tk.IntVar(value=9)
         self.dmx_num_fixtures = tk.IntVar(value=4)
@@ -814,6 +1086,11 @@ class PixelChallengeConsole:
         self.refresh_player_status_panel()
         self.refresh_controller_panel()
         self.refresh_info_window()
+
+        # Load user-authored DMX scenes and slot assignments (after build_ui)
+        self._load_user_scenes_into_dmx()
+        self._load_slot_assignments()
+        self._refresh_dmx_scene_combo()
 
         self.init_joysticks()
         self.root.after(16, self.poll_joysticks)
@@ -1244,6 +1521,275 @@ class PixelChallengeConsole:
         if self.dmx:
             self.dmx.set_brightness(pct)
         self.refresh_dmx_fixture_cards()
+
+    def _apply_scene_with_animation(self, scene_name: str):
+        """Apply a named DMX scene and start pattern animation if applicable."""
+        self._stop_dmx_animation()
+        self._stop_scene_animation()
+        if self.dmx and scene_name:
+            self.dmx.apply_scene(scene_name)
+            self._start_scene_animation()
+            self.refresh_dmx_fixture_cards()
+
+    def _on_dmx_scene_selected(self, event=None):
+        """Handle scene dropdown selection — apply chosen scene via DMXService."""
+        name = self.dmx_scene.get()
+        self._apply_scene_with_animation(name)
+        if name:
+            self.log(f"DMX scene applied: {name}")
+
+    def _on_dmx_speed_changed(self, value):
+        """Handle speed slider change — store value for scene animation speed."""
+        pct = int(float(value))
+        self.dmx_speed.set(pct)
+        self.log(f"DMX speed: {pct}%")
+
+    def _on_dmx_bank_selected(self, bank_index: int, bank_label: str):
+        """Handle bank button selection — highlight active bank."""
+        self.dmx_bank.set(bank_index + 1)
+        if hasattr(self, '_dmx_bank_buttons'):
+            for i, btn in enumerate(self._dmx_bank_buttons):
+                btn.configure(bg="#5544cc" if i == bank_index else "#2a1a4a")
+        self.log(f"DMX bank selected: {bank_label}")
+
+    def _on_dmx_slot_pressed(self, slot_index: int):
+        """Handle user-assignable slot button press — apply the assigned scene."""
+        if not hasattr(self, '_dmx_slot_scenes') or slot_index >= len(self._dmx_slot_scenes):
+            self.log(f"DMX Slot {slot_index + 1} (unassigned)")
+            return
+        scene_name = self._dmx_slot_scenes[slot_index]
+        if scene_name and self.dmx:
+            self._apply_scene_with_animation(scene_name)
+            self.log(f"DMX Slot {slot_index + 1} applied: {scene_name}")
+        else:
+            self.log(f"DMX Slot {slot_index + 1} (unassigned)")
+
+    def _load_user_scenes_into_dmx(self):
+        """Load user-authored scenes from dmx_scenes.json into DMXService."""
+        if not self.dmx:
+            return
+        try:
+            if os.path.isfile(DMX_SCENES_FILE):
+                with open(DMX_SCENES_FILE, "r", encoding="utf-8") as fh:
+                    raw = json.load(fh)
+                loaded = 0
+                for item in raw:
+                    name = item.get("name", "")
+                    if not name:
+                        continue
+                    try:
+                        # Convert editor scene format to DMXService scene format
+                        colors = item.get("colors", {})
+                        fc = colors.get("fixture_colors", colors.get("palette", []))
+                        fixtures = []
+                        for i in range(self.dmx.num_fixtures):
+                            if fc:
+                                hex_c = fc[i % len(fc)]
+                            else:
+                                hex_c = "#000000"
+                            r, g, b = _hex_to_rgb(hex_c)
+                            fixtures.append({"r": r, "g": g, "b": b, "strobe": 0, "dimmer": 255})
+                        scene_entry = {"fixtures": fixtures}
+                        # Preserve pattern data so effects animate at runtime
+                        pattern = item.get("pattern", {})
+                        pat_type = pattern.get("type", "static") if isinstance(pattern, dict) else "static"
+                        if pat_type != "static":
+                            scene_entry["pattern"] = dict(pattern)
+                            scene_entry["colors"] = list(fc) if fc else []
+                        self.dmx.scenes[name] = scene_entry
+                        loaded += 1
+                    except Exception as e:
+                        self.log(f"DMX: Skipped scene '{name}': {e}")
+                self.log(f"Loaded {loaded} user scene(s) from dmx_scenes.json")
+        except Exception as e:
+            self.log(f"DMX: Could not load user scenes: {e}")
+
+    def _load_slot_assignments(self):
+        """Load slot button assignments from dmx_scenes.json button_assignment data."""
+        self._dmx_slot_scenes = [""] * 6
+        self._dmx_slot_names = [""] * 6
+        self._dmx_fixed_scenes = {}  # maps fixed labels (SCORE, INTRO, etc.) → scene name
+        fixed_labels = {"SCORE", "INTRO", "GAMEPLAY", "START", "TEST"}
+        try:
+            if os.path.isfile(DMX_SCENES_FILE):
+                with open(DMX_SCENES_FILE, "r", encoding="utf-8") as fh:
+                    raw = json.load(fh)
+                for item in raw:
+                    assignment = item.get("button_assignment")
+                    if not assignment:
+                        continue
+                    scene_name = item.get("name", "")
+                    if not scene_name:
+                        continue
+                    # Fixed button assignment (SCORE, INTRO, etc.)
+                    if assignment in fixed_labels:
+                        self._dmx_fixed_scenes[assignment] = scene_name
+                        continue
+                    # Check if assignment matches a user slot name or user slot index
+                    slot_names = item.get("user_slot_names", [""] * 6)
+                    for si in range(6):
+                        sn = slot_names[si] if si < len(slot_names) else ""
+                        if sn and assignment == sn:
+                            self._dmx_slot_scenes[si] = scene_name
+                            self._dmx_slot_names[si] = sn
+                            break
+        except Exception:
+            pass
+        # Update slot button text
+        self._refresh_dmx_slot_buttons()
+
+    def _refresh_dmx_slot_buttons(self):
+        """Update slot button text labels from loaded assignments."""
+        if not hasattr(self, '_dmx_slot_buttons'):
+            return
+        for i, btn in enumerate(self._dmx_slot_buttons):
+            name = self._dmx_slot_names[i] if i < len(self._dmx_slot_names) else ""
+            btn.configure(text=name if name else "")
+
+    def _refresh_dmx_scene_combo(self):
+        """Refresh the scene dropdown with current available scenes."""
+        if not hasattr(self, '_dmx_scene_combo'):
+            return
+        scene_names = self.dmx.get_scene_names() if self.dmx else []
+        self._dmx_scene_combo.configure(values=scene_names)
+
+    # ------------------------------------------------------------------
+    # DMX animation control (v26.5.1)
+    # ------------------------------------------------------------------
+
+    def _start_dmx_animation(self, preset_name: str):
+        """Start a looping DMX animation preset (results effects)."""
+        self._stop_dmx_animation()
+        self._stop_scene_animation()
+        self._dmx_anim_preset = preset_name
+        self._dmx_anim_step = 0
+        self.log(f"DMX animation started: {preset_name}")
+        self._dmx_anim_tick()
+
+    def _stop_dmx_animation(self):
+        """Stop the current DMX animation if running."""
+        if self._dmx_anim_timer is not None:
+            try:
+                self.root.after_cancel(self._dmx_anim_timer)
+            except Exception:
+                pass
+            self._dmx_anim_timer = None
+        self._dmx_anim_preset = None
+
+    def _dmx_anim_tick(self):
+        """Run one animation frame and schedule the next."""
+        if self._dmx_anim_preset is None or not self.dmx:
+            return
+        self.dmx.animate_step(self._dmx_anim_preset, self._dmx_anim_step)
+        self._dmx_anim_step += 1
+        self.refresh_dmx_fixture_cards()
+        # Speed slider (0-100) maps to interval: 100=fast(50ms) 0=slow(500ms)
+        speed = self.dmx_speed.get()
+        interval = max(50, 500 - speed * 4)
+        self._dmx_anim_timer = self.root.after(interval, self._dmx_anim_tick)
+
+    def _on_dmx_results_preset(self, preset_name: str):
+        """Handle results preset button press."""
+        if self._dmx_anim_preset == preset_name:
+            # Toggle off
+            self._stop_dmx_animation()
+            self.log(f"DMX animation stopped: {preset_name}")
+        else:
+            self._start_dmx_animation(preset_name)
+
+    # ------------------------------------------------------------------
+    # Scene pattern animation (v26.6.0)
+    # ------------------------------------------------------------------
+
+    def _start_scene_animation(self):
+        """Start animating the active scene pattern effect (pulse, chase, etc.)."""
+        self._stop_scene_animation()
+        if not self.dmx or not getattr(self.dmx, "_active_scene_data", None):
+            return
+        pat = self.dmx._active_scene_data.get("pattern", "static")
+        if pat == "static":
+            return
+        self._scene_anim_step = 0
+        self.log(f"DMX scene animation started: {pat}")
+        self._scene_anim_tick()
+
+    def _stop_scene_animation(self):
+        """Stop the current scene pattern animation if running."""
+        if self._scene_anim_timer is not None:
+            try:
+                self.root.after_cancel(self._scene_anim_timer)
+            except Exception:
+                pass
+            self._scene_anim_timer = None
+
+    def _scene_anim_tick(self):
+        """Run one scene pattern animation frame and schedule the next."""
+        if not self.dmx or not getattr(self.dmx, "_active_scene_data", None):
+            self._scene_anim_timer = None
+            return
+        self.dmx.animate_scene_step(self._scene_anim_step)
+        self._scene_anim_step += 1
+        self.refresh_dmx_fixture_cards()
+        # Speed slider (0-100) maps to interval: 100=fast(50ms) 0=slow(500ms)
+        speed = self.dmx_speed.get()
+        interval = max(50, 500 - speed * 4)
+        self._scene_anim_timer = self.root.after(interval, self._scene_anim_tick)
+
+    def _on_dmx_override_fixture(self, fixture_index: int, fixture_label: str):
+        """Handle OVERRIDE button on a fixture card — open color chooser."""
+        from tkinter import colorchooser
+        self._stop_dmx_animation()
+        result = colorchooser.askcolor(title=f"Override {fixture_label}")
+        if result and result[0]:
+            r, g, b = [int(c) for c in result[0]]
+            if self.dmx:
+                self.dmx.set_fixture_color(fixture_index, r, g, b)
+                self.refresh_dmx_fixture_cards()
+                self.log(f"DMX Override {fixture_label}: #{r:02x}{g:02x}{b:02x}")
+
+    def _on_dmx_preview(self):
+        """Preview current scene dropdown selection on fixtures, with active-state toggle."""
+        name = self.dmx_scene.get()
+        if name and self.dmx:
+            self._apply_scene_with_animation(name)
+            self.log(f"DMX Preview: {name}")
+        # Toggle preview button visual state
+        if hasattr(self, '_rp_preview_active'):
+            self._rp_preview_active = not self._rp_preview_active
+            if self._rp_preview_active:
+                self._rp_preview_btn.configure(bg="#22aa22", text="● PREVIEW ON")
+            else:
+                self._rp_preview_btn.configure(bg="#555555", text="PREVIEW")
+
+    def _choose_idle_wash_color(self):
+        """Open a color chooser to change the idle wash color."""
+        from tkinter import colorchooser
+        result = colorchooser.askcolor(
+            initialcolor=self._idle_wash_color,
+            title="Choose Idle Wash Color"
+        )
+        if result and result[1]:
+            self._idle_wash_color = result[1]
+            self._iw_swatch.configure(bg=self._idle_wash_color)
+            self._iw_label.configure(text=self._idle_wash_color.upper())
+            # Update the warm_amber scene in DMXService to this new color
+            if self.dmx:
+                r, g, b = int(result[0][0]), int(result[0][1]), int(result[0][2])
+                n = self.dmx.num_fixtures
+                self.dmx.scenes["warm_amber"] = {
+                    "fixtures": [{"r": r, "g": g, "b": b, "strobe": 0, "dimmer": 255}] * n
+                }
+
+    def _apply_idle_wash(self):
+        """Apply the current idle wash color to all fixtures."""
+        if self.dmx:
+            hex_c = self._idle_wash_color
+            r = int(hex_c[1:3], 16)
+            g = int(hex_c[3:5], 16)
+            b = int(hex_c[5:7], 16)
+            self.dmx.set_all_color(r, g, b)
+            self.refresh_dmx_fixture_cards()
+            self.log(f"Idle wash applied: {hex_c}")
 
     def refresh_dmx_fixture_cards(self):
         """Update fixture card swatches from current DMX fixture_states."""
@@ -2232,9 +2778,14 @@ class PixelChallengeConsole:
                     self.log(f"Game complete! Winner: Player {result.winner_player_id}")
                     self.record_score_history(result)
                     payload = self.build_scoreboard_payload(result, title="Final Results")
-                    # Apply DMX results scene (v25.3.0)
+                    # Apply DMX results scene — use SCORE-assigned scene or fallback (v26.7.0)
                     if self.dmx:
-                        self.dmx.apply_scene("results_white")
+                        score_scene = getattr(self, '_dmx_fixed_scenes', {}).get("SCORE", "")
+                        if score_scene and score_scene in self.dmx.scenes:
+                            self._apply_scene_with_animation(score_scene)
+                            self.log(f"DMX results scene: {score_scene}")
+                        else:
+                            self.dmx.apply_scene("results_white")
                         self.refresh_dmx_fixture_cards()
                     self.show_scoreboard_temporarily(seconds=30, payload=payload, final=True)
                 else:
@@ -2444,7 +2995,18 @@ class PixelChallengeConsole:
         """Called after countdown completes to actually start the game"""
         self.set_state(HostState.GAME_RUNNING, f"Game started: {self.selected_game.get()}")
         self.viewer.show_game_active()
-        
+
+        # Apply the user-selected DMX scene for gameplay (v26.6.0)
+        if self.dmx:
+            selected = self.dmx_scene.get()
+            if selected and selected in self.dmx.scenes:
+                self._apply_scene_with_animation(selected)
+                self.log(f"DMX gameplay scene applied: {selected}")
+            else:
+                # Fallback to built-in gameplay preset
+                self.dmx.apply_scene("gameplay_blue")
+                self.refresh_dmx_fixture_cards()
+
         # Signal game to transition from READY to RUNNING
         if self.game_manager.is_running():
             self.game_manager.signal_start()
@@ -2463,6 +3025,8 @@ class PixelChallengeConsole:
         
         # Stop background music with fade-out (same as normal game end)
         self.stop_music()
+        # Stop any scene pattern animation (v26.6.0)
+        self._stop_scene_animation()
         
         if self.game_manager.is_running():
             self.game_manager.abort_game()
@@ -3060,27 +3624,25 @@ class PixelChallengeConsole:
         quick_row.pack(fill="x", pady=(4, 4))
 
         def _dmx_blackout():
+            self._stop_dmx_animation()
+            self._stop_scene_animation()
             if self.dmx:
                 self.dmx.blackout()
             self.refresh_dmx_fixture_cards()
 
         def _dmx_gameplay():
-            if self.dmx:
-                self.dmx.apply_scene("gameplay_blue")
-            self.refresh_dmx_fixture_cards()
+            self._apply_scene_with_animation("gameplay_blue")
 
         def _dmx_results():
-            if self.dmx:
-                self.dmx.apply_scene("results_white")
-            self.refresh_dmx_fixture_cards()
+            self._apply_scene_with_animation("results_white")
 
         def _dmx_wash():
-            if self.dmx:
-                self.dmx.apply_scene("warm_amber")
-            self.refresh_dmx_fixture_cards()
+            self._apply_scene_with_animation("warm_amber")
 
         def _dmx_test():
             """Cycle red→green→blue→white, 1 second each, then restore previous scene."""
+            self._stop_dmx_animation()
+            self._stop_scene_animation()
             if not self.dmx:
                 return
             prev = self.dmx.current_scene
@@ -3111,16 +3673,19 @@ class PixelChallengeConsole:
                       relief="raised", bd=2, font=("Arial", 12, "bold"),
                       padx=10, pady=6, cursor="hand2").pack(side="left", padx=3, fill="x", expand=True)
 
-        # --- (a2) Second row of blank placeholder buttons for future assignment ---
+        # --- (a2) Second row of user-assignable slot buttons ---
         slot_row = tk.Frame(dmx_body, bg="#17071f")
         slot_row.pack(fill="x", pady=(0, 4))
-        slot_colors = ["#2a1a4a", "#1a2a4a", "#1a4a2a", "#4a2a1a", "#4a1a2a", "#2a4a1a"]
-        for i, bg_col in enumerate(slot_colors, start=1):
-            tk.Button(slot_row, text="", width=6,
-                      command=lambda n=i: self.log(f"DMX Slot {n} (unassigned)"),
-                      bg=bg_col, fg="white", activebackground=bg_col, activeforeground="white",
-                      relief="raised", bd=2, font=("Arial", 12, "bold"),
-                      padx=10, pady=6, cursor="hand2").pack(side="left", padx=3, fill="x", expand=True)
+        slot_colors = ["#FF6600", "#00BBFF", "#FF3399", "#00DD66", "#FFCC00", "#AA44FF"]
+        self._dmx_slot_buttons = []
+        for i, bg_col in enumerate(slot_colors):
+            btn = tk.Button(slot_row, text="", width=6,
+                            command=lambda n=i: self._on_dmx_slot_pressed(n),
+                            bg=bg_col, fg="white", activebackground=bg_col, activeforeground="white",
+                            relief="raised", bd=2, font=("Arial", 12, "bold"),
+                            padx=10, pady=6, cursor="hand2")
+            btn.pack(side="left", padx=3, fill="x", expand=True)
+            self._dmx_slot_buttons.append(btn)
 
         # --- (a3) EDITOR button row ---
         editor_row = tk.Frame(dmx_body, bg="#17071f")
@@ -3137,16 +3702,18 @@ class PixelChallengeConsole:
         tk.Label(bank_row, text="BANK:", bg="#17071f", fg="#cccccc",
                  font=("Arial", 13, "bold")).pack(side="left", padx=(0, 4))
         bank_labels = ["1-4", "5-8", "9-12", "13-16"]
+        self._dmx_bank_buttons = []
         for i, bl in enumerate(bank_labels):
             active = (i == 0)
             bg = "#5544cc" if active else "#2a1a4a"
             fg = "white"
-            tk.Button(bank_row, text=bl, bg=bg, fg=fg,
-                      activebackground=bg, activeforeground=fg,
-                      relief="raised", bd=2, font=("Arial", 12, "bold"),
-                      padx=10, pady=4, cursor="hand2",
-                      command=lambda b=bl: self.log(f"DMX Bank {b} (placeholder)")
-                      ).pack(side="left", padx=3)
+            btn = tk.Button(bank_row, text=bl, bg=bg, fg=fg,
+                            activebackground=bg, activeforeground=fg,
+                            relief="raised", bd=2, font=("Arial", 12, "bold"),
+                            padx=10, pady=4, cursor="hand2",
+                            command=lambda idx=i, lbl=bl: self._on_dmx_bank_selected(idx, lbl))
+            btn.pack(side="left", padx=3)
+            self._dmx_bank_buttons.append(btn)
         tk.Checkbutton(bank_row, text="\u2611 LINK ALL", variable=self.dmx_link_all,
                        bg="#17071f", fg="white", activebackground="#17071f",
                        activeforeground="white", selectcolor="#071a30",
@@ -3175,11 +3742,6 @@ class PixelChallengeConsole:
         ch_per = self.dmx_channels_per_fixture_var.get() if hasattr(self, 'dmx_channels_per_fixture_var') else 8
         tk.Label(status_left, text=f" | UNIVERSE: {universe_num} | FIXTURES: {num_fix} x {ch_per}CH",
                  bg="#17071f", fg="#cccccc", font=("Arial", 12, "bold")).pack(side="left")
-        tk.Button(status_row, text="PREVIEW...",
-                  command=lambda: self.log("DMX Preview (placeholder)"),
-                  bg="#555555", fg="white", activebackground="#555555", activeforeground="white",
-                  relief="raised", bd=1, font=("Arial", 12, "bold"),
-                  padx=10, pady=4, cursor="hand2").pack(side="right", padx=(10, 0))
 
         # --- (e) Three preset groups — packed second so they sit just above the status row ---
         presets_frame = tk.Frame(dmx_body, bg="#17071f")
@@ -3213,39 +3775,61 @@ class PixelChallengeConsole:
         gp_frame.grid_columnconfigure(2, weight=1)
         tk.Frame(gp_frame, bg="#1a0a2e", height=6).grid(row=3, column=0, columnspan=3)
 
-        # RESULTS PRESETS
-        rp_frame = tk.Frame(presets_frame, bg="#1a0a2e", bd=1, relief="groove")
-        rp_frame.pack(side="left", padx=(0, 8), fill="both", expand=True)
-        tk.Label(rp_frame, text="RESULTS PRESETS", bg="#1a0a2e", fg="white",
-                 font=("Arial", 12, "bold")).pack(pady=(6, 4), padx=10)
-        for rp_label in ["Rainbow Rotate", "Color Strobe", "Chase Random"]:
-            tk.Button(rp_frame, text=rp_label, bg="#3b2d8b", fg="white",
-                      activebackground="#3b2d8b", activeforeground="white",
-                      relief="raised", bd=1, font=("Arial", 11, "bold"),
-                      padx=10, pady=5, cursor="hand2",
-                      command=lambda l=rp_label: self.log(f"DMX Results {l} (placeholder)")
-                      ).pack(fill="x", padx=6, pady=3)
-        tk.Frame(rp_frame, bg="#1a0a2e", height=6).pack()
-
-        # IDLE WASH
+        # IDLE WASH (swapped — now in middle position)
         iw_frame = tk.Frame(presets_frame, bg="#1a0a2e", bd=1, relief="groove")
-        iw_frame.pack(side="left", fill="both", expand=True)
+        iw_frame.pack(side="left", padx=(0, 8), fill="both", expand=True)
         tk.Label(iw_frame, text="IDLE WASH", bg="#1a0a2e", fg="white",
                  font=("Arial", 12, "bold")).pack(pady=(6, 4), padx=10)
-        iw_swatch = tk.Canvas(iw_frame, width=40, height=28, bg="#ff9632",
-                              highlightthickness=0)
-        iw_swatch.pack(pady=4)
-        tk.Label(iw_frame, text="Warm Amber", bg="#1a0a2e", fg="#cccccc",
-                 font=("Arial", 11)).pack()
+        self._idle_wash_color = "#ff9632"  # default warm amber
+        self._iw_swatch = tk.Canvas(iw_frame, width=40, height=28, bg=self._idle_wash_color,
+                              highlightthickness=1, highlightbackground="#555555",
+                              cursor="hand2")
+        self._iw_swatch.pack(pady=4)
+        self._iw_swatch.bind("<Button-1>", lambda e: self._choose_idle_wash_color())
+        self._iw_label = tk.Label(iw_frame, text="Warm Amber", bg="#1a0a2e", fg="#cccccc",
+                 font=("Arial", 11))
+        self._iw_label.pack()
+        tk.Button(iw_frame, text="CHANGE COLOR", bg="#555555", fg="white",
+                  activebackground="#666666", activeforeground="white",
+                  relief="raised", bd=1, font=("Arial", 10, "bold"),
+                  padx=6, pady=3, cursor="hand2",
+                  command=self._choose_idle_wash_color
+                  ).pack(pady=(4, 2), padx=6, fill="x")
         tk.Button(iw_frame, text="APPLY WASH", bg="#2ea62e", fg="white",
                   activebackground="#2ea62e", activeforeground="white",
                   relief="raised", bd=1, font=("Arial", 11, "bold"),
                   padx=8, pady=5, cursor="hand2",
-                  command=lambda: (
-                      self.dmx.apply_scene("warm_amber") if self.dmx else None,
-                      self.refresh_dmx_fixture_cards()
-                  )
-                  ).pack(pady=(6, 8), padx=6, fill="x")
+                  command=self._apply_idle_wash
+                  ).pack(pady=(2, 8), padx=6, fill="x")
+
+        # RESULTS PRESETS (swapped — now in right position, with border + preview)
+        rp_frame = tk.Frame(presets_frame, bg="#1a0a2e", bd=2, relief="solid",
+                            highlightthickness=1, highlightbackground="#555555")
+        rp_frame.pack(side="left", fill="both", expand=True)
+        tk.Label(rp_frame, text="RESULTS PRESETS", bg="#1a0a2e", fg="white",
+                 font=("Arial", 12, "bold")).pack(pady=(6, 4), padx=10)
+        rp_presets = [
+            ("Rainbow Rotate", "rainbow_rotate"),
+            ("Color Strobe",   "color_strobe"),
+            ("Chase Random",   "chase_random"),
+        ]
+        for rp_label, rp_key in rp_presets:
+            tk.Button(rp_frame, text=rp_label, bg="#3b2d8b", fg="white",
+                      activebackground="#3b2d8b", activeforeground="white",
+                      relief="raised", bd=1, font=("Arial", 11, "bold"),
+                      padx=10, pady=5, cursor="hand2",
+                      command=lambda k=rp_key: self._on_dmx_results_preset(k)
+                      ).pack(fill="x", padx=6, pady=3)
+        # Preview button inside the results presets border
+        self._rp_preview_btn = tk.Button(
+            rp_frame, text="PREVIEW", bg="#555555", fg="white",
+            activebackground="#555555", activeforeground="white",
+            relief="raised", bd=1, font=("Arial", 11, "bold"),
+            padx=10, pady=5, cursor="hand2",
+            command=self._on_dmx_preview
+        )
+        self._rp_preview_btn.pack(fill="x", padx=6, pady=(3, 6))
+        self._rp_preview_active = False
 
         # --- (c) Four Fixture Cards with live swatches ---
         cards_frame = tk.Frame(dmx_body, bg="#17071f")
@@ -3277,7 +3861,7 @@ class PixelChallengeConsole:
                       activebackground="#2ea62e", activeforeground="white",
                       relief="raised", bd=1, font=("Arial", 11, "bold"),
                       padx=6, pady=4, cursor="hand2",
-                      command=lambda l=label: self.log(f"DMX Override {l} (placeholder)")
+                      command=lambda i=idx, l=label: self._on_dmx_override_fixture(i, l)
                       ).pack(pady=(6, 8), padx=6, fill="x")
 
         # --- (d) Scene row (full width, tall) ---
@@ -3286,10 +3870,11 @@ class PixelChallengeConsole:
         tk.Label(scene_row, text="Scene:", bg="#17071f", fg="#ffd74f",
                  font=("Arial", 15, "bold")).pack(side="left", padx=(0, 4))
         scene_names = self.dmx.get_scene_names() if self.dmx else ["Cool Blue Static", "Warm Amber"]
-        scene_combo = ttk.Combobox(scene_row, textvariable=self.dmx_scene,
-                                   values=scene_names,
-                                   font=("Arial", 14), state="readonly", width=30)
-        scene_combo.pack(side="left", fill="x", expand=True, ipady=6)
+        self._dmx_scene_combo = ttk.Combobox(scene_row, textvariable=self.dmx_scene,
+                                              values=scene_names,
+                                              font=("Arial", 14), state="readonly", width=30)
+        self._dmx_scene_combo.pack(side="left", fill="x", expand=True, ipady=6)
+        self._dmx_scene_combo.bind("<<ComboboxSelected>>", self._on_dmx_scene_selected)
 
         # --- Speed / Brightness — label on top, slider below, side by side ---
         slider_row = tk.Frame(dmx_body, bg="#17071f")
@@ -3309,7 +3894,8 @@ class PixelChallengeConsole:
         tk.Scale(speed_col, from_=0, to=100, resolution=1, orient="horizontal",
                  variable=self.dmx_speed, bg="#17071f", fg="white",
                  troughcolor="#071a30", highlightthickness=0,
-                 font=("Arial", 10, "bold"), length=190).pack(fill="x", padx=(0, 8))
+                 font=("Arial", 10, "bold"), length=190,
+                 command=self._on_dmx_speed_changed).pack(fill="x", padx=(0, 8))
 
         # Brightness column (right)
         bright_col = tk.Frame(slider_row, bg="#17071f")
@@ -3330,7 +3916,8 @@ class PixelChallengeConsole:
 
     def open_dmx_editor(self):
         """Open the full-screen DMX Lighting Theme Editor (v25.5.0)."""
-        from dmx_editor import DMXLightingEditor
+        # Pass the currently active scene name so the editor highlights it
+        active_scene = getattr(self.dmx, "current_scene", None) if self.dmx else None
         self.editor = DMXLightingEditor(
             parent=self.root,
             dmx_service=self.dmx,
@@ -3340,22 +3927,38 @@ class PixelChallengeConsole:
             saved_colors_file=DMX_SAVED_COLORS_FILE,
             on_close_callback=self.on_editor_closed,
             on_reconfigure_callback=self.open_dmx_hw_config_from_editor,
+            on_scene_applied_callback=self._on_editor_scene_applied,
             game_list=self.games.list_names(),
             current_game=self.selected_game.get(),
+            current_scene_name=active_scene,
         )
         self.editor.show()
 
     def on_editor_closed(self):
-        """Called when the DMX editor is closed — restore normal console view."""
+        """Called when the DMX editor is closed — restore normal console view, reload scenes."""
         if hasattr(self, "editor") and self.editor is not None:
             try:
                 self.editor.hide()
             except Exception:
                 pass
-        self.log("DMX Editor closed.")
+        # Reload user scenes into DMXService and refresh UI
+        self._load_user_scenes_into_dmx()
+        self._refresh_dmx_scene_combo()
+        self._load_slot_assignments()
+        self.refresh_dmx_fixture_cards()
+        self.log("DMX Editor closed — scenes reloaded.")
+
+    def _on_editor_scene_applied(self):
+        """Called when the editor applies or tests a scene — start animation if needed."""
+        self._stop_dmx_animation()
+        self._stop_scene_animation()
+        self._start_scene_animation()
+        self.refresh_dmx_fixture_cards()
 
     def open_dmx_hw_config_from_editor(self):
-        """Open DMX Hardware Configuration from within the editor."""
+        """Open the DMX Hardware Configuration from within the editor (v25.5.0).
+        When the setup window is closed, return to the editor.
+        """
         def _on_setup_close():
             self.close_setup_window()
             if hasattr(self, "editor") and self.editor is not None:
@@ -3363,8 +3966,10 @@ class PixelChallengeConsole:
                     self.editor.show()
                 except Exception:
                     pass
+
         self.open_setup_window()
         if self.setup_window and self.setup_window.winfo_exists():
+            # Override the setup window close protocol to return to editor
             self.setup_window.protocol("WM_DELETE_WINDOW", _on_setup_close)
 
     def build_audio_area(self, parent):
