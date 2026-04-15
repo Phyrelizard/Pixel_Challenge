@@ -4,22 +4,96 @@
       "layout_id": "small_rig_8_fixture",
       "name": "Default Small Rig",
       "fixtures": [
-        {"id": "F1", "type": "wash", "x": 80, "y": 580, "direction": "left"},
-        {"id": "F2", "type": "wash", "x": 80, "y": 420, "direction": "left"},
-        {"id": "F3", "type": "top", "x": 250, "y": 100, "direction": "down"},
-        {"id": "F4", "type": "top", "x": 370, "y": 100, "direction": "down"},
-        {"id": "F5", "type": "top", "x": 490, "y": 100, "direction": "down"},
-        {"id": "F6", "type": "top", "x": 610, "y": 100, "direction": "down"},
-        {"id": "F7", "type": "wash", "x": 780, "y": 420, "direction": "right"},
-        {"id": "F8", "type": "wash", "x": 780, "y": 580, "direction": "right"}
+        {
+          "id": "F1",
+          "type": "wash",
+          "x": 80,
+          "y": 580,
+          "direction": "left"
+        },
+        {
+          "id": "F2",
+          "type": "wash",
+          "x": 80,
+          "y": 420,
+          "direction": "left"
+        },
+        {
+          "id": "F3",
+          "type": "top",
+          "x": 250,
+          "y": 100,
+          "direction": "down"
+        },
+        {
+          "id": "F4",
+          "type": "top",
+          "x": 370,
+          "y": 100,
+          "direction": "down"
+        },
+        {
+          "id": "F5",
+          "type": "top",
+          "x": 490,
+          "y": 100,
+          "direction": "down"
+        },
+        {
+          "id": "F6",
+          "type": "top",
+          "x": 610,
+          "y": 100,
+          "direction": "down"
+        },
+        {
+          "id": "F7",
+          "type": "wash",
+          "x": 780,
+          "y": 420,
+          "direction": "right"
+        },
+        {
+          "id": "F8",
+          "type": "wash",
+          "x": 780,
+          "y": 580,
+          "direction": "right"
+        }
       ],
       "targets": {
-        "All Fixtures": ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"],
-        "Left Wash Group": ["F1", "F2"],
-        "Right Wash Group": ["F7", "F8"],
-        "Top Fixtures": ["F3", "F4", "F5", "F6"],
-        "Top Left Pair": ["F3", "F4"],
-        "Top Right Pair": ["F5", "F6"]
+        "All Fixtures": [
+          "F1",
+          "F2",
+          "F3",
+          "F4",
+          "F5",
+          "F6",
+          "F7",
+          "F8"
+        ],
+        "Left Wash Group": [
+          "F1",
+          "F2"
+        ],
+        "Right Wash Group": [
+          "F7",
+          "F8"
+        ],
+        "Top Fixtures": [
+          "F3",
+          "F4",
+          "F5",
+          "F6"
+        ],
+        "Top Left Pair": [
+          "F3",
+          "F4"
+        ],
+        "Top Right Pair": [
+          "F5",
+          "F6"
+        ]
       }
     }
   ]
