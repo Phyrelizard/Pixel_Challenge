@@ -1,0 +1,1064 @@
+Pixel Challenge DMX Visualizer
+Final v1 Design and Integration Specification
+1. Purpose
+
+The DMX Visualizer is the replacement for the current overgrown DMX editor workflow. Its purpose is to provide a simple, touch-friendly, game-aware visual configuration tool that lets the operator assign reusable lighting effects to a small set of named gameplay elements, then direct those effects to either all fixtures, selected fixtures, or predefined target groups.
+
+The Visualizer is intentionally narrower in scope than the current editor. It is not trying to be a full scene authoring lab, a fixture profile editor, a show sequencer, and a trigger rules engine all at once. Its job is much simpler:
+
+pick a game
+load a profile for that game
+choose a gameplay element
+browse effects visually
+assign the selected effect to one or more targets
+save the profile
+
+That is the core of the system.
+
+The design goal is KISS: keep the interface large, clear, predictable, and easy to use on a touchscreen, while still leaving room for fixture growth and more advanced lighting layouts later.
+
+2. Visualizer screen overview
+
+The final visualizer uses a true 50/50 split:
+
+left half = configuration and profile editing
+right half = layout preview and live stage visualization
+
+This even split is important. The left side is the brains. The right side is the visual confirmation. Neither side dominates the other.
+
+Left pane title
+
+CONFIGURATION
+
+Right pane title
+
+LAYOUT PREVIEW
+
+The right side contains no configuration buttons in the final design. It is purely for the visual layout, fixture interaction, and live effect preview.
+
+3. Left pane structure
+
+The left pane is arranged in a logical top-to-bottom workflow.
+
+3.1 Game
+
+At the top of the configuration pane is the Game dropdown.
+
+This dropdown lists all games currently available in the game library. In the current console, that list can already be provided by the host, since open_dmx_editor() passes game_list=self.games.list_names() and current_game=self.selected_game.get() into the editor. That means the host already knows the active game list and the currently selected game, which is exactly what the visualizer needs.
+
+The selected game determines which saved profiles are relevant and which visual element assignments are being edited.
+
+This should remain a normal dropdown because:
+
+the number of games is manageable
+the user is already familiar with selecting games this way in the console
+the host already maintains current game selection
+3.2 Profile row
+
+Directly beneath the Game selector is the Profile row.
+
+This row has two functions:
+
+show the currently open profile name
+provide access to the Targets manager
+
+In the final layout, the profile row contains:
+
+a Profile label
+a field showing the currently loaded profile name
+a Targets button on the same line
+
+This is a strong design choice because it keeps profile context visible at all times and keeps the Targets tool nearby without wasting vertical space.
+
+Profile meaning
+
+A profile is a saved lighting configuration for a specific game.
+
+A profile stores:
+
+which effect is assigned to each element
+which target each assignment applies to
+optionally, which fixture layout or target definitions were used when that profile was created
+
+A profile is not just one effect. It is the complete saved mapping for that game’s visual behavior.
+
+Example profile names:
+
+Default Small Rig
+Blue Wash Setup
+Church Wall Wash
+Fast Action Layout
+Kids Event Profile
+
+This allows one game to have multiple lighting setups without changing code.
+
+Profile visibility behavior
+
+If a profile is open, its name must be visible in this row at all times.
+
+That is important because the operator must always know:
+
+what game is selected
+which profile is currently being edited
+
+If no profile is open yet, the row can display an “Open Profile” state or placeholder. Once loaded, the profile name replaces that placeholder.
+
+3.3 Targets button
+
+The Targets button opens the target definition manager.
+
+Targets are defined before they can be used in the Apply To control.
+
+This was an important design decision because it prevents:
+
+invalid target references
+“custom” selections that only exist temporarily
+confusion about whether a target is saved or not
+
+A target may represent:
+
+one individual fixture
+a named group of fixtures
+
+Examples:
+
+F1
+F2
+Left Wash Group
+Right Wash Group
+Top Fixtures
+All Fixtures
+
+The visualizer should not require the user to rebuild these every time. Targets are reusable definitions.
+
+Target rule
+
+A target can only be created if at least one fixture already exists on the right-side layout canvas.
+
+So the dependency order is:
+
+fixture exists in layout → target can be defined → target becomes available in Apply To
+
+That rule keeps the system grounded in the actual stage layout.
+
+3.4 Element column
+
+The next section is the Element list.
+
+This is one of the two main scrolling columns in the left pane.
+
+It must have:
+
+a visible section label: Element
+a wide touchscreen-friendly vertical scrollbar
+
+The element list contains the visual event buckets that a game can use.
+
+The final agreed element list is:
+
+Gameplay
+Bonus
+Danger
+Special
+Randomizer
+Overlay 1
+Overlay 2
+Overlay 3
+Overlay 4
+
+These elements are intentionally broad. They are not meant to mirror every tiny gameplay event. They are the stable visual buckets that all games can share.
+
+Element meanings
+Gameplay
+
+The normal active game state. This is the default in-play look.
+
+Bonus
+
+A positive event or reward moment. This may be brief or emphasized.
+
+Danger
+
+A warning or high-tension state, such as final seconds, critical condition, or failure risk.
+
+Special
+
+A major alternate mode, special round, boss phase, frenzy, or similar standout sequence.
+
+Randomizer
+
+A wildcard or special-purpose state for gameplay sections where a more chaotic or rotating visual style is wanted.
+
+Overlay 1–4
+
+Independent auxiliary outputs that may run on top of the main state without replacing it.
+
+These were introduced specifically because your setup includes a 4-port dimmer pack with:
+
+a beacon
+three dimmable dumb lights
+
+Those overlays are not the same thing as the main visual state. They are stackable auxiliaries.
+
+3.5 Effect column
+
+Next to the Element list is the Effect list.
+
+This is the second main scrolling column in the left pane.
+
+It must have:
+
+its own explicit label: Effect
+a wide touchscreen-friendly scrollbar
+a highlighted selected item background, matching the same light-blue visual emphasis used in the Element column
+
+This list is expected to grow large, so it should not be a tiny dropdown. It should function as a proper browsing list.
+
+Effect meaning
+
+An effect is a reusable visual behavior or look.
+
+Examples:
+
+Slow Blue Sweep
+Slow Green Fade
+Fast Red Wipe
+White Strobe
+Rainbow Collider
+Warm Pulse
+Orange Flash
+Color Chase
+Purple Shimmer
+Red Glitter
+
+The effect list is essentially the visualizer’s preset library.
+
+Hover-preview behavior
+
+One of the key behaviors of the final design is that effects are previewed by hover.
+
+Once the user has selected:
+
+a Game
+an Element
+
+then moving the mouse over the Effect list should temporarily animate the preview on the right side in real time.
+
+The important behavior is:
+
+while the pointer is over an effect, the preview is live
+the fixtures animate to show what that effect looks like
+this preview does not save anything by itself
+
+This removes the need for a Preview button.
+
+The hover-preview is deliberate because it allows rapid visual browsing without extra taps.
+
+Selection behavior
+
+Hover previews. Click selects.
+
+Once the user finds an effect they want, they can click it to make it the current chosen effect for assignment.
+
+That chosen effect is then paired with the current Apply To target.
+
+3.6 Apply To
+
+Near the bottom of the configuration pane is Apply To.
+
+This is the target selector for the current assignment.
+
+Because of its vertical position in the UI, it should not behave as a normal downward dropdown. It should behave as a drop-up or popup selector so the options open upward into available space.
+
+That is the correct choice for this layout.
+
+Apply To default
+
+The first and default entry must be:
+
+All Fixtures
+
+This is the most sensible default because when browsing an effect, the first thing the operator usually wants to know is:
+
+“What does this look like on everything?”
+
+After that, the list should contain:
+
+saved named groups
+individual fixtures
+any other valid targets previously defined
+
+Examples:
+
+All Fixtures
+Left Wash Group
+Right Wash Group
+F1
+F2
+F3
+F4
+F5
+F6
+F7
+F8
+
+This list is populated from previously defined targets.
+
+If no valid targets exist yet, Apply To should be empty or disabled.
+
+3.7 Bottom action buttons
+
+The final bottom row of the left pane contains:
+
+Save Profile
+Save As
+Delete Profile
+
+This is a strong final choice.
+
+Save Profile
+
+Saves the current profile under its existing name.
+
+Use when:
+
+editing an already loaded profile
+updating assignments
+refining an existing setup
+Save As
+
+Creates a new named profile from the current current configuration.
+
+Use when:
+
+making a variation
+copying a base profile and changing a few assignments
+building event-specific or venue-specific alternatives
+Delete Profile
+
+Deletes the currently selected profile.
+
+This belongs here because profiles are first-class objects in the final design.
+
+There are no action buttons on the right pane in the final layout.
+
+4. Right pane: layout preview
+
+The right side is the stage preview and fixture manipulation canvas.
+
+Its purpose is to show:
+
+fixture positions
+fixture labels
+beam direction
+live effect color and animation preview
+actual stage relationships at a glance
+
+The right pane has a black background because that makes color beams easy to see and avoids visual clutter.
+
+4.1 Current default rig layout
+
+The current small-rig default layout contains eight fixtures:
+
+F1 = lower left
+F2 = upper left
+F3 = top left
+F4 = top mid-left
+F5 = top mid-right
+F6 = top right
+F7 = upper right
+F8 = lower right
+
+This numbering was intentionally corrected in the final layout.
+
+The four top fixtures point downward.
+
+The two left fixtures face left.
+
+The two right fixtures face right.
+
+This matches your current real-world small setup:
+
+two color wash heads on the left wall side
+two color wash heads on the right wall side
+four top-mounted lights centered above the play area
+future possibility that one top slot may later become a beacon or other special fixture
+4.2 Right pane instruction text
+
+At the bottom of the right pane is a short instruction strip explaining interaction.
+
+The final instruction text is essentially:
+
+left click fixture to rotate
+hold left click to drag
+right click for options
+
+This is important because the right pane is interactive and not purely static.
+
+4.3 Layout interaction model
+Left click
+
+Rotates the selected fixture.
+
+Hold left click and drag
+
+Moves the fixture to a new location on the layout canvas.
+
+Right click
+
+Opens a context menu or options menu for that fixture.
+
+That context menu may later include:
+
+rename fixture
+change fixture type
+delete fixture
+enable/disable fixture
+assign DMX role
+assign fixture group membership
+
+For v1, the most important interactions are drag and rotate.
+
+4.4 Direction model
+
+Fixtures should rotate in a limited set of directions rather than full free-angle rotation.
+
+Eight positions is the right approach for v1:
+
+up
+up-right
+right
+down-right
+down
+down-left
+left
+up-left
+
+That is simple enough for touch and strong enough for visual layout work.
+
+4.5 Fixture labels
+
+Every fixture on the layout preview should be visibly labeled.
+
+This is essential for:
+
+target creation
+documentation
+consistency with Apply To
+quick operator understanding
+
+Without visible labels, the layout is visually attractive but operationally vague.
+
+With labels, it becomes useful.
+
+4.6 Future fixture expansion
+
+Even though the current small rig is eight fixtures, the visualizer should be designed so fixtures can later be:
+
+added
+removed
+changed in type
+
+That means the right pane should not be hardcoded forever to only the current eight-light arrangement.
+
+However, the default v1 profile should open with your current eight-fixture layout because that is the real hardware baseline.
+
+5. Targets
+
+Targets are how effects are directed.
+
+A target is a saved destination definition for assignment. It may represent:
+
+one fixture
+several fixtures
+a named reusable group
+
+This is a key concept because the visualizer does not want to force the user to assign everything by raw fixture number every time.
+
+Examples of useful targets for the current layout:
+
+All Fixtures
+F1
+F2
+F3
+F4
+F5
+F6
+F7
+F8
+Left Wash Group
+Right Wash Group
+Top Fixtures
+Top Left Pair
+Top Right Pair
+
+Targets should be defined in the Targets manager and then automatically become available in Apply To.
+
+That makes assignment easy and repeatable.
+
+6. Profiles
+
+Profiles are the central saved object in the new system.
+
+A profile is the full saved mapping for one game under one named configuration.
+
+A profile stores, at minimum:
+
+game name
+profile name
+element-to-effect assignments
+element-to-target assignments
+references to target definitions or fixture layout IDs
+optionally, layout state if profile-specific layouts are allowed
+
+For example, a Surround game might have:
+
+Profile: Default Small Rig
+
+Gameplay → Slow Blue Sweep → All Fixtures
+Bonus → Orange Flash → Top Fixtures
+Danger → Red Glitter → All Fixtures
+Overlay 1 → Beacon Pulse → Beacon
+Overlay 2 → Warm Dim → Left Wash Group
+
+Another profile for the same game might instead use:
+
+more restrained color choices
+only the top fixtures for danger
+different overlay behavior for a church or kids event
+
+That is why profiles matter. They separate the game logic from the lighting flavor.
+
+7. Effects
+
+Effects are reusable visual presets.
+
+They are not tied to one game. They are selected from a library and then assigned to elements inside a profile.
+
+An effect should define things like:
+
+animation style
+color behavior
+speed
+dimmer behavior
+strobe or pulse rules if applicable
+fixture rendering behavior in preview
+DMX playback instructions at runtime
+
+The effect list may be long, which is why:
+
+it needs a proper labeled section
+it needs a wide scrollbar
+it should preview by hover
+
+Effects are chosen visually, not by memorizing names alone.
+
+8. Console role vs game role
+
+This is one of the most important architectural parts of the system.
+
+Console role
+
+The console is the lighting traffic controller.
+
+The console:
+
+owns game selection
+owns profile loading
+owns countdown
+knows when a game starts
+knows when a game ends
+owns scoreboard and winner presentation
+owns the DMX service
+owns effect execution
+owns the active layout and profile context
+
+The console should remain the single place where DMX commands are actually applied.
+
+That keeps all lighting control centralized.
+
+Game role
+
+The games should not directly decide which raw theme or DMX scene to play.
+
+Instead, games should report only the internal states the console cannot infer on its own.
+
+Those include your agreed game elements:
+
+Gameplay
+Bonus
+Danger
+Special
+Randomizer
+Overlay 1–4 when needed
+
+In other words:
+
+the game knows what is happening
+the console decides how that should look
+
+That is the clean split.
+
+9. Runtime interaction between games, console, and profiles
+
+At runtime, the interaction model should be:
+
+Console selects a game.
+Console loads a profile for that game.
+That profile defines which effect belongs to each element.
+The game starts.
+Console already knows the game started because it launched it.
+During play, the game reports internal visual events to the console.
+Console resolves those events using the loaded profile.
+Console sends the chosen effect to the DMX service using the current targets and layout.
+When the game ends and returns score data, the console takes over again for results and scoreboard handling.
+
+This means the profile becomes the translation layer between:
+
+game semantics
+actual lighting output
+10. Console-owned vs game-owned visual states
+Console-owned
+
+These are already known by the host and do not need to be sent by the game:
+
+idle / attract
+check-in
+countdown
+game start
+game end
+scoreboard
+winner / celebration
+
+The current console already handles countdown and scoreboard timing directly.
+
+Game-owned
+
+These are the internal runtime buckets the game should send:
+
+Gameplay
+Bonus
+Danger
+Special
+Randomizer
+Overlay 1–4 as needed
+
+This keeps the interface stable across current and future games.
+
+11. Overlays
+
+Overlays were added because of your dimmer pack and beacon use case.
+
+They are different from the base game elements.
+
+A base state like Gameplay or Danger replaces the current active game look.
+
+An overlay like Overlay 1 or Overlay 2 may run on top of the current look without replacing it.
+
+That means:
+
+Gameplay can remain active on the main fixtures
+Overlay 1 can briefly turn on the beacon
+Overlay 2 can pulse a dimmer channel
+Overlay 3 can bring up a dumb light
+Overlay 4 can control another utility lamp
+
+This is the right architecture for your rig.
+
+12. How the final visualizer replaces the current editor
+
+The current dmx_editor.py is doing too much:
+
+scene editing
+scene library management
+trigger mapping
+fixture role definitions
+button assignments
+advanced transitions
+safety configuration
+import/export
+runtime testing
+
+The visualizer replaces that with a much narrower workflow:
+
+pick game
+pick profile
+pick element
+browse effect
+apply to target
+save
+
+That is a much smaller blast radius.
+
+13. Replacing the current editor in v26.7.0
+
+From the uploaded project, the console currently opens the editor through:
+
+open_dmx_editor()
+import: from dmx_editor import DMXLightingEditor
+
+and passes these arguments into the editor:
+
+parent
+dmx_service
+falcon_service
+profiles
+scenes_file
+saved_colors_file
+on_close_callback
+on_reconfigure_callback
+on_scene_applied_callback
+game_list
+current_game
+current_scene_name
+
+This is good news.
+
+That integration point is small.
+
+Best low-risk replacement strategy
+
+Do not immediately rewrite the console side to speak a brand-new API.
+
+Instead, replace the current editor behind the same entry point.
+
+Option A: keep the module/class names the same
+
+Keep:
+
+file name: dmx_editor.py
+class name: DMXLightingEditor
+
+but change the UI and data behavior so the user sees the new Visualizer instead of the old editor.
+
+This is the safest path because the console import and constructor call do not need to change.
+
+Internally, the window title and labels can say Visualizer, while the compatibility layer still uses the old import/class names.
+
+That means open_dmx_editor() in the host can stay exactly where it is for now.
+
+Option B: create a new module and thin wrapper
+
+Create:
+
+dmx_visualizer.py
+class DMXVisualizer
+
+Then keep a tiny compatibility wrapper inside dmx_editor.py that simply imports and exposes the new class under the old name.
+
+That also minimizes host changes.
+
+14. Reusing existing host arguments for minimal console changes
+
+This is one of the strongest parts of the current setup.
+
+You can reuse most of the host arguments exactly as they are.
+
+parent
+
+Still needed. The visualizer remains a Tkinter child/top-level window.
+
+dmx_service
+
+Still needed. Live preview and test output still require direct DMX access.
+
+falcon_service
+
+Likely still useful if any preview or integration needs Falcon-linked fixture information.
+
+profiles
+
+Currently used for DMX fixture profiles. That can continue unchanged for hardware-level profile data.
+
+scenes_file
+
+This is the most important argument to rethink carefully.
+
+Right now this points to dmx_scenes.json.
+
+For minimal host changes, you have two realistic choices:
+
+Choice 1: keep using dmx_scenes.json
+
+The visualizer stores its new profile-oriented data in the same file, or in a backward-compatible subset.
+
+This is lowest-friction but can get messy because the old file is scene-oriented, not profile-oriented.
+
+Choice 2: keep the argument name, change what file it points to
+
+The host can still pass scenes_file=..., but now that file can be something like:
+
+dmx_visualizer_profiles.json
+
+The argument name stays the same for compatibility, even if the file meaning changes.
+
+That is probably the cleaner long-term choice.
+
+saved_colors_file
+
+Still reusable if the new visualizer keeps a saved color/effect palette concept.
+
+on_close_callback
+
+Still needed. When the visualizer closes, the console should reload data and refresh its DMX UI.
+
+on_reconfigure_callback
+
+Still useful. The user may still need to open DMX hardware configuration from the visualizer.
+
+on_scene_applied_callback
+
+This should be kept for compatibility, but semantically it becomes:
+
+profile assignment updated
+visualizer applied preview/assignment
+runtime scene/effect data changed
+
+The callback name can stay the same even if its meaning broadens.
+
+game_list
+
+Absolutely still needed.
+
+current_game
+
+Absolutely still needed.
+
+current_scene_name
+
+This can be reinterpreted as the current active console DMX state if useful, or simply ignored if the new visualizer does not need it immediately.
+
+15. How to phase out the existing header.py
+
+I did not find a literal header.py file in the uploaded project, so I cannot document that file specifically by code inspection.
+
+So this section is based on your description that header.py is part of the older workflow being phased out.
+
+Best replacement philosophy
+
+Do not try to preserve old UI behavior if it belongs to a workflow you are intentionally retiring.
+
+Instead, preserve only:
+
+the data contracts the host already expects
+the callbacks the host already calls
+the minimal argument surface between host and visualizer
+
+If header.py was acting as a front-end configuration layer, the new visualizer should become that front-end.
+
+If header.py was storing named mappings or element selections, that responsibility should move into the visualizer profile system.
+
+Recommended migration strategy
+
+Replace header.py in stages:
+
+Stage 1
+
+Keep host call flow unchanged.
+Swap old header/editor entry point to new visualizer window.
+
+Stage 2
+
+Move stored mapping data into profile files.
+
+Stage 3
+
+Add a compatibility reader so old header-driven assignments can still be loaded and converted.
+
+Stage 4
+
+Remove old header-specific logic after the new profile system is stable.
+
+The key point is that the visualizer becomes the new single source of truth for game visual assignments.
+
+16. Suggested data model for the visualizer
+
+A clean profile file should probably be profile-oriented, not scene-oriented.
+
+A profile entry could look conceptually like this:
+
+{
+  "game": "Surround",
+  "profile_name": "Default Small Rig",
+  "layout_id": "small_rig_8_fixture",
+  "assignments": {
+    "Gameplay": {
+      "effect": "Slow Blue Sweep",
+      "apply_to": "All Fixtures"
+    },
+    "Bonus": {
+      "effect": "Orange Flash",
+      "apply_to": "Top Fixtures"
+    },
+    "Danger": {
+      "effect": "Red Glitter",
+      "apply_to": "All Fixtures"
+    },
+    "Overlay 1": {
+      "effect": "Beacon Pulse",
+      "apply_to": "Beacon"
+    }
+  }
+}
+
+Targets should be stored separately or inside a layout definition.
+
+A layout definition might look like:
+
+{
+  "layout_id": "small_rig_8_fixture",
+  "fixtures": [
+    {"id": "F1", "type": "wash", "x": 100, "y": 500, "direction": "left"},
+    {"id": "F2", "type": "wash", "x": 100, "y": 380, "direction": "left"},
+    {"id": "F3", "type": "top",  "x": 280, "y": 120, "direction": "down"},
+    {"id": "F4", "type": "top",  "x": 390, "y": 120, "direction": "down"},
+    {"id": "F5", "type": "top",  "x": 500, "y": 120, "direction": "down"},
+    {"id": "F6", "type": "top",  "x": 610, "y": 120, "direction": "down"},
+    {"id": "F7", "type": "wash", "x": 820, "y": 380, "direction": "right"},
+    {"id": "F8", "type": "wash", "x": 820, "y": 500, "direction": "right"}
+  ],
+  "targets": {
+    "All Fixtures": ["F1","F2","F3","F4","F5","F6","F7","F8"],
+    "Left Wash Group": ["F1","F2"],
+    "Right Wash Group": ["F7","F8"],
+    "Top Fixtures": ["F3","F4","F5","F6"]
+  }
+}
+
+That is the kind of structure that fits the visualizer better than the current all-purpose scene file.
+
+17. How the visualizer should interact with the existing console runtime
+Current console capabilities already in place
+
+From the uploaded code, the console already:
+
+knows the selected game
+handles countdown
+handles gameplay start
+handles game completion
+builds scoreboard payloads
+shows scoreboard and results
+creates a host API object for games
+already uses DMX fixed scenes like GAMEPLAY and SCORE in some places
+
+That means you do not need to invent a whole new host architecture.
+
+Best integration pattern
+
+The visualizer should initially plug into the existing console like this:
+
+visualizer saves profile data
+console loads profile data for current game
+console already owns start/countdown/results
+games continue using ConsoleHostAPI
+when games need lighting state changes, they report simple event names to console
+console looks up the current game profile
+console resolves event → effect → target
+console applies the corresponding DMX output
+
+That is a clean evolution of what is already there.
+
+18. Minimal ConsoleHostAPI changes
+
+The existing ConsoleHostAPI already exposes DMX-related methods such as:
+
+dmx_apply_scene
+dmx_set_color
+dmx_set_fixture_color
+dmx_blackout
+dmx_set_strobe
+dmx_set_brightness
+
+That is useful for backward compatibility, but for the new visualizer architecture, games should not be calling raw DMX scene names directly.
+
+Instead, the best long-term addition would be a very small event-style API, for example:
+
+visual_event("Gameplay")
+visual_event("Bonus")
+visual_event("Danger")
+visual_event("Special")
+visual_event("Randomizer")
+visual_event("Overlay 1", action="on")
+visual_event("Overlay 1", action="off")
+
+That method can be added to ConsoleHostAPI later without breaking the current system.
+
+Phase 1 does not require ripping out the old DMX methods. It only requires adding a cleaner path forward.
+
+19. Recommended phased rollout
+Phase 1: UI replacement
+
+Replace the current editor UI with the final visualizer layout.
+
+Goals:
+
+keep host integration surface the same
+get the visualizer window working
+get profiles, targets, and layout preview functional
+preserve close/reload callbacks
+Phase 2: Data replacement
+
+Move from scene-heavy editing to profile-heavy editing.
+
+Goals:
+
+save and load profiles
+manage targets
+manage layout definitions
+preserve effect library
+Phase 3: Runtime event mapping
+
+Have games report gameplay elements to the console, and have the console resolve those through the active profile.
+
+Goals:
+
+profile-driven runtime lighting
+cleaner game/console split
+overlays working independently
+Phase 4: Retire old scene-only assumptions
+
+Once the visualizer proves stable, remove or reduce the old editor-only scene model where it no longer fits.
+
+20. Why this final visualizer is the right design
+
+This final design works because it fixes the biggest problem of the previous editor: too much scope in one place.
+
+The final visualizer:
+
+is visually clean
+is touchscreen-friendly
+is organized by game and profile
+uses reusable targets
+uses a live layout preview
+keeps the console in charge of actual runtime DMX
+lets games report only meaningful visual states
+supports your current 8-fixture small rig cleanly
+leaves room for more fixtures later
+avoids giant recoding in the host by reusing the existing editor entry point and callbacks
+
+Most importantly, it gives you a tool that matches the actual project:
+an LED game console with game-aware lighting profiles, not a general-purpose theatrical programming desk.
+
+21. Recommended final summary
+
+The new visualizer should become the primary DMX configuration interface for Pixel Challenge.
+
+It should replace the current editor workflow with a simpler profile-based system centered on:
+
+Game
+Profile
+Targets
+Element
+Effect
+Apply To
+Layout Preview
+
+The host should remain the runtime authority.
+
+The games should report semantic visual states.
+
+The visualizer should define how those states look.
+
+The DMX service should continue to execute the actual output.
+
+That is the cleanest path forward with the least disruption to v26.7.0.

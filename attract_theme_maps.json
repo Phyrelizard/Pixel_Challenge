@@ -1,5 +1,5 @@
 {
-  "auto_enabled": true,
+  "auto_enabled": false,
   "cycle_enabled": true,
   "cycle_seconds": 20,
   "per_theme_speed": {
@@ -15,9 +15,9 @@
     "Lane Chase RL": 3
   },
   "selected_themes": [
+    "Rainbow Pulse",
     "Lane Chase LR",
-    "Color Wash",
-    "Rainbow Pulse"
+    "Color Wash"
   ],
   "sash_left_attract_bottom": 576,
   "sash_center_ctrl": 401,
@@ -27,10 +27,10 @@
   "sash_mixer_height": null,
   "falcon_brightness": 30,
   "gameplay_brightness": 72,
-  "music_volume": 0,
+  "music_volume": 6,
   "sfx_volume": 35,
   "voice_volume": 12,
-  "master_volume": 22,
+  "master_volume": 17,
   "falcon_ip": "192.168.2.28",
   "wifi_dhcp": true,
   "wifi_ssid": "skynet",
@@ -46,7 +46,7 @@
   "auto_start": true,
   "backup_restore": true,
   "apply_reboot": true,
-  "debug_logging": false,
+  "debug_logging": true,
   "setup_geometry": "1920x998+1920+52",
   "game_mode": 1,
   "window_geometry": "1920x992+1920+52",

@@ -1,0 +1,68 @@
+2. Walkthrough: Create a Simple Theme, Name It, Save It, Test It, View on Falcon
+Here's the step-by-step workflow:
+
+Step 1 — Open the Editor from the Console
+On the console main screen, find the DMX panel on the right side
+Click the "EDITOR" button in the editor button row
+This calls open_dmx_editor() which overlays the full-screen DMX LIGHTING THEME EDITOR on top of the console
+
+Step 2 — Create a New Scene
+In the editor top bar, click "✚ NEW"
+A dialog pops up: "Enter name for the new scene:" (defaults to "New Scene")
+Type your name, e.g. "My Cool Blue" → click OK
+The editor creates a blank DMXScene, saves it to dmx_scenes.json, and loads it for editing
+
+Step 3 — Choose Your Fixtures
+In Row 1 (Fixture Targets) on the left, you see a 2x8 grid of fixture canvases (F1–F16)
+Click a fixture to select it (gold border = active). That fixture's current color loads into the color wheel
+Use the Bank buttons (if present) to switch between fixture banks (each bank = 8 fixtures)
+
+Step 4 — Pick Colors
+On the right side of Row 1 is the Color Palette with an HSV color wheel and RGB sliders
+Use the color wheel or R/G/B sliders to pick a color
+The active fixture updates to that color
+Click other fixtures and assign different colors, or use the Presets dropdown for pre-made palettes
+The palette slots (8 swatches) let you store and recall frequently-used colors
+
+Step 5 — Edit the Step Sequence (Scene Preview)
+Row 3 shows 20 step canvases — this is the scene's animation timeline
+Click any step to paint it with the current palette color
+This builds your lighting sequence/pattern across the 20 steps
+
+Step 6 — Configure Settings
+Row 2 (Playback): Set pattern type, speed, fade time, direction, loop behavior
+Row 4 (Settings): Trigger settings (what events activate this scene), lighting effects, saved colors
+Assign buttons: Assign this scene to a console slot button for quick recall
+
+Step 7 — Save the Scene
+Click "💾 SAVE" in the top bar (or press Ctrl+S)
+This writes the scene to dmx_scenes.json
+The status bar shows "Saved: My Cool Blue"
+Alternatively, "SAVE AS…" lets you save a copy under a new name
+
+Step 8 — Test the Scene on the DMX Fixtures
+Click "⚡ TEST SCENE" in the top bar
+This calls DMXService.test_scene() which sends the scene's fixture colors as a DMX frame to the Falcon via sACN
+Your physical DMX fixtures should immediately show the colors
+
+Step 9 — Apply the Scene
+Click "▶ APPLY" to apply the scene as the current active scene
+This calls DMXService.apply_scene() — same as TEST but sets it as the "current scene" going forward
+
+Step 10 — Close the Editor & Use from Console
+Click "✕ CLOSE" or "◀ Back" (or press Escape)
+The editor closes and on_editor_closed() fires, which:
+Reloads all scenes from dmx_scenes.json into the DMXService
+Refreshes the console's scene dropdown and slot button labels
+Your new scene "My Cool Blue" now appears in the Scene dropdown on the console DMX panel
+
+Step 11 — Recall from Console
+Select "My Cool Blue" from the Scene dropdown → it immediately applies to all fixtures via the Falcon
+Or if you assigned it to a slot button, just press that slot to instantly recall it
+
+Step 12 — View on the Falcon
+The Falcon F16V4 controller receives the sACN data at 192.168.2.113 (default IP)
+Pixel universes 1–8 drive the LED pixel lanes (for game visuals)
+The DMX universe (typically universe 9) drives your DMX fixtures
+The _send_dmx_frame() method builds a 512-byte DMX buffer using the fixture profile's channel map (red, green, blue, strobe, dimmer, etc.) and sends it as self.falcon.sender[self.universe].dmx_data
+Open the Falcon's web interface (browse to http://192.168.2.113) to see the sACN input status and verify data is arriving on the correct universe
