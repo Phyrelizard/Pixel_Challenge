@@ -127,6 +127,7 @@ class DMXLightingEditor:
         self._animate_preview()
 
     def hide(self):
+        self._syncing = False
         if self.window and self.window.winfo_exists():
             if self.preview_timer:
                 try:
@@ -136,7 +137,6 @@ class DMXLightingEditor:
                 self.preview_timer = None
             self.window.destroy()
         self.preview_timer = None
-        self._syncing = False
         self.window = None
         self.canvas = None
         self.effect_listbox = None
@@ -460,7 +460,7 @@ class DMXLightingEditor:
         self._sync_element_selection(self.element_listbox.curselection()[0] if self.element_listbox.curselection() else 0)
 
     def _on_element_selected(self, event=None):
-        if self._syncing:
+        if self._syncing or not self.element_listbox:
             return
         idx = self.element_listbox.curselection()[0] if self.element_listbox.curselection() else 0
         self._sync_element_selection(idx)
@@ -481,7 +481,7 @@ class DMXLightingEditor:
                 self.effect_listbox.see(e_idx)
                 self.hover_effect_name = effect_name
         self._draw_layout()
-        if self.window:
+        if self.window and self.window.winfo_exists():
             self.window.after_idle(self._end_sync)
 
     def _end_sync(self):
