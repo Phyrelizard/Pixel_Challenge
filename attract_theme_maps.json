@@ -15,9 +15,9 @@
     "Lane Chase RL": 3
   },
   "selected_themes": [
+    "Color Wash",
     "Rainbow Pulse",
-    "Lane Chase LR",
-    "Color Wash"
+    "Lane Chase LR"
   ],
   "sash_left_attract_bottom": 576,
   "sash_center_ctrl": 401,
@@ -46,7 +46,7 @@
   "auto_start": true,
   "backup_restore": true,
   "apply_reboot": true,
-  "debug_logging": true,
+  "debug_logging": false,
   "setup_geometry": "1920x998+1920+52",
   "game_mode": 1,
   "window_geometry": "1920x992+1920+52",

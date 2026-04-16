@@ -56,6 +56,8 @@ class DMXLightingEditor:
         self.directions = ["up", "up-right", "right", "down-right", "down", "down-left", "left", "up-left"]
 
         self.window = None
+        self._embedded = False
+        self._syncing = False
         self.canvas = None
         self.effect_listbox = None
         self.element_listbox = None
@@ -88,16 +90,24 @@ class DMXLightingEditor:
     # ------------------------------------------------------------------
     def show(self):
         if self.window and self.window.winfo_exists():
-            self.window.deiconify()
+            if not self._embedded:
+                self.window.deiconify()
             self.window.lift()
             self.window.focus_force()
             return
 
-        self.window = tk.Toplevel(self.parent) if self.parent else tk.Tk()
-        self.window.title("DMX Visualizer")
-        self.window.geometry("1500x900")
+        self._embedded = self.parent is not None
+        if self._embedded:
+            self.window = tk.Frame(self.parent, bg="#1e242d")
+            self.window.place(relx=0, rely=0, relwidth=1, relheight=1)
+            self.window.lift()
+            self.window.focus_force()
+        else:
+            self.window = tk.Tk()
+            self.window.title("DMX Visualizer")
+            self.window.geometry("1500x900")
+            self.window.protocol("WM_DELETE_WINDOW", self._on_close)
         self.window.configure(bg="#1e242d")
-        self.window.protocol("WM_DELETE_WINDOW", self._on_close)
 
         style = ttk.Style(self.window)
         try:
@@ -106,9 +116,10 @@ class DMXLightingEditor:
             pass
         style.configure("Viz.TCombobox", fieldbackground="#2b3440", background="#2b3440", foreground="white")
 
-        self.game_var = tk.StringVar(value=self.current_game)
-        self.profile_name_var = tk.StringVar(value=self.active_profile.get("profile_name", "Default Small Rig"))
-        self.apply_target_var = tk.StringVar(value=self._current_assignment().get("apply_to", ALL_FIXTURES_TARGET))
+        var_master = self.parent if self._embedded else self.window
+        self.game_var = tk.StringVar(master=var_master, value=self.current_game)
+        self.profile_name_var = tk.StringVar(master=var_master, value=self.active_profile.get("profile_name", "Default Small Rig"))
+        self.apply_target_var = tk.StringVar(master=var_master, value=self._current_assignment().get("apply_to", ALL_FIXTURES_TARGET))
 
         self._build_ui()
         self._refresh_effect_list()
@@ -116,6 +127,7 @@ class DMXLightingEditor:
         self._animate_preview()
 
     def hide(self):
+        self._syncing = False
         if self.window and self.window.winfo_exists():
             if self.preview_timer:
                 try:
@@ -124,11 +136,15 @@ class DMXLightingEditor:
                     pass
                 self.preview_timer = None
             self.window.destroy()
-            self.window = None
+        self.preview_timer = None
+        self.window = None
+        self.canvas = None
+        self.effect_listbox = None
+        self.element_listbox = None
 
     def run(self):
         self.show()
-        if self.window and isinstance(self.window, tk.Tk):
+        if not self._embedded and self.window:
             self.window.mainloop()
 
     # ------------------------------------------------------------------
@@ -353,6 +369,18 @@ class DMXLightingEditor:
 
         tk.Label(left, text="CONFIGURATION", bg="#242b35", fg="white", font=("Arial", 18, "bold")).pack(pady=(14, 18))
         tk.Label(right, text="LAYOUT PREVIEW", bg="#202833", fg="white", font=("Arial", 18, "bold")).pack(pady=(14, 18))
+        if self._embedded:
+            close_btn = tk.Button(
+                right,
+                text="✕ CLOSE",
+                bg="#4a1a1a",
+                fg="white",
+                activebackground="#6e2b2b",
+                relief="flat",
+                font=("Arial", 12, "bold"),
+                command=self._on_close,
+            )
+            close_btn.pack(anchor="ne", padx=18, pady=(0, 4))
 
         # Game
         tk.Label(left, text="Game", bg="#242b35", fg="#cfd8e3", anchor="w", font=("Arial", 12, "bold")).pack(fill="x", padx=20)
@@ -373,7 +401,7 @@ class DMXLightingEditor:
         elem_wrap = tk.Frame(list_row, bg="#242b35")
         elem_wrap.pack(side="left", fill="both", expand=True, padx=(0, 8))
         tk.Label(elem_wrap, text="Element", bg="#242b35", fg="#cfd8e3", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 4))
-        self.element_listbox = tk.Listbox(elem_wrap, bg="#111820", fg="#e9f0ff", selectbackground="#8ec5ff", selectforeground="#0a1a2b", activestyle="none", font=("Arial", 12), relief="flat")
+        self.element_listbox = tk.Listbox(elem_wrap, bg="#111820", fg="#e9f0ff", selectbackground="#8ec5ff", selectforeground="#0a1a2b", activestyle="none", font=("Arial", 12), relief="flat", exportselection=False)
         elem_scroll = tk.Scrollbar(elem_wrap, command=self.element_listbox.yview, width=26)
         self.element_listbox.configure(yscrollcommand=elem_scroll.set)
         self.element_listbox.pack(side="left", fill="both", expand=True)
@@ -385,7 +413,7 @@ class DMXLightingEditor:
         effect_wrap = tk.Frame(list_row, bg="#242b35")
         effect_wrap.pack(side="left", fill="both", expand=True, padx=(8, 0))
         tk.Label(effect_wrap, text="Effect", bg="#242b35", fg="#cfd8e3", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 4))
-        self.effect_listbox = tk.Listbox(effect_wrap, bg="#111820", fg="#e9f0ff", selectbackground="#8ec5ff", selectforeground="#0a1a2b", activestyle="none", font=("Arial", 12), relief="flat")
+        self.effect_listbox = tk.Listbox(effect_wrap, bg="#111820", fg="#e9f0ff", selectbackground="#8ec5ff", selectforeground="#0a1a2b", activestyle="none", font=("Arial", 12), relief="flat", exportselection=False)
         eff_scroll = tk.Scrollbar(effect_wrap, command=self.effect_listbox.yview, width=26)
         self.effect_listbox.configure(yscrollcommand=eff_scroll.set)
         self.effect_listbox.pack(side="left", fill="both", expand=True)
@@ -432,10 +460,13 @@ class DMXLightingEditor:
         self._sync_element_selection(self.element_listbox.curselection()[0] if self.element_listbox.curselection() else 0)
 
     def _on_element_selected(self, event=None):
+        if self._syncing or not self.element_listbox:
+            return
         idx = self.element_listbox.curselection()[0] if self.element_listbox.curselection() else 0
         self._sync_element_selection(idx)
 
     def _sync_element_selection(self, idx):
+        self._syncing = True
         self.element_listbox.selection_clear(0, "end")
         self.element_listbox.selection_set(idx)
         assignment = self._current_assignment()
@@ -450,6 +481,11 @@ class DMXLightingEditor:
                 self.effect_listbox.see(e_idx)
                 self.hover_effect_name = effect_name
         self._draw_layout()
+        if self.window and self.window.winfo_exists():
+            self.window.after_idle(self._end_sync)
+
+    def _end_sync(self):
+        self._syncing = False
 
     def _refresh_effect_list(self):
         self.effect_listbox.delete(0, "end")
@@ -462,6 +498,8 @@ class DMXLightingEditor:
             self.hover_effect_name = self.effects[idx]["name"]
 
     def _on_effect_selected(self, event=None):
+        if self._syncing:
+            return
         if not self.effect_listbox.curselection():
             return
         effect = self.effects[self.effect_listbox.curselection()[0]]
@@ -618,19 +656,18 @@ class DMXLightingEditor:
         effect_name = self.hover_effect_name or assignment.get("effect", "")
         color = self._effect_color(effect_name)
 
-        # Draw beams then fixtures
+        # Draw beams then fixtures — wide dispersal fan shape
         for fixture in self.fixtures:
             x = fixture.get("x", 0)
             y = fixture.get("y", 0)
             angle = self._fixture_angle(fixture.get("direction", "down"))
-            tip_x = x + math.cos(angle) * 180
-            tip_y = y + math.sin(angle) * 180
-            spread = 38
-            left_angle = angle + math.radians(16)
-            right_angle = angle - math.radians(16)
-            p2 = (x + math.cos(left_angle) * spread, y + math.sin(left_angle) * spread)
-            p3 = (x + math.cos(right_angle) * spread, y + math.sin(right_angle) * spread)
-            self.canvas.create_polygon(x, y, p2[0], p2[1], tip_x, tip_y, p3[0], p3[1], fill=color, stipple="gray50", outline="")
+            beam_length = 180
+            half_spread = math.radians(35)
+            left_angle = angle - half_spread
+            right_angle = angle + half_spread
+            p_left = (x + math.cos(left_angle) * beam_length, y + math.sin(left_angle) * beam_length)
+            p_right = (x + math.cos(right_angle) * beam_length, y + math.sin(right_angle) * beam_length)
+            self.canvas.create_polygon(x, y, p_left[0], p_left[1], p_right[0], p_right[1], fill=color, stipple="gray50", outline="")
 
         for fixture in self.fixtures:
             x = fixture.get("x", 0)
@@ -681,6 +718,8 @@ class DMXLightingEditor:
             cur = self.drag_fixture.get("direction", "down")
             idx = self.directions.index(cur) if cur in self.directions else 0
             self.drag_fixture["direction"] = self.directions[(idx + 1) % len(self.directions)]
+        self.layout["fixtures"] = self.fixtures
+        self._save_layouts()
         self._draw_layout()
 
     def _on_canvas_right_click(self, event):
@@ -697,17 +736,23 @@ class DMXLightingEditor:
         cur = fixture.get("direction", "down")
         idx = self.directions.index(cur) if cur in self.directions else 0
         fixture["direction"] = self.directions[(idx + 1) % len(self.directions)]
+        self.layout["fixtures"] = self.fixtures
+        self._save_layouts()
         self._draw_layout()
 
     def _reset_fixture_position(self, fixture):
         saved = self.default_fixture_positions.get(fixture.get("id"), {})
         fixture["x"] = saved.get("x", fixture.get("x"))
         fixture["y"] = saved.get("y", fixture.get("y"))
+        self.layout["fixtures"] = self.fixtures
+        self._save_layouts()
         self._draw_layout()
 
     def _reset_fixture_direction(self, fixture):
         saved = self.default_fixture_positions.get(fixture.get("id"), {})
         fixture["direction"] = saved.get("direction", "down")
+        self.layout["fixtures"] = self.fixtures
+        self._save_layouts()
         self._draw_layout()
 
     def _preview_dmx_effect(self, effect_name):
@@ -722,9 +767,18 @@ class DMXLightingEditor:
                     pass
 
     def _animate_preview(self):
-        self.preview_phase += 0.35
-        self._draw_layout()
-        self.preview_timer = self.window.after(110, self._animate_preview)
+        if not self.window or not self.canvas:
+            self.preview_timer = None
+            return
+        try:
+            if not self.window.winfo_exists():
+                self.preview_timer = None
+                return
+            self.preview_phase += 0.35
+            self._draw_layout()
+            self.preview_timer = self.window.after(110, self._animate_preview)
+        except Exception:
+            self.preview_timer = None
 
 
 if __name__ == "__main__":
