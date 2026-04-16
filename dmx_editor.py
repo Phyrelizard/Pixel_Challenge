@@ -608,7 +608,7 @@ class DMXLightingEditor:
         for i, effect in enumerate(self.effects):
             if effect.get("_is_header"):
                 self.effect_listbox.insert("end", effect["name"])
-                self.effect_listbox.itemconfig(i, fg="#6699aa", selectbackground="#111820", selectforeground="#6699aa")
+                self.effect_listbox.itemconfig(i, fg="#88ccdd", selectbackground="#111820", selectforeground="#88ccdd")
             else:
                 desc = _brief_description(effect)
                 label = f"{effect['name']}  ({desc})" if desc else effect["name"]
@@ -733,7 +733,7 @@ class DMXLightingEditor:
             line = lst.get(lst.curselection()[0])
             old_key = line.split(":", 1)[0].strip()
             if old_key == ALL_FIXTURES_TARGET:
-                messagebox.showinfo("Targets", "Cannot edit the All Fixtures group.", parent=dialog)
+                messagebox.showinfo("Targets", "Cannot edit the All Fixtures group. It is a system target that always includes every fixture.", parent=dialog)
                 return
             old_fixtures = self.targets.get(old_key, [])
             new_name = simpledialog.askstring("Edit Target", "Target name:", initialvalue=old_key, parent=dialog)
