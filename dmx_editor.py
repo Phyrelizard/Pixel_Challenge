@@ -8,10 +8,98 @@ import math
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 
-VISUALIZER_VERSION = "v1.1.0"
+VISUALIZER_VERSION = "v1.2.0"
 ALL_FIXTURES_TARGET = "All Fixtures"
 FIXTURE_HIT_WIDTH = 14
 FIXTURE_HIT_HEIGHT = 12
+
+# Category ordering for the effect list
+_CATEGORY_ORDER = [
+    "static", "fade", "pulse", "chase", "sweep",
+    "wave", "bounce", "alternating", "strobe", "random_flash",
+    "palette_cycle", "other",
+]
+_CATEGORY_LABELS = {
+    "static": "── STATIC ──",
+    "fade": "── FADES ──",
+    "pulse": "── PULSES ──",
+    "chase": "── CHASES ──",
+    "sweep": "── SWEEPS ──",
+    "wave": "── WAVES ──",
+    "bounce": "── BOUNCES ──",
+    "alternating": "── ALTERNATING ──",
+    "strobe": "── STROBES ──",
+    "random_flash": "── RANDOM ──",
+    "palette_cycle": "── PALETTE CYCLE ──",
+    "other": "── OTHER ──",
+}
+
+_COLOR_NAMES = {
+    "#ff0000": "Red", "#cc0000": "DkRed", "#ff4400": "RedOrg",
+    "#ff2200": "RedOrg", "#ff1100": "RedOrg", "#dd0000": "DkRed",
+    "#dd8800": "Amber",
+    "#ff6600": "Org", "#ff8800": "Org", "#ff9900": "Org",
+    "#ff7700": "Org",
+    "#ffaa00": "Amber", "#ffbb00": "Amber", "#ffcc00": "Gold",
+    "#ffd700": "Gold", "#ffe066": "LtGold", "#ffee00": "Ylw",
+    "#ffff00": "Ylw", "#ffffaa": "LtYlw", "#ffe400": "Ylw",
+    "#ffdd00": "Ylw", "#ffe199": "LtGold", "#ffcc00": "Gold",
+    "#00ff44": "Grn", "#00cc33": "Grn", "#00ee33": "Grn",
+    "#44ff66": "LtGrn", "#00aa22": "DkGrn", "#00cc00": "Grn",
+    "#0044cc": "Blu", "#0066ff": "Blu", "#4499ff": "LtBlu",
+    "#88bbff": "PaleBlu", "#0033aa": "DkBlu", "#1f7cff": "Blu",
+    "#0a1a5e": "DkBlu", "#1b66ff": "Blu", "#58d9ff": "Cyan",
+    "#00ffc8": "Aqua", "#11b5ff": "SkyBlu", "#9f4bff": "Violet",
+    "#3b0a71": "DkPurp", "#7a2bcb": "Purp", "#c87cff": "LtPurp",
+    "#af0075": "Magenta", "#aa00ff": "Purp", "#8800ff": "Purp",
+    "#b86bff": "LtPurp", "#ff4f91": "Pink", "#7a8cff": "Peri",
+    "#62ffe2": "Mint", "#ff2255": "HotPink", "#00d4ff": "Cyan",
+    "#6bff5e": "LimeGrn", "#ffd447": "Gold", "#b98bff": "Lavender",
+    "#ff5a7a": "Pink", "#b00e28": "Crim", "#350007": "DkRed",
+    "#ffffff": "White", "#000000": "Black",
+    "#77e7ff": "IceBlu", "#e6faff": "PaleIce", "#8bc2ff": "SkyBlu",
+    "#ff6a00": "Org", "#ffc100": "Gold", "#ffe879": "LtYlw",
+    "#4a2b00": "DkBrown", "#b56700": "Brown", "#ffc166": "Peach",
+    "#0d2e5b": "DkBlu", "#5aa5ff": "Blu", "#d0f3ff": "PaleIce",
+    "#4b0a00": "DkRed", "#a61d00": "DkOrg",
+    "#00143a": "DkBlu", "#00a2ff": "Blu", "#9be5ff": "LtBlu",
+    "#050a1f": "DkBlu", "#322a7a": "DkPurp",
+    "#331800": "DkBrown", "#b05a22": "Brown", "#f4b178": "Peach",
+    "#023329": "DkTeal", "#00a387": "Teal", "#89ffe1": "Mint",
+    "#09153d": "DkBlu", "#1f6dde": "Blu", "#7fc6ff": "SkyBlu",
+    "#150022": "DkPurp", "#5d17a8": "Purp", "#e9d4ff": "Lav",
+    "#5a2c00": "DkBrown", "#e89a1d": "Amber", "#2e0200": "DkRed",
+    "#d73700": "RedOrg", "#ffc04a": "Gold",
+    "#120021": "DkPurp", "#562b9b": "Purp", "#b996ff": "LtPurp",
+    "#00d9b6": "Teal", "#48a4ff": "Blu", "#bc6cff": "Purp",
+    "#2a3748": "Steel", "#5c7494": "Steel", "#aec4e0": "LtSteel",
+    "#3d0f1e": "DkRose", "#b73762": "Rose", "#ffa3c0": "LtPink",
+    "#00313a": "DkTeal", "#00b6d9": "Cyan", "#a5f5ff": "LtCyan",
+    "#2b0000": "DkRed", "#a30000": "Red", "#ff2a2a": "BrtRed",
+    "#0b4f2f": "DkGrn", "#14a45e": "Grn", "#6effb1": "Mint",
+    "#ff3300": "RedOrg", "#3399ff": "Blu", "#00ff66": "Grn",
+    "#cc00ff": "Purp",
+    "#26aaa0": "Teal", "#88aa77": "Sage", "#ccbd1e": "Olive",
+    "#060066": "DkBlu", "#cd9173": "Tan", "#8678e0": "LavBlu",
+}
+
+
+def _color_name(hex_color: str) -> str:
+    """Return a short human name for a hex color."""
+    return _COLOR_NAMES.get(hex_color.lower(), hex_color[:7])
+
+
+def _brief_description(effect: dict) -> str:
+    """Return a short description like 'Red, Org, Gold' for an effect."""
+    palette = effect.get("palette") or []
+    names = []
+    seen = set()
+    for c in palette[:4]:
+        n = _color_name(c)
+        if n not in seen:
+            seen.add(n)
+            names.append(n)
+    return ", ".join(names) if names else ""
 
 
 class DMXLightingEditor:
@@ -80,7 +168,7 @@ class DMXLightingEditor:
         self.fixtures = [dict(item) for item in self.layout.get("fixtures", [])]
 
         self.effects = self._build_effect_library()
-        self.effects_by_name = {e["name"]: e for e in self.effects}
+        self.effects_by_name = {e["name"]: e for e in self.effects if not e.get("_is_header")}
 
         self.profiles_data = self._load_profiles()
         self.active_profile = self._resolve_profile(self._game_key(self.current_game))
@@ -269,7 +357,35 @@ class DMXLightingEditor:
         by_name = {}
         for effect in scene_effects + generated_effects:
             by_name[effect["name"]] = effect
-        return list(by_name.values())
+
+        # Sort into categories
+        categorized: dict[str, list] = {cat: [] for cat in _CATEGORY_ORDER}
+        for effect in by_name.values():
+            cat = effect.get("pattern_type", "static")
+            if cat not in categorized:
+                cat = "other"
+            categorized[cat].append(effect)
+
+        ordered: list[dict] = []
+        self._effect_category_headers: set[int] = set()  # indices that are headers
+        for cat in _CATEGORY_ORDER:
+            effects_in_cat = categorized.get(cat, [])
+            if not effects_in_cat:
+                continue
+            header_idx = len(ordered)
+            # Insert a placeholder header entry
+            ordered.append({
+                "name": _CATEGORY_LABELS.get(cat, f"── {cat.upper()} ──"),
+                "palette": [],
+                "pattern_type": cat,
+                "speed": 0,
+                "fade_time": 0,
+                "brightness": 0,
+                "_is_header": True,
+            })
+            self._effect_category_headers.add(header_idx)
+            ordered.extend(effects_in_cat)
+        return ordered
 
     def _default_assignments(self):
         defaults = {
@@ -489,12 +605,18 @@ class DMXLightingEditor:
 
     def _refresh_effect_list(self):
         self.effect_listbox.delete(0, "end")
-        for effect in self.effects:
-            self.effect_listbox.insert("end", effect["name"])
+        for i, effect in enumerate(self.effects):
+            if effect.get("_is_header"):
+                self.effect_listbox.insert("end", effect["name"])
+                self.effect_listbox.itemconfig(i, fg="#6699aa", selectbackground="#111820", selectforeground="#6699aa")
+            else:
+                desc = _brief_description(effect)
+                label = f"{effect['name']}  ({desc})" if desc else effect["name"]
+                self.effect_listbox.insert("end", label)
 
     def _on_effect_hover(self, event):
         idx = self.effect_listbox.nearest(event.y)
-        if 0 <= idx < len(self.effects):
+        if 0 <= idx < len(self.effects) and idx not in self._effect_category_headers:
             self.hover_effect_name = self.effects[idx]["name"]
 
     def _on_effect_selected(self, event=None):
@@ -502,7 +624,12 @@ class DMXLightingEditor:
             return
         if not self.effect_listbox.curselection():
             return
-        effect = self.effects[self.effect_listbox.curselection()[0]]
+        idx = self.effect_listbox.curselection()[0]
+        # Skip category headers
+        if idx in self._effect_category_headers:
+            self.effect_listbox.selection_clear(idx)
+            return
+        effect = self.effects[idx]
         assignment = self._current_assignment()
         assignment["effect"] = effect["name"]
         assignment["apply_to"] = self.apply_target_var.get() or ALL_FIXTURES_TARGET
@@ -566,7 +693,7 @@ class DMXLightingEditor:
         dialog = tk.Toplevel(self.window)
         dialog.title("Targets")
         dialog.configure(bg="#202833")
-        dialog.geometry("460x420")
+        dialog.geometry("460x480")
         dialog.transient(self.window)
 
         tk.Label(dialog, text="Target Groups", bg="#202833", fg="white", font=("Arial", 14, "bold")).pack(pady=10)
@@ -582,8 +709,10 @@ class DMXLightingEditor:
 
         controls = tk.Frame(dialog, bg="#202833")
         controls.pack(fill="x", padx=12, pady=8)
-        tk.Button(controls, text="Add", bg="#2f9b4e", fg="white", relief="flat", command=lambda: add_target()).pack(side="left", padx=(0, 8), ipady=4, ipadx=10)
-        tk.Button(controls, text="Delete", bg="#30445e", fg="white", relief="flat", command=lambda: delete_target()).pack(side="left", ipady=4, ipadx=10)
+        tk.Button(controls, text="Add", bg="#2f9b4e", fg="white", relief="flat", font=("Arial", 11, "bold"), command=lambda: add_target()).pack(side="left", padx=(0, 8), ipady=4, ipadx=10)
+        tk.Button(controls, text="Edit", bg="#cf8f2b", fg="white", relief="flat", font=("Arial", 11, "bold"), command=lambda: edit_target()).pack(side="left", padx=(0, 8), ipady=4, ipadx=10)
+        tk.Button(controls, text="Delete", bg="#30445e", fg="white", relief="flat", font=("Arial", 11, "bold"), command=lambda: delete_target()).pack(side="left", padx=(0, 8), ipady=4, ipadx=10)
+        tk.Button(controls, text="Save", bg="#2f6b9e", fg="white", relief="flat", font=("Arial", 11, "bold"), command=lambda: save_targets()).pack(side="right", ipady=4, ipadx=10)
 
         def add_target():
             name = simpledialog.askstring("Target Name", "New target name:", parent=dialog)
@@ -594,6 +723,30 @@ class DMXLightingEditor:
                 return
             fixtures = [f.strip().upper() for f in fixture_text.split(",") if f.strip()]
             self.targets[name.strip()] = fixtures
+            self.layout["targets"] = self.targets
+            self._save_layouts()
+            refresh()
+
+        def edit_target():
+            if not lst.curselection():
+                return
+            line = lst.get(lst.curselection()[0])
+            old_key = line.split(":", 1)[0].strip()
+            if old_key == ALL_FIXTURES_TARGET:
+                messagebox.showinfo("Targets", "Cannot edit the All Fixtures group.", parent=dialog)
+                return
+            old_fixtures = self.targets.get(old_key, [])
+            new_name = simpledialog.askstring("Edit Target", "Target name:", initialvalue=old_key, parent=dialog)
+            if not new_name:
+                return
+            fixture_text = simpledialog.askstring("Edit Fixtures", "Fixture IDs (comma-separated):", initialvalue=", ".join(old_fixtures), parent=dialog)
+            if fixture_text is None:
+                return
+            fixtures = [f.strip().upper() for f in fixture_text.split(",") if f.strip()]
+            new_name = new_name.strip()
+            if new_name != old_key:
+                self.targets.pop(old_key, None)
+            self.targets[new_name] = fixtures
             self.layout["targets"] = self.targets
             self._save_layouts()
             refresh()
@@ -609,6 +762,11 @@ class DMXLightingEditor:
             self.layout["targets"] = self.targets
             self._save_layouts()
             refresh()
+
+        def save_targets():
+            self.layout["targets"] = self.targets
+            self._save_layouts()
+            messagebox.showinfo("Targets", "Target groups saved.", parent=dialog)
 
     def _save_layouts(self):
         try:
@@ -634,16 +792,76 @@ class DMXLightingEditor:
         }
         return math.radians(mapping.get(direction, 90))
 
-    def _effect_color(self, effect_name):
+    def _fixture_color(self, effect_name, fixture_index, total_fixtures):
+        """Compute per-fixture color that matches actual DMX pattern behaviour."""
         effect = self.effects_by_name.get(effect_name)
-        if not effect:
+        if not effect or effect.get("_is_header"):
             return "#4fa8ff"
         palette = effect.get("palette") or ["#4fa8ff"]
+        plen = len(palette)
         pattern = effect.get("pattern_type", "static")
-        idx = 0
-        if pattern in {"chase", "alternating", "wave", "sweep", "strobe", "pulse", "fade"}:
-            idx = int(self.preview_phase) % len(palette)
-        return palette[idx]
+        phase = self.preview_phase
+
+        if pattern == "static":
+            # Static: show first palette color (or per-fixture if enough colors)
+            return palette[fixture_index % plen]
+
+        if pattern == "chase":
+            # Chase: each fixture gets sequential palette color, offset marches over time
+            offset = int(phase) + fixture_index
+            return palette[offset % plen]
+
+        if pattern == "sweep":
+            # Sweep: like chase but slower, direction-based
+            offset = int(phase * 0.6) + fixture_index
+            return palette[offset % plen]
+
+        if pattern == "pulse":
+            # Pulse: all fixtures share same palette walk, cycling through colours
+            return palette[int(phase) % plen]
+
+        if pattern == "fade":
+            # Fade: slow walk through palette, all fixtures same colour
+            return palette[int(phase * 0.5) % plen]
+
+        if pattern == "alternating":
+            # Alternating: even/odd fixtures get different palette slots, swap on phase
+            slot = (fixture_index + int(phase)) % plen
+            return palette[slot]
+
+        if pattern == "wave":
+            # Wave: phase-shifted across fixtures
+            slot = (int(phase) + fixture_index) % plen
+            return palette[slot]
+
+        if pattern == "strobe":
+            # Strobe: flash on/off, palette color cycles
+            if int(phase * 2) % 2 == 0:
+                return palette[int(phase) % plen]
+            return "#000000"
+
+        if pattern == "bounce":
+            # Bounce: chase forward then backward
+            cycle = total_fixtures * 2 - 2 if total_fixtures > 1 else 1
+            pos = int(phase) % max(cycle, 1)
+            if pos >= total_fixtures:
+                pos = cycle - pos
+            if fixture_index == pos:
+                return palette[0]
+            return palette[min(1, plen - 1)] if plen > 1 else "#111111"
+
+        if pattern == "random_flash":
+            # Random flash: pseudo-random per fixture per phase
+            seed = (int(phase) * 7 + fixture_index * 13) % max(plen * 3, 1)
+            if seed < plen:
+                return palette[seed]
+            return "#080808"
+
+        if pattern == "palette_cycle":
+            return palette[int(phase) % plen]
+
+        # Fallback
+        return palette[int(phase) % plen]
 
     def _draw_layout(self):
         if not self.canvas:
@@ -654,12 +872,18 @@ class DMXLightingEditor:
 
         assignment = self._current_assignment()
         effect_name = self.hover_effect_name or assignment.get("effect", "")
-        color = self._effect_color(effect_name)
+        target_name = assignment.get("apply_to", ALL_FIXTURES_TARGET)
+        active_ids = set(self.targets.get(target_name, [fid["id"] for fid in self.fixtures]))
+
+        # Build ordered list of only the active fixture indices for pattern calculation
+        active_fixture_indices = [i for i, f in enumerate(self.fixtures) if f.get("id") in active_ids]
+        total_active = len(active_fixture_indices) or 1
 
         # Draw beams then fixtures — wide dispersal fan shape
-        for fixture in self.fixtures:
+        for i, fixture in enumerate(self.fixtures):
             x = fixture.get("x", 0)
             y = fixture.get("y", 0)
+            fid = fixture.get("id", "F?")
             angle = self._fixture_angle(fixture.get("direction", "down"))
             beam_length = 180
             half_spread = math.radians(35)
@@ -667,13 +891,21 @@ class DMXLightingEditor:
             right_angle = angle + half_spread
             p_left = (x + math.cos(left_angle) * beam_length, y + math.sin(left_angle) * beam_length)
             p_right = (x + math.cos(right_angle) * beam_length, y + math.sin(right_angle) * beam_length)
+
+            if fid in active_ids:
+                # Position within active set for pattern computation
+                pos_in_active = active_fixture_indices.index(i) if i in active_fixture_indices else 0
+                color = self._fixture_color(effect_name, pos_in_active, total_active)
+            else:
+                color = "#181e28"  # dim off for non-targeted fixtures
             self.canvas.create_polygon(x, y, p_left[0], p_left[1], p_right[0], p_right[1], fill=color, stipple="gray50", outline="")
 
         for fixture in self.fixtures:
             x = fixture.get("x", 0)
             y = fixture.get("y", 0)
             fid = fixture.get("id", "F?")
-            self.canvas.create_rectangle(x - 12, y - 7, x + 12, y + 7, fill="#c3ccd9", outline="#202833", width=2)
+            outline_color = "#8ec5ff" if fid in active_ids else "#202833"
+            self.canvas.create_rectangle(x - 12, y - 7, x + 12, y + 7, fill="#c3ccd9", outline=outline_color, width=2)
             self.canvas.create_text(x, y + 22, text=fid, fill="white", font=("Arial", 10, "bold"))
 
         self.canvas.create_text(
