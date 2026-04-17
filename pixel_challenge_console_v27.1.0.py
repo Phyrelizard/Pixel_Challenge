@@ -4643,7 +4643,13 @@ class PixelChallengeConsole:
             prev_dimmer = []
             for pi, pack in enumerate(self.dmx.dimmer_packs):
                 ports = pack.get("num_ports", 0)
-                prev_dimmer.append([self.dmx.dimmer_levels[pi][p] if pi < len(self.dmx.dimmer_levels) and p < len(self.dmx.dimmer_levels[pi]) else 0 for p in range(ports)])
+                saved_levels = []
+                for p in range(ports):
+                    if pi < len(self.dmx.dimmer_levels) and p < len(self.dmx.dimmer_levels[pi]):
+                        saved_levels.append(self.dmx.dimmer_levels[pi][p])
+                    else:
+                        saved_levels.append(0)
+                prev_dimmer.append(saved_levels)
                 for port in range(1, ports + 1):
                     self.dmx.set_dimmer_port(pi, port, 255)
             self.refresh_dmx_fixture_cards()
