@@ -507,6 +507,7 @@ class PixelPopSession(GameSession):
                         if not self.warning_active.get(warning_key, False):
                             self.warning_active[warning_key] = True
                             self.host.play_sound("pp_snake_warning")
+                            self.host.visual_event("Danger", "on")  # snake near-end danger
                     else:
                         self.warning_active[warning_key] = False
                     
@@ -597,6 +598,7 @@ class PixelPopSession(GameSession):
             
             # Play sound
             self.host.play_sound("pp_shot_hit_correct")
+            self.host.visual_event("Overlay 2", "on")  # hit/success accent
             
             # Apply speed ramp if enabled
             if snake_config.get("speed_ramp_enabled", True):
@@ -628,6 +630,7 @@ class PixelPopSession(GameSession):
         # Play sound
         self.host.play_sound("pp_shot_hit_wrong")
         self.host.play_sound("pp_snake_grow")
+        self.host.visual_event("Overlay 3", "on")  # miss/penalty accent
         
         head_color = snake.get_head_color()
         self.host.log(f"[PIXEL POP] P{player_id} WRONG! Shot {shot_color}, head was {head_color}. Snake grew +{growth}px")
@@ -644,6 +647,7 @@ class PixelPopSession(GameSession):
         
         # Play sound
         self.host.play_sound("pp_snake_reached_end")
+        self.host.visual_event("Overlay 3", "on")  # snake reached end penalty accent
         
         self.host.log(f"[PIXEL POP] P{player_id} snake reached end on {lane}! {penalty} points")
         
@@ -674,6 +678,7 @@ class PixelPopSession(GameSession):
         
         # Play sound
         self.host.play_sound("pp_lane_clear")
+        self.host.visual_event("Overlay 2", "on")  # lane clear success accent
         
         self.host.log(f"[PIXEL POP] P{player_id} cleared {lane} lane! +{bonus} bonus")
         
@@ -722,6 +727,7 @@ class PixelPopSession(GameSession):
         
         self.host.log(f"[PIXEL POP] BONUS ROUND triggered by P{triggering_player}!")
         self.host.play_sound("pp_bonus_start")
+        self.host.visual_event("Bonus", "on")  # bonus base state
         
         # Spawn initial bonus targets
         self._spawn_bonus_targets(current_time)
@@ -776,6 +782,7 @@ class PixelPopSession(GameSession):
         
         self.host.log("[PIXEL POP] Bonus round ended!")
         self.host.play_sound("pp_bonus_end")
+        self.host.visual_event("Gameplay", "on")  # return to gameplay base state
         
         # Spawn new snakes for all players
         self._spawn_all_snakes()
@@ -886,6 +893,7 @@ class PixelPopSession(GameSession):
         
         self.host.log("[PIXEL POP] Game complete!")
         self.host.play_sound("pp_round_end")
+        self.host.visual_event("Overlay 4", "on")  # game-over / completion accent
         
         # Clear lanes
         self.host.clear_all_pixels()
@@ -904,6 +912,8 @@ class PixelPopSession(GameSession):
         self._spawn_all_snakes()
         
         self.host.log("[PIXEL POP] GAME STARTED!")
+        self.host.visual_event("Gameplay", "on")
+        self.host.visual_event("Overlay 1", "on")  # round-start accent
         
         # Start background music
         if self.config.get("audio", {}).get("music_enabled", True):
