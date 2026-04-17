@@ -9,10 +9,54 @@ import re
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 
-VISUALIZER_VERSION = "v1.1.0"
+VISUALIZER_VERSION = "v1.8.0"
 ALL_FIXTURES_TARGET = "All Fixtures"
 FIXTURE_HIT_WIDTH = 14
 FIXTURE_HIT_HEIGHT = 12
+
+FADE_STEP_MS = 125
+FADE_MIN_MS = 0
+FADE_MAX_MS = 1000
+FADE_DEFAULT_MS = 250
+
+_CATEGORY_ORDER = [
+    "dimmer", "static", "fades", "pulses", "chases", "sweeps",
+    "waves", "alternating", "strobes", "random",
+]
+_CATEGORY_LABELS = {
+    "dimmer": "── Dimmer ──",
+    "static": "── Static ──",
+    "fades": "── Fades ──",
+    "pulses": "── Pulses ──",
+    "chases": "── Chases ──",
+    "sweeps": "── Sweeps ──",
+    "waves": "── Waves ──",
+    "alternating": "── Alternating ──",
+    "strobes": "── Strobes ──",
+    "random": "── Random ──",
+}
+_PATTERN_TO_CATEGORY = {
+    "dimmer": "dimmer",
+    "static": "static",
+    "fade": "fades",
+    "fade_loop": "fades",
+    "breathing": "fades",
+    "pulse": "pulses",
+    "chase": "chases",
+    "sweep": "sweeps",
+    "wave": "waves",
+    "wave_center": "waves",
+    "wave_lr": "waves",
+    "wave_player": "waves",
+    "alternating": "alternating",
+    "palette_cycle": "alternating",
+    "strobe": "strobes",
+    "random_flash": "random",
+    "sparkle": "random",
+    "bounce": "chases",
+    "build_up": "chases",
+    "explosion": "random",
+}
 
 
 class DMXLightingEditor:
@@ -70,6 +114,11 @@ class DMXLightingEditor:
         self.drag_fixture = None
         self.drag_start = None
         self.dragging = False
+
+        self._effect_category_headers = set()
+        self._effect_index_map = {}
+        self._preview_paused = False
+        self._preview_speed_ms = 110
 
         self.layouts_data = self._load_layouts()
         self.layout = self.layouts_data["layouts"][0]
@@ -201,6 +250,14 @@ class DMXLightingEditor:
         return default
 
     def _build_effect_library(self):
+        dimmer_effects = [
+            {"name": "No Effect", "palette": ["#000000"], "pattern_type": "static", "speed": 0, "fade_time": 0, "brightness": 0.0, "is_dimmer": False, "dimmer_level": 0},
+            {"name": "Dimmer On (100%)", "palette": ["#FFFFFF"], "pattern_type": "dimmer", "speed": 0, "fade_time": 0, "brightness": 1.0, "is_dimmer": True, "dimmer_level": 255},
+            {"name": "Dimmer 75%", "palette": ["#BFBFBF"], "pattern_type": "dimmer", "speed": 0, "fade_time": 0, "brightness": 0.75, "is_dimmer": True, "dimmer_level": 191},
+            {"name": "Dimmer 50%", "palette": ["#808080"], "pattern_type": "dimmer", "speed": 0, "fade_time": 0, "brightness": 0.5, "is_dimmer": True, "dimmer_level": 128},
+            {"name": "Dimmer 25%", "palette": ["#404040"], "pattern_type": "dimmer", "speed": 0, "fade_time": 0, "brightness": 0.25, "is_dimmer": True, "dimmer_level": 64},
+            {"name": "Dimmer Off", "palette": ["#000000"], "pattern_type": "dimmer", "speed": 0, "fade_time": 0, "brightness": 0.0, "is_dimmer": True, "dimmer_level": 0},
+        ]
         scene_effects = []
         try:
             if os.path.isfile(self.scenes_file):
@@ -274,7 +331,15 @@ class DMXLightingEditor:
         by_name = {}
         for effect in scene_effects + generated_effects:
             by_name[effect["name"]] = effect
-        return list(by_name.values())
+        ordered = []
+        for d in dimmer_effects:
+            if d["name"] not in by_name:
+                by_name[d["name"]] = d
+                ordered.append(d)
+        for e in by_name.values():
+            if e not in ordered:
+                ordered.append(e)
+        return ordered
 
     def _default_assignments(self):
         defaults = {
@@ -397,7 +462,11 @@ class DMXLightingEditor:
         profile_row = tk.Frame(left, bg="#242b35")
         profile_row.pack(fill="x", padx=20, pady=(0, 12))
         tk.Label(profile_row, text="Profile", bg="#242b35", fg="#cfd8e3", font=("Arial", 12, "bold")).pack(side="left", padx=(0, 8))
-        tk.Entry(profile_row, textvariable=self.profile_name_var, bg="#1a212b", fg="white", insertbackground="white", relief="flat", font=("Arial", 12)).pack(side="left", fill="x", expand=True)
+        self.profile_combo = ttk.Combobox(profile_row, textvariable=self.profile_name_var,
+                                           state="readonly", style="Viz.TCombobox", font=("Arial", 12))
+        self.profile_combo.pack(side="left", fill="x", expand=True)
+        self.profile_combo.bind("<<ComboboxSelected>>", self._on_profile_combo_changed)
+        self._refresh_profile_combo()
         tk.Button(profile_row, text="TARGETS", bg="#3b4552", fg="white", activebackground="#506074", relief="flat", font=("Arial", 11, "bold"), command=self._open_targets_dialog).pack(side="left", padx=(10, 0), ipady=4, ipadx=8)
 
         list_row = tk.Frame(left, bg="#242b35")
@@ -426,11 +495,46 @@ class DMXLightingEditor:
         self.effect_listbox.bind("<Motion>", self._on_effect_hover)
         self.effect_listbox.bind("<<ListboxSelect>>", self._on_effect_selected)
 
+        # Fade controls panel
+        fade_panel = tk.Frame(effect_wrap, bg="#242b35")
+        fade_panel.pack(fill="x", pady=(6, 0))
+
+        self._fade_enabled_var = tk.BooleanVar(value=False)
+        self._fade_in_var = tk.IntVar(value=FADE_DEFAULT_MS)
+        self._fade_out_var = tk.IntVar(value=FADE_DEFAULT_MS)
+
+        tk.Checkbutton(fade_panel, text="Fade", variable=self._fade_enabled_var,
+                       bg="#242b35", fg="#cfd8e3", selectcolor="#111820",
+                       activebackground="#242b35", activeforeground="white",
+                       font=("Arial", 10), command=self._on_fade_toggled).pack(side="left")
+
+        tk.Label(fade_panel, text="In:", bg="#242b35", fg="#8899aa", font=("Arial", 10)).pack(side="left", padx=(8, 2))
+        tk.Button(fade_panel, text="◀", bg="#2e3845", fg="white", relief="flat", font=("Arial", 9),
+                  command=self._fade_in_down, width=2).pack(side="left")
+        self._fade_in_label = tk.Label(fade_panel, text=f"{FADE_DEFAULT_MS}ms", bg="#242b35", fg="white", font=("Arial", 10), width=6)
+        self._fade_in_label.pack(side="left")
+        tk.Button(fade_panel, text="▶", bg="#2e3845", fg="white", relief="flat", font=("Arial", 9),
+                  command=self._fade_in_up, width=2).pack(side="left")
+
+        tk.Label(fade_panel, text="Out:", bg="#242b35", fg="#8899aa", font=("Arial", 10)).pack(side="left", padx=(8, 2))
+        tk.Button(fade_panel, text="◀", bg="#2e3845", fg="white", relief="flat", font=("Arial", 9),
+                  command=self._fade_out_down, width=2).pack(side="left")
+        self._fade_out_label = tk.Label(fade_panel, text=f"{FADE_DEFAULT_MS}ms", bg="#242b35", fg="white", font=("Arial", 10), width=6)
+        self._fade_out_label.pack(side="left")
+        tk.Button(fade_panel, text="▶", bg="#2e3845", fg="white", relief="flat", font=("Arial", 9),
+                  command=self._fade_out_up, width=2).pack(side="left")
+
         target_wrap = tk.Frame(left, bg="#242b35")
         target_wrap.pack(fill="x", padx=20, pady=(12, 10))
         tk.Label(target_wrap, text="Apply To", bg="#242b35", fg="#cfd8e3", font=("Arial", 12, "bold")).pack(side="left", padx=(0, 10))
         self.target_button = tk.Button(target_wrap, textvariable=self.apply_target_var, bg="#2e3845", fg="white", activebackground="#4b6078", relief="flat", font=("Arial", 12), command=self._open_target_dropup)
         self.target_button.pack(side="left", fill="x", expand=True, ipady=4)
+        tk.Button(target_wrap, text="⏸", bg="#2e3845", fg="white", relief="flat", font=("Arial", 12),
+                  command=self._toggle_pause, width=3).pack(side="left", padx=(10, 2))
+        tk.Button(target_wrap, text="▼", bg="#2e3845", fg="white", relief="flat", font=("Arial", 12),
+                  command=self._speed_down, width=3).pack(side="left", padx=2)
+        tk.Button(target_wrap, text="▲", bg="#2e3845", fg="white", relief="flat", font=("Arial", 12),
+                  command=self._speed_up, width=3).pack(side="left", padx=2)
 
         button_row = tk.Frame(left, bg="#242b35")
         button_row.pack(fill="x", padx=20, pady=(0, 18))
@@ -463,6 +567,7 @@ class DMXLightingEditor:
         self.active_profile = self._resolve_profile(self._game_key(self.game_var.get()))
         self.profile_name_var.set(self.active_profile.get("profile_name", "Default Small Rig"))
         self._sync_element_selection(self.element_listbox.curselection()[0] if self.element_listbox.curselection() else 0)
+        self._refresh_profile_combo()
 
     def _on_element_selected(self, event=None):
         if self._syncing or not self.element_listbox:
@@ -478,14 +583,15 @@ class DMXLightingEditor:
         self.apply_target_var.set(assignment.get("apply_to", ALL_FIXTURES_TARGET))
         effect_name = assignment.get("effect", "")
         if effect_name:
-            names = [e["name"] for e in self.effects]
-            if effect_name in names:
-                e_idx = names.index(effect_name)
-                self.effect_listbox.selection_clear(0, "end")
-                self.effect_listbox.selection_set(e_idx)
-                self.effect_listbox.see(e_idx)
-                self.hover_effect_name = effect_name
+            for lb_idx, eff_idx in self._effect_index_map.items():
+                if 0 <= eff_idx < len(self.effects) and self.effects[eff_idx]["name"] == effect_name:
+                    self.effect_listbox.selection_clear(0, "end")
+                    self.effect_listbox.selection_set(lb_idx)
+                    self.effect_listbox.see(lb_idx)
+                    self.hover_effect_name = effect_name
+                    break
         self._draw_layout()
+        self._load_fade_for_element()
         if self.window and self.window.winfo_exists():
             self.window.after_idle(self._end_sync)
 
@@ -494,20 +600,66 @@ class DMXLightingEditor:
 
     def _refresh_effect_list(self):
         self.effect_listbox.delete(0, "end")
-        for effect in self.effects:
-            self.effect_listbox.insert("end", effect["name"])
+        self._effect_category_headers = set()
+        self._effect_index_map = {}
+
+        # Group effects by category
+        categorized = {}
+        for i, effect in enumerate(self.effects):
+            pat = effect.get("pattern_type", "static")
+            cat = _PATTERN_TO_CATEGORY.get(pat, "static")
+            categorized.setdefault(cat, []).append((i, effect))
+
+        listbox_idx = 0
+        for cat_key in _CATEGORY_ORDER:
+            if cat_key not in categorized:
+                continue
+            label = _CATEGORY_LABELS.get(cat_key, f"── {cat_key.title()} ──")
+            self.effect_listbox.insert("end", label)
+            self.effect_listbox.itemconfig(listbox_idx, fg="#6688aa", selectbackground="#111820", selectforeground="#6688aa")
+            self._effect_category_headers.add(listbox_idx)
+            listbox_idx += 1
+            for effect_idx, effect in categorized[cat_key]:
+                self.effect_listbox.insert("end", f"  {effect['name']}")
+                self._effect_index_map[listbox_idx] = effect_idx
+                listbox_idx += 1
+
+        # Any uncategorized
+        seen_cats = set(_CATEGORY_ORDER)
+        for cat_key, items in categorized.items():
+            if cat_key in seen_cats:
+                continue
+            label = f"── {cat_key.title()} ──"
+            self.effect_listbox.insert("end", label)
+            self.effect_listbox.itemconfig(listbox_idx, fg="#6688aa", selectbackground="#111820", selectforeground="#6688aa")
+            self._effect_category_headers.add(listbox_idx)
+            listbox_idx += 1
+            for effect_idx, effect in items:
+                self.effect_listbox.insert("end", f"  {effect['name']}")
+                self._effect_index_map[listbox_idx] = effect_idx
+                listbox_idx += 1
 
     def _on_effect_hover(self, event):
         idx = self.effect_listbox.nearest(event.y)
-        if 0 <= idx < len(self.effects):
-            self.hover_effect_name = self.effects[idx]["name"]
+        if idx in self._effect_category_headers:
+            return
+        effect_idx = self._effect_index_map.get(idx)
+        if effect_idx is not None and 0 <= effect_idx < len(self.effects):
+            self.hover_effect_name = self.effects[effect_idx]["name"]
 
     def _on_effect_selected(self, event=None):
         if self._syncing:
             return
         if not self.effect_listbox.curselection():
             return
-        effect = self.effects[self.effect_listbox.curselection()[0]]
+        lb_idx = self.effect_listbox.curselection()[0]
+        if lb_idx in self._effect_category_headers:
+            self.effect_listbox.selection_clear(lb_idx)
+            return
+        effect_idx = self._effect_index_map.get(lb_idx)
+        if effect_idx is None or effect_idx >= len(self.effects):
+            return
+        effect = self.effects[effect_idx]
         assignment = self._current_assignment()
         assignment["effect"] = effect["name"]
         assignment["apply_to"] = self.apply_target_var.get() or ALL_FIXTURES_TARGET
@@ -566,6 +718,84 @@ class DMXLightingEditor:
         self.profile_name_var.set(self.active_profile.get("profile_name", "Default Small Rig"))
         self._save_profiles()
         self._sync_element_selection(0)
+
+    def _on_fade_toggled(self):
+        assignment = self._current_assignment()
+        assignment["fade_enabled"] = self._fade_enabled_var.get()
+        if self._fade_enabled_var.get():
+            assignment.setdefault("fade_in_ms", FADE_DEFAULT_MS)
+            assignment.setdefault("fade_out_ms", FADE_DEFAULT_MS)
+
+    def _fade_in_down(self):
+        val = max(FADE_MIN_MS, self._fade_in_var.get() - FADE_STEP_MS)
+        self._fade_in_var.set(val)
+        self._fade_in_label.config(text=f"{val}ms")
+        self._current_assignment()["fade_in_ms"] = val
+
+    def _fade_in_up(self):
+        val = min(FADE_MAX_MS, self._fade_in_var.get() + FADE_STEP_MS)
+        self._fade_in_var.set(val)
+        self._fade_in_label.config(text=f"{val}ms")
+        self._current_assignment()["fade_in_ms"] = val
+
+    def _fade_out_down(self):
+        val = max(FADE_MIN_MS, self._fade_out_var.get() - FADE_STEP_MS)
+        self._fade_out_var.set(val)
+        self._fade_out_label.config(text=f"{val}ms")
+        self._current_assignment()["fade_out_ms"] = val
+
+    def _fade_out_up(self):
+        val = min(FADE_MAX_MS, self._fade_out_var.get() + FADE_STEP_MS)
+        self._fade_out_var.set(val)
+        self._fade_out_label.config(text=f"{val}ms")
+        self._current_assignment()["fade_out_ms"] = val
+
+    def _load_fade_for_element(self):
+        """Load fade settings from current assignment into UI."""
+        assignment = self._current_assignment()
+        self._fade_enabled_var.set(assignment.get("fade_enabled", False))
+        fade_in = assignment.get("fade_in_ms", FADE_DEFAULT_MS)
+        fade_out = assignment.get("fade_out_ms", FADE_DEFAULT_MS)
+        self._fade_in_var.set(fade_in)
+        self._fade_out_var.set(fade_out)
+        if hasattr(self, '_fade_in_label'):
+            self._fade_in_label.config(text=f"{fade_in}ms")
+        if hasattr(self, '_fade_out_label'):
+            self._fade_out_label.config(text=f"{fade_out}ms")
+
+    def _refresh_profile_combo(self):
+        """Refresh the profile dropdown with available profiles for current game."""
+        game_key = self._game_key(self.game_var.get())
+        profiles = self.profiles_data.get("profiles", [])
+        names = []
+        for p in profiles:
+            if p.get("game") == game_key or p.get("game") == "global":
+                name = p.get("profile_name", "Default Small Rig")
+                if name not in names:
+                    names.append(name)
+        if not names:
+            names = ["Default Small Rig"]
+        if hasattr(self, 'profile_combo'):
+            self.profile_combo.configure(values=names)
+
+    def _on_profile_combo_changed(self, event=None):
+        """Switch to the selected profile."""
+        selected_name = self.profile_name_var.get().strip()
+        game_key = self._game_key(self.game_var.get())
+        for p in self.profiles_data.get("profiles", []):
+            if p.get("profile_name") == selected_name and (p.get("game") == game_key or p.get("game") == "global"):
+                self.active_profile = p
+                break
+        self._sync_element_selection(0)
+
+    def _toggle_pause(self):
+        self._preview_paused = not self._preview_paused
+
+    def _speed_down(self):
+        self._preview_speed_ms = min(500, self._preview_speed_ms + 40)
+
+    def _speed_up(self):
+        self._preview_speed_ms = max(30, self._preview_speed_ms - 40)
 
     def _open_targets_dialog(self):
         dialog = tk.Toplevel(self.window)
@@ -720,8 +950,24 @@ class DMXLightingEditor:
         effect_name = self.hover_effect_name or assignment.get("effect", "")
         color = self._effect_color(effect_name)
 
+        # Get active target fixture IDs
+        target_name = self.apply_target_var.get() if hasattr(self, 'apply_target_var') else ALL_FIXTURES_TARGET
+        target_fids = set()
+        if target_name == ALL_FIXTURES_TARGET:
+            target_fids = {f.get("id") for f in self.fixtures}
+        else:
+            target_val = self.targets.get(target_name, [])
+            if isinstance(target_val, list):
+                for item in target_val:
+                    if isinstance(item, list):
+                        target_fids.update(str(x).upper() for x in item)
+                    else:
+                        target_fids.add(str(item).upper())
+
         # Draw beams then fixtures — wide dispersal fan shape
         for fixture in self.fixtures:
+            fid = fixture.get("id", "").upper()
+            is_active = fid in target_fids
             x = fixture.get("x", 0)
             y = fixture.get("y", 0)
             angle = self._fixture_angle(fixture.get("direction", "down"))
@@ -731,14 +977,17 @@ class DMXLightingEditor:
             right_angle = angle + half_spread
             p_left = (x + math.cos(left_angle) * beam_length, y + math.sin(left_angle) * beam_length)
             p_right = (x + math.cos(right_angle) * beam_length, y + math.sin(right_angle) * beam_length)
-            self.canvas.create_polygon(x, y, p_left[0], p_left[1], p_right[0], p_right[1], fill=color, stipple="gray50", outline="")
+            beam_color = color if is_active else "#1a1a2a"
+            self.canvas.create_polygon(x, y, p_left[0], p_left[1], p_right[0], p_right[1], fill=beam_color, stipple="gray50", outline="")
 
         for fixture in self.fixtures:
+            fid = fixture.get("id", "").upper()
+            is_active = fid in target_fids
             x = fixture.get("x", 0)
             y = fixture.get("y", 0)
-            fid = fixture.get("id", "F?")
-            self.canvas.create_rectangle(x - 12, y - 7, x + 12, y + 7, fill="#c3ccd9", outline="#202833", width=2)
-            self.canvas.create_text(x, y + 22, text=fid, fill="white", font=("Arial", 10, "bold"))
+            fix_fill = "#c3ccd9" if is_active else "#3a3a4a"
+            self.canvas.create_rectangle(x - 12, y - 7, x + 12, y + 7, fill=fix_fill, outline="#202833", width=2)
+            self.canvas.create_text(x, y + 22, text=fixture.get("id", "F?"), fill="white", font=("Arial", 10, "bold"))
 
         self.canvas.create_text(
             w // 2,
@@ -838,9 +1087,10 @@ class DMXLightingEditor:
             if not self.window.winfo_exists():
                 self.preview_timer = None
                 return
-            self.preview_phase += 0.35
-            self._draw_layout()
-            self.preview_timer = self.window.after(110, self._animate_preview)
+            if not self._preview_paused:
+                self.preview_phase += 0.35
+                self._draw_layout()
+            self.preview_timer = self.window.after(self._preview_speed_ms, self._animate_preview)
         except Exception:
             self.preview_timer = None
 
