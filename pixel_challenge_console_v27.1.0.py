@@ -343,7 +343,7 @@ class DMXService:
         self.num_fixtures = num_fixtures
         self.start_address = start_address
         self.channels_per_fixture = channels_per_fixture
-        self.brightness = 255          # master dimmer 0-255 (255 = full)
+        self.brightness = 76           # master dimmer 0-255 (30% default)
         self.current_scene = None
         self.fixture_states = [
             {"r": 0, "g": 0, "b": 0, "strobe": 0, "dimmer": 255}
@@ -912,7 +912,7 @@ class PixelChallengeConsole:
         self.dmx_link_all = tk.BooleanVar(value=True)
         self.dmx_scene = tk.StringVar(value="Cool Blue Static")
         self.dmx_speed = tk.IntVar(value=50)
-        self.dmx_brightness = tk.IntVar(value=63)
+        self.dmx_brightness = tk.IntVar(value=30)
         self.dmx_mode = tk.StringVar(value="auto")  # blackout, gameplay, results, wash, test, manual
 
         # DMX animation state (v26.5.1)
@@ -1495,17 +1495,15 @@ class PixelChallengeConsole:
         except Exception as e:
             self.log(f"save_dmx_profiles error: {e}")
 
-    def _build_default_visualizer_assignments(self) -> dict:
+    def _build_default_visualizer_assignments(self, elements=None) -> dict:
+        game_elements = [
+            "Gameplay", "Bonus", "Danger", "Special", "Randomizer",
+            "Overlay 1", "Overlay 2", "Overlay 3", "Overlay 4",
+        ]
+        names = list(elements or game_elements)
         return {
-            "Gameplay": {"effect": "Fire Burst", "apply_to": "All Fixtures"},
-            "Bonus": {"effect": "Gold Victory", "apply_to": "Top Fixtures"},
-            "Danger": {"effect": "Red Alert", "apply_to": "All Fixtures"},
-            "Special": {"effect": "Rainbow Wave", "apply_to": "All Fixtures"},
-            "Randomizer": {"effect": "Ocean Pulse", "apply_to": "All Fixtures"},
-            "Overlay 1": {"effect": "Amber Glow", "apply_to": "Top Left Pair"},
-            "Overlay 2": {"effect": "Sapphire Wave", "apply_to": "Top Right Pair"},
-            "Overlay 3": {"effect": "Neon Rush", "apply_to": "Left Wash Group"},
-            "Overlay 4": {"effect": "Crimson Storm", "apply_to": "Right Wash Group"},
+            name: {"effect": None, "apply_to": "All Fixtures"}
+            for name in names
         }
 
     def load_visualizer_profiles(self) -> dict:
@@ -1515,9 +1513,21 @@ class PixelChallengeConsole:
                     "game": game,
                     "profile_name": "Default Small Rig",
                     "layout_id": "small_rig_8_fixture",
-                    "assignments": self._build_default_visualizer_assignments(),
+                    "assignments": self._build_default_visualizer_assignments(
+                        [
+                            "Idle",
+                            "Check-In Open",
+                            "Game Running",
+                            "Results / Scoreboard",
+                            "Countdown",
+                            "Game Over",
+                            "Attract Mode",
+                        ]
+                        if game == "console"
+                        else None
+                    ),
                 }
-                for game in ("dot_dash", "pixel_pop", "surround", "ascend", "global")
+                for game in ("dot_dash", "pixel_pop", "surround", "ascend", "global", "console")
             ]
         }
         try:
