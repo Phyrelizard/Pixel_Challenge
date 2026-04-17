@@ -697,18 +697,20 @@ class DMXService:
         fade_out_ms = data.get("fade_out_ms", 0)
         if fade_in_ms or fade_out_ms:
             # Estimate cycle length from pattern type (steps per full cycle)
+            palette_len = len(fc) if fc else 1
             cycle_len = max(n, 8)
             if pat_type in ("alternating", "strobe"):
                 cycle_len = max(n, 4)
             elif pat_type in ("chase", "sweep", "bounce"):
                 cycle_len = max(n * 2, 16)
             elif pat_type in ("fade", "fade_loop", "breathing"):
-                cycle_len = max(len(fc) * 12, 24) if fc else 24
+                cycle_len = max(palette_len * 12, 24)
             elif pat_type in ("wave", "palette_cycle"):
-                cycle_len = max(len(fc) * 8, 16) if fc else 16
+                cycle_len = max(palette_len * 8, 16)
             pos_in_cycle = step % cycle_len
-            # Speed slider maps to 50-500ms per step; use mid estimate (200ms)
-            ms_per_step = 200
+            # Use actual speed data to estimate ms per step
+            speed_pct = data.get("speed", 50)
+            ms_per_step = max(50, 500 - speed_pct * 4)
             elapsed_ms = pos_in_cycle * ms_per_step
             remaining_ms = (cycle_len - pos_in_cycle) * ms_per_step
             fade_mult = 1.0

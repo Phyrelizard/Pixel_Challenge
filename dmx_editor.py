@@ -12,6 +12,10 @@ VISUALIZER_VERSION = "v1.4.0"
 ALL_FIXTURES_TARGET = "All Fixtures"
 FIXTURE_HIT_WIDTH = 14
 FIXTURE_HIT_HEIGHT = 12
+FADE_STEP_MS = 125
+FADE_MIN_MS = 0
+FADE_MAX_MS = 1000
+FADE_DEFAULT_MS = 250
 
 # Category ordering for the effect list
 _CATEGORY_ORDER = [
@@ -166,8 +170,8 @@ class DMXLightingEditor:
 
         # Fade controls state (per-element, synced from assignment)
         self._fade_enabled = False
-        self._fade_in_ms = 250
-        self._fade_out_ms = 250
+        self._fade_in_ms = FADE_DEFAULT_MS
+        self._fade_out_ms = FADE_DEFAULT_MS
 
         self.drag_fixture = None
         self.drag_start = None
@@ -1136,25 +1140,25 @@ class DMXLightingEditor:
         self._push_fade_to_dmx()
 
     def _fade_in_down(self):
-        self._fade_in_ms = max(0, self._fade_in_ms - 125)
+        self._fade_in_ms = max(FADE_MIN_MS, self._fade_in_ms - FADE_STEP_MS)
         self._fade_in_lbl.configure(text=str(self._fade_in_ms))
         self._current_assignment()["fade_in_ms"] = self._fade_in_ms
         self._push_fade_to_dmx()
 
     def _fade_in_up(self):
-        self._fade_in_ms = min(1000, self._fade_in_ms + 125)
+        self._fade_in_ms = min(FADE_MAX_MS, self._fade_in_ms + FADE_STEP_MS)
         self._fade_in_lbl.configure(text=str(self._fade_in_ms))
         self._current_assignment()["fade_in_ms"] = self._fade_in_ms
         self._push_fade_to_dmx()
 
     def _fade_out_down(self):
-        self._fade_out_ms = max(0, self._fade_out_ms - 125)
+        self._fade_out_ms = max(FADE_MIN_MS, self._fade_out_ms - FADE_STEP_MS)
         self._fade_out_lbl.configure(text=str(self._fade_out_ms))
         self._current_assignment()["fade_out_ms"] = self._fade_out_ms
         self._push_fade_to_dmx()
 
     def _fade_out_up(self):
-        self._fade_out_ms = min(1000, self._fade_out_ms + 125)
+        self._fade_out_ms = min(FADE_MAX_MS, self._fade_out_ms + FADE_STEP_MS)
         self._fade_out_lbl.configure(text=str(self._fade_out_ms))
         self._current_assignment()["fade_out_ms"] = self._fade_out_ms
         self._push_fade_to_dmx()
@@ -1163,8 +1167,8 @@ class DMXLightingEditor:
         """Refresh fade panel from the current assignment data."""
         assignment = self._current_assignment()
         self._fade_enabled = assignment.get("fade_enabled", False)
-        self._fade_in_ms = assignment.get("fade_in_ms", 250)
-        self._fade_out_ms = assignment.get("fade_out_ms", 250)
+        self._fade_in_ms = assignment.get("fade_in_ms", FADE_DEFAULT_MS)
+        self._fade_out_ms = assignment.get("fade_out_ms", FADE_DEFAULT_MS)
         self._fade_var.set(self._fade_enabled)
         self._fade_in_lbl.configure(text=str(self._fade_in_ms))
         self._fade_out_lbl.configure(text=str(self._fade_out_ms))
