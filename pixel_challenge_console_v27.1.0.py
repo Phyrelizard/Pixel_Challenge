@@ -2114,8 +2114,9 @@ class PixelChallengeConsole:
         if not self.dmx or self.dmx._fade_duration_ms <= 0:
             # Fade complete — schedule next main step
             self._fade_subtick_timer = None
+            elapsed = self.dmx._fade_elapsed_ms if self.dmx else 0
             self._scene_anim_timer = self.root.after(
-                max(1, step_interval_ms - self.dmx._fade_elapsed_ms if self.dmx else step_interval_ms),
+                max(1, step_interval_ms - elapsed),
                 self._scene_anim_tick,
             )
             return
