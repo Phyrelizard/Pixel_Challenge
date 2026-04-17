@@ -8,11 +8,39 @@ import math
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 
-VISUALIZER_VERSION = "v1.1.0"
+VISUALIZER_VERSION = "v1.5.0"
 ALL_FIXTURES_TARGET = "All Fixtures"
 NO_EFFECT_LABEL = "— No Effect —"
 FIXTURE_HIT_WIDTH = 14
 FIXTURE_HIT_HEIGHT = 12
+
+# Effect category organisation
+_CATEGORY_ORDER = [
+    "Static", "Fades", "Pulses", "Chases", "Sweeps",
+    "Waves", "Alternating", "Strobes", "Random",
+]
+_PATTERN_TO_CATEGORY = {
+    "static": "Static",
+    "fade": "Fades",
+    "fade_loop": "Fades",
+    "pulse": "Pulses",
+    "breathing": "Pulses",
+    "chase": "Chases",
+    "sweep": "Sweeps",
+    "wave": "Waves",
+    "bounce": "Waves",
+    "alternating": "Alternating",
+    "palette_cycle": "Alternating",
+    "strobe": "Strobes",
+    "random_flash": "Random",
+    "sparkle": "Random",
+}
+
+# Fade constants
+FADE_STEP_MS = 125
+FADE_MIN_MS = 0
+FADE_MAX_MS = 1000
+FADE_DEFAULT_MS = 250
 
 
 class DMXLightingEditor:
@@ -73,10 +101,19 @@ class DMXLightingEditor:
         self.effect_listbox = None
         self.element_listbox = None
         self.profile_combo = None
+        self._effect_category_headers = set()  # listbox indices that are category headers
+        self._effect_index_map = []  # maps listbox index → effects[] index (or -1 for headers/no-effect)
 
         self.hover_effect_name = None
         self.preview_phase = 0
         self.preview_timer = None
+
+        # Fade controls state
+        self._fade_enabled_var = None
+        self._fade_in_var = None
+        self._fade_out_var = None
+        self._fade_in_label = None
+        self._fade_out_label = None
 
         self.drag_fixture = None
         self.drag_start = None
@@ -450,6 +487,34 @@ class DMXLightingEditor:
         eff_scroll.pack(side="left", fill="y")
         self.effect_listbox.bind("<<ListboxSelect>>", self._on_effect_selected)
 
+        # Fade controls panel (below effects list)
+        fade_panel = tk.Frame(left, bg="#242b35")
+        fade_panel.pack(fill="x", padx=20, pady=(6, 0))
+        var_master = self.parent if self._embedded else self.window
+        self._fade_enabled_var = tk.BooleanVar(master=var_master, value=False)
+        self._fade_in_var = tk.IntVar(master=var_master, value=FADE_DEFAULT_MS)
+        self._fade_out_var = tk.IntVar(master=var_master, value=FADE_DEFAULT_MS)
+        tk.Checkbutton(fade_panel, text="Fade", variable=self._fade_enabled_var,
+                        bg="#242b35", fg="#cfd8e3", selectcolor="#111820",
+                        activebackground="#242b35", activeforeground="white",
+                        font=("Arial", 11, "bold")).pack(side="left")
+        tk.Label(fade_panel, text="In:", bg="#242b35", fg="#8fa3b8", font=("Arial", 10)).pack(side="left", padx=(8, 2))
+        tk.Button(fade_panel, text="◀", bg="#2e3845", fg="white", relief="flat", font=("Arial", 9),
+                  command=self._fade_in_down, width=2).pack(side="left")
+        self._fade_in_label = tk.Label(fade_panel, text=f"{FADE_DEFAULT_MS}ms", bg="#242b35", fg="white",
+                                        font=("Arial", 10, "bold"), width=6)
+        self._fade_in_label.pack(side="left")
+        tk.Button(fade_panel, text="▶", bg="#2e3845", fg="white", relief="flat", font=("Arial", 9),
+                  command=self._fade_in_up, width=2).pack(side="left")
+        tk.Label(fade_panel, text="Out:", bg="#242b35", fg="#8fa3b8", font=("Arial", 10)).pack(side="left", padx=(10, 2))
+        tk.Button(fade_panel, text="◀", bg="#2e3845", fg="white", relief="flat", font=("Arial", 9),
+                  command=self._fade_out_down, width=2).pack(side="left")
+        self._fade_out_label = tk.Label(fade_panel, text=f"{FADE_DEFAULT_MS}ms", bg="#242b35", fg="white",
+                                         font=("Arial", 10, "bold"), width=6)
+        self._fade_out_label.pack(side="left")
+        tk.Button(fade_panel, text="▶", bg="#2e3845", fg="white", relief="flat", font=("Arial", 9),
+                  command=self._fade_out_up, width=2).pack(side="left")
+
         target_wrap = tk.Frame(left, bg="#242b35")
         target_wrap.pack(fill="x", padx=20, pady=(12, 10))
         tk.Label(target_wrap, text="Apply To", bg="#242b35", fg="#cfd8e3", font=("Arial", 12, "bold")).pack(side="left", padx=(0, 10))
@@ -520,17 +585,25 @@ class DMXLightingEditor:
         effect_name = assignment.get("effect")
         self.effect_listbox.selection_clear(0, "end")
         if effect_name:
-            names = [e["name"] for e in self.effects]
-            if effect_name in names:
-                no_effect_offset = 1 if self.effect_listbox.size() and self.effect_listbox.get(0) == NO_EFFECT_LABEL else 0
-                e_idx = names.index(effect_name) + no_effect_offset
-                self.effect_listbox.selection_set(e_idx)
-                self.effect_listbox.see(e_idx)
-                self.hover_effect_name = effect_name
+            # Find the listbox index for this effect name using the index map
+            for lb_idx, eff_idx in enumerate(self._effect_index_map):
+                if eff_idx >= 0 and eff_idx < len(self.effects) and self.effects[eff_idx]["name"] == effect_name:
+                    self.effect_listbox.selection_set(lb_idx)
+                    self.effect_listbox.see(lb_idx)
+                    self.hover_effect_name = effect_name
+                    break
             else:
                 self.hover_effect_name = None
         else:
             self.hover_effect_name = None
+        # Sync fade controls from assignment
+        if self._fade_enabled_var:
+            self._fade_enabled_var.set(assignment.get("fade_enabled", False))
+        if self._fade_in_var:
+            self._fade_in_var.set(assignment.get("fade_in_ms", FADE_DEFAULT_MS))
+        if self._fade_out_var:
+            self._fade_out_var.set(assignment.get("fade_out_ms", FADE_DEFAULT_MS))
+        self._refresh_fade_labels()
         self._draw_layout()
         if self.window and self.window.winfo_exists():
             self.window.after_idle(self._end_sync)
@@ -538,11 +611,77 @@ class DMXLightingEditor:
     def _end_sync(self):
         self._syncing = False
 
+    # ------------------------------------------------------------------
+    # Fade controls
+    # ------------------------------------------------------------------
+    def _fade_in_down(self):
+        v = max(FADE_MIN_MS, self._fade_in_var.get() - FADE_STEP_MS)
+        self._fade_in_var.set(v)
+        self._refresh_fade_labels()
+        self._save_fade_to_assignment()
+
+    def _fade_in_up(self):
+        v = min(FADE_MAX_MS, self._fade_in_var.get() + FADE_STEP_MS)
+        self._fade_in_var.set(v)
+        self._refresh_fade_labels()
+        self._save_fade_to_assignment()
+
+    def _fade_out_down(self):
+        v = max(FADE_MIN_MS, self._fade_out_var.get() - FADE_STEP_MS)
+        self._fade_out_var.set(v)
+        self._refresh_fade_labels()
+        self._save_fade_to_assignment()
+
+    def _fade_out_up(self):
+        v = min(FADE_MAX_MS, self._fade_out_var.get() + FADE_STEP_MS)
+        self._fade_out_var.set(v)
+        self._refresh_fade_labels()
+        self._save_fade_to_assignment()
+
+    def _refresh_fade_labels(self):
+        if hasattr(self, '_fade_in_label') and self._fade_in_label:
+            self._fade_in_label.configure(text=f"{self._fade_in_var.get()}ms")
+        if hasattr(self, '_fade_out_label') and self._fade_out_label:
+            self._fade_out_label.configure(text=f"{self._fade_out_var.get()}ms")
+
+    def _save_fade_to_assignment(self):
+        assignment = self._current_assignment()
+        if self._fade_enabled_var:
+            assignment["fade_enabled"] = self._fade_enabled_var.get()
+        if self._fade_in_var:
+            assignment["fade_in_ms"] = self._fade_in_var.get()
+        if self._fade_out_var:
+            assignment["fade_out_ms"] = self._fade_out_var.get()
+
     def _refresh_effect_list(self):
         self.effect_listbox.delete(0, "end")
+        self._effect_category_headers = set()
+        self._effect_index_map = []
+
+        # Index 0: No Effect
         self.effect_listbox.insert("end", NO_EFFECT_LABEL)
-        for effect in self.effects:
-            self.effect_listbox.insert("end", effect["name"])
+        self._effect_index_map.append(-1)
+
+        # Group effects by category
+        categorized: dict[str, list[int]] = {}
+        for i, effect in enumerate(self.effects):
+            cat = _PATTERN_TO_CATEGORY.get(effect.get("pattern_type", "static"), "Static")
+            categorized.setdefault(cat, []).append(i)
+
+        for cat in _CATEGORY_ORDER:
+            if cat not in categorized:
+                continue
+            # Insert category header
+            header_text = f"━━ {cat} ━━"
+            lb_idx = self.effect_listbox.size()
+            self.effect_listbox.insert("end", header_text)
+            self.effect_listbox.itemconfig(lb_idx, fg="#7a8fa5", selectbackground="#111820", selectforeground="#7a8fa5")
+            self._effect_category_headers.add(lb_idx)
+            self._effect_index_map.append(-1)
+            # Insert effects in this category
+            for eff_idx in categorized[cat]:
+                self.effect_listbox.insert("end", self.effects[eff_idx]["name"])
+                self._effect_index_map.append(eff_idx)
 
     def _on_effect_selected(self, event=None):
         if self._syncing:
@@ -550,19 +689,32 @@ class DMXLightingEditor:
         if not self.effect_listbox.curselection():
             return
         selected_idx = self.effect_listbox.curselection()[0]
-        no_effect_offset = 1 if self.effect_listbox.size() and self.effect_listbox.get(0) == NO_EFFECT_LABEL else 0
+        # Skip category headers (non-selectable)
+        if selected_idx in self._effect_category_headers:
+            self.effect_listbox.selection_clear(selected_idx)
+            return
         assignment = self._current_assignment()
         assignment["apply_to"] = self.apply_target_var.get() or ALL_FIXTURES_TARGET
-        if no_effect_offset and selected_idx == 0:
+        # Index 0 is "— No Effect —"
+        if selected_idx == 0:
             assignment["effect"] = None
             self.hover_effect_name = None
             self._draw_layout()
             return
-        effect_index = selected_idx - no_effect_offset
-        if not (0 <= effect_index < len(self.effects)):
+        # Map listbox index to effects[] index
+        if selected_idx < len(self._effect_index_map):
+            effect_index = self._effect_index_map[selected_idx]
+        else:
+            return
+        if effect_index < 0 or effect_index >= len(self.effects):
             return
         effect = self.effects[effect_index]
         assignment["effect"] = effect["name"]
+        # Save fade settings into assignment
+        if self._fade_enabled_var:
+            assignment["fade_enabled"] = self._fade_enabled_var.get()
+            assignment["fade_in_ms"] = self._fade_in_var.get() if self._fade_in_var else FADE_DEFAULT_MS
+            assignment["fade_out_ms"] = self._fade_out_var.get() if self._fade_out_var else FADE_DEFAULT_MS
         self.hover_effect_name = effect["name"]
         self._preview_dmx_effect(effect["name"])
 
