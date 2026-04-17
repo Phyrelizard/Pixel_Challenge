@@ -555,6 +555,7 @@ class DMXService:
 
         Call this repeatedly from a timer to animate patterns like chase, pulse, sweep.
         When fade is enabled, color transitions are smoothly interpolated per-fixture.
+        Grouped targets (fixture_groups in active data) treat each sub-group as one slot.
         """
         data = getattr(self, "_active_scene_data", None)
         if not data:
@@ -563,12 +564,19 @@ class DMXService:
         pat_type = data.get("pattern", "static")
         if pat_type == "static":
             return  # no animation needed
-        n = self.num_fixtures
 
-        # Compute target RGB, dimmer, and strobe for each fixture this step
-        target_rgb = []
-        target_dimmer = []
-        target_strobe = []
+        # Grouped targets: each sub-group is one virtual "slot" in the pattern
+        fixture_groups = data.get("fixture_groups")  # list-of-lists or None
+        if fixture_groups:
+            num_slots = len(fixture_groups)
+        else:
+            num_slots = self.num_fixtures
+        n = num_slots  # number of virtual animation slots
+
+        # Compute target RGB, dimmer, and strobe for each *slot* this step
+        slot_rgb = []
+        slot_dimmer = []
+        slot_strobe = []
         for i in range(n):
             if fc:
                 hex_c = fc[i % len(fc)]
@@ -579,12 +587,10 @@ class DMXService:
             dimmer_val = self.brightness
             if pat_type == "strobe":
                 strobe_val = max(16, min(255, data.get("speed", 100)))
-                # Alternate strobe on/off each step
                 if step % 2 == 1:
                     dimmer_val = 0
             elif pat_type == "pulse":
                 import math
-                # Pulse: cycle through palette colors with sine brightness modulation
                 if fc:
                     color_idx = (step // 4) % len(fc)
                     hex_c = fc[color_idx]
@@ -592,7 +598,6 @@ class DMXService:
                 phase = (step * 0.15 + i * 0.3) % (2 * math.pi)
                 dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
             elif pat_type == "chase":
-                # Chase: shift palette colors across fixtures over time
                 if fc:
                     shifted_idx = (i + step) % len(fc)
                     hex_c = fc[shifted_idx]
@@ -600,7 +605,6 @@ class DMXService:
                 active = step % max(n, 1)
                 dimmer_val = self.brightness if i == active else int(self.brightness * 0.25)
             elif pat_type == "sweep":
-                # Sweep: gradient spotlight moves across fixtures with palette colors
                 if fc:
                     shifted_idx = (i + step) % len(fc)
                     hex_c = fc[shifted_idx]
@@ -610,7 +614,6 @@ class DMXService:
                 falloff = max(0, 1.0 - dist / max(n * 0.3, 1))
                 dimmer_val = int(self.brightness * max(0.15, falloff))
             elif pat_type == "bounce":
-                # Bounce: spotlight forward then backward with palette colors
                 if fc:
                     shifted_idx = (i + step) % len(fc)
                     hex_c = fc[shifted_idx]
@@ -623,7 +626,6 @@ class DMXService:
                 falloff = max(0, 1.0 - dist / max(n * 0.3, 1))
                 dimmer_val = int(self.brightness * falloff)
             elif pat_type == "alternating":
-                # Alternating: switch palette colors across fixtures, swap on step
                 flip = step % 2
                 if fc:
                     slot = (i + flip) % len(fc)
@@ -635,7 +637,6 @@ class DMXService:
                 hex_c = fc[shifted_idx] if fc else "#000000"
                 r, g, b = _hex_to_rgb(hex_c)
             elif pat_type == "wave":
-                # Wave: phase-shifted palette cycle across fixtures
                 if fc:
                     shifted_idx = (i + step) % len(fc)
                     hex_c = fc[shifted_idx]
@@ -646,14 +647,12 @@ class DMXService:
                     dimmer_val = int(self.brightness * (0.5 + 0.5 * _m.sin(phase)))
             elif pat_type == "random_flash":
                 import random
-                # Random flash: randomly pick a palette color and flash on/off
                 if fc:
                     hex_c = fc[random.randint(0, len(fc) - 1)]
                     r, g, b = _hex_to_rgb(hex_c)
                 dimmer_val = self.brightness if random.random() > 0.5 else 0
             elif pat_type == "fade_loop" or pat_type == "fade":
                 import math
-                # Fade: cycle through palette colors smoothly over time
                 if fc:
                     cycle_len = len(fc)
                     pos = (step * 0.08) % cycle_len
@@ -690,12 +689,10 @@ class DMXService:
                 phase = (step * 0.15 + i * 0.6) % (2 * math.pi)
                 dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
             elif pat_type == "build_up":
-                # Progressively light fixtures from first to last
                 lit_count = min((step % (n + 4)), n)
                 dimmer_val = self.brightness if i < lit_count else 0
             elif pat_type == "explosion":
                 import math
-                # All off, then sudden flash, then fade out
                 cycle = step % 20
                 if cycle < 2:
                     dimmer_val = self.brightness
@@ -703,9 +700,39 @@ class DMXService:
                     dimmer_val = int(self.brightness * max(0, 1.0 - (cycle - 2) / 8.0))
                 else:
                     dimmer_val = 0
-            target_rgb.append((r, g, b))
-            target_dimmer.append(clamp8(dimmer_val))
-            target_strobe.append(strobe_val)
+            slot_rgb.append((r, g, b))
+            slot_dimmer.append(clamp8(dimmer_val))
+            slot_strobe.append(strobe_val)
+
+        # ── Expand slots to actual fixtures ──
+        total = self.num_fixtures
+        target_rgb = [(0, 0, 0)] * total
+        target_dimmer = [0] * total
+        target_strobe = [0] * total
+        if fixture_groups:
+            # Map each group's slot values to all fixtures in that group
+            included = set()
+            for slot_idx, group in enumerate(fixture_groups):
+                for fix_idx in group:
+                    if 0 <= fix_idx < total:
+                        target_rgb[fix_idx] = slot_rgb[slot_idx]
+                        target_dimmer[fix_idx] = slot_dimmer[slot_idx]
+                        target_strobe[fix_idx] = slot_strobe[slot_idx]
+                        included.add(fix_idx)
+            # Fixtures not in any group keep their current state (untouched)
+            for i in range(total):
+                if i not in included:
+                    s = self.fixture_states[i]
+                    target_rgb[i] = (s.get("r", 0), s.get("g", 0), s.get("b", 0))
+                    target_dimmer[i] = s.get("dimmer", 0)
+                    target_strobe[i] = s.get("strobe", 0)
+        else:
+            # No grouping — slot_i maps directly to fixture_i
+            for i in range(total):
+                if i < len(slot_rgb):
+                    target_rgb[i] = slot_rgb[i]
+                    target_dimmer[i] = slot_dimmer[i]
+                    target_strobe[i] = slot_strobe[i]
 
         # ── Per-fixture color crossfade ──
         fade_in_ms = data.get("fade_in_ms", 0)
@@ -713,7 +740,6 @@ class DMXService:
         fade_ms = max(fade_in_ms, fade_out_ms)
 
         if fade_ms > 0:
-            # Snapshot current fixture RGB as the "from" state before updating
             self._fade_prev_rgb = [
                 (s.get("r", 0), s.get("g", 0), s.get("b", 0))
                 for s in self.fixture_states
@@ -723,10 +749,8 @@ class DMXService:
             self._fade_target_strobe = target_strobe
             self._fade_duration_ms = fade_ms
             self._fade_elapsed_ms = 0
-            # Don't send frame yet — the sub-tick loop handles it
         else:
-            # No fade — instant color change (original behavior)
-            for i in range(n):
+            for i in range(total):
                 r, g, b = target_rgb[i]
                 self.fixture_states[i] = {
                     "r": r, "g": g, "b": b,
@@ -1734,8 +1758,15 @@ class PixelChallengeConsole:
         layouts = self.visualizer_layouts.get("layouts", []) if isinstance(self.visualizer_layouts, dict) else []
         targets = layouts[0].get("targets", {}) if layouts and isinstance(layouts[0], dict) else {}
         fixture_ids = targets.get(target_name, [])
+        # Flatten grouped targets [[F1,F3],[F2,F4]] → [F1,F3,F2,F4]
+        flat = []
+        if isinstance(fixture_ids, list) and fixture_ids and isinstance(fixture_ids[0], list):
+            for g in fixture_ids:
+                flat.extend(g)
+        else:
+            flat = list(fixture_ids)
         indexes = []
-        for fid in fixture_ids:
+        for fid in flat:
             if isinstance(fid, str) and fid.upper().startswith("F"):
                 try:
                     idx = int(fid[1:]) - 1
@@ -1745,19 +1776,58 @@ class PixelChallengeConsole:
                     pass
         return indexes
 
+    def _target_fixture_groups(self, target_name: str) -> "list[list[int]] | None":
+        """Return grouped fixture indexes for a target, or None if flat/ungrouped.
+
+        For ``[["F1","F3"],["F2","F4"]]`` returns ``[[0,2],[1,3]]``.
+        For flat ``["F1","F2"]`` returns None (caller uses per-fixture logic).
+        """
+        layouts = self.visualizer_layouts.get("layouts", []) if isinstance(self.visualizer_layouts, dict) else []
+        targets = layouts[0].get("targets", {}) if layouts and isinstance(layouts[0], dict) else {}
+        fixture_ids = targets.get(target_name, [])
+        if not (isinstance(fixture_ids, list) and fixture_ids and isinstance(fixture_ids[0], list)):
+            return None
+        groups = []
+        for g in fixture_ids:
+            idxs = []
+            for fid in g:
+                if isinstance(fid, str) and fid.upper().startswith("F"):
+                    try:
+                        idx = int(fid[1:]) - 1
+                        if idx >= 0:
+                            idxs.append(idx)
+                    except Exception:
+                        pass
+            if idxs:
+                groups.append(idxs)
+        return groups if groups else None
+
     def _apply_scene_to_target(self, scene_name: str, target_name: str):
-        """Apply a scene and mask fixtures outside the selected visualizer target."""
+        """Apply a scene and mask fixtures outside the selected visualizer target.
+
+        For grouped targets (e.g. [[F1,F3],[F2,F4]]), inject group data into
+        the active scene so animate_scene_step() treats each sub-group as one
+        animation slot.
+        """
         self._apply_scene_with_animation(scene_name)
         if not target_name or target_name == "All Fixtures":
             return
         included = set(self._target_fixture_indexes(target_name))
         if not included:
             return
+        # Inject grouped target data so animate_scene_step uses sub-groups
+        groups = self._target_fixture_groups(target_name)
+        data = getattr(self.dmx, "_active_scene_data", None)
+        if data and groups:
+            data["fixture_groups"] = groups
         self._stop_scene_animation()
         for i in range(self.dmx.num_fixtures):
             if i not in included:
                 self.dmx.set_fixture_color(i, 0, 0, 0)
                 self.dmx.set_fixture_strobe(i, 0)
+        # Restart animation with group data injected
+        if data and data.get("pattern", "static") != "static":
+            self._start_scene_animation()
 
     def fire_dmx_cue(self, element: str, action: str = "on"):
         """Resolve gameplay visual cue to DMX scene output.

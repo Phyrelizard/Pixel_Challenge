@@ -114,6 +114,67 @@ def _hex_to_rgb(hex_color: str):
     return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
 
 
+def _parse_grouped_target_text(text: str):
+    """Parse user input like ``[F1,F3],[F2,F4]`` into a grouped target list.
+
+    Returns a list-of-lists (grouped) when brackets are present,
+    or a flat list of fixture IDs when the input is plain CSV.
+
+    Examples::
+
+        "[F1,F3],[F2,F4]"  →  [["F1","F3"], ["F2","F4"]]
+        "F1,F2,F3,F4"      →  ["F1","F2","F3","F4"]
+    """
+    text = text.strip()
+    if "[" in text:
+        import re
+        groups = re.findall(r"\[([^\]]+)\]", text)
+        result = []
+        for g in groups:
+            ids = [f.strip().upper() for f in g.split(",") if f.strip()]
+            if ids:
+                result.append(ids)
+        return result if result else [f.strip().upper() for f in text.split(",") if f.strip()]
+    return [f.strip().upper() for f in text.split(",") if f.strip()]
+
+
+def _format_target_value(value) -> str:
+    """Format a target value for display in the dialog list.
+
+    Grouped (list-of-lists): ``[F1, F3], [F2, F4]``
+    Flat list:               ``F1, F2, F3, F4``
+    """
+    if not value:
+        return ""
+    if isinstance(value, list) and value and isinstance(value[0], list):
+        return ", ".join("[" + ", ".join(g) + "]" for g in value)
+    return ", ".join(value)
+
+
+def _format_target_edit(value) -> str:
+    """Format a target value as initial text for the edit dialog.
+
+    Grouped → ``[F1,F3],[F2,F4]``   Flat → ``F1,F2,F3,F4``
+    """
+    if not value:
+        return ""
+    if isinstance(value, list) and value and isinstance(value[0], list):
+        return ",".join("[" + ",".join(g) + "]" for g in value)
+    return ", ".join(value)
+
+
+def _target_all_fixture_ids(value) -> list[str]:
+    """Flatten a target value (flat or grouped) into a simple list of fixture IDs."""
+    if not value:
+        return []
+    if isinstance(value, list) and value and isinstance(value[0], list):
+        out = []
+        for g in value:
+            out.extend(g)
+        return out
+    return list(value)
+
+
 class DMXLightingEditor:
     def __init__(
         self,
@@ -771,7 +832,7 @@ class DMXLightingEditor:
         def refresh():
             lst.delete(0, "end")
             for k, v in self.targets.items():
-                lst.insert("end", f"{k}: {', '.join(v)}")
+                lst.insert("end", f"{k}: {_format_target_value(v)}")
 
         refresh()
 
@@ -782,14 +843,22 @@ class DMXLightingEditor:
         tk.Button(controls, text="Delete", bg="#30445e", fg="white", relief="flat", font=("Arial", 11, "bold"), command=lambda: delete_target()).pack(side="left", padx=(0, 8), ipady=4, ipadx=10)
         tk.Button(controls, text="Save", bg="#2f6b9e", fg="white", relief="flat", font=("Arial", 11, "bold"), command=lambda: save_targets()).pack(side="right", ipady=4, ipadx=10)
 
+        # Hint label for grouped syntax
+        tk.Label(dialog, text="Grouped: [F1,F3],[F2,F4]   Flat: F1,F2,F3,F4",
+                 bg="#202833", fg="#667788", font=("Arial", 9)).pack(padx=12, pady=(0, 4))
+
         def add_target():
             name = simpledialog.askstring("Target Name", "New target name:", parent=dialog)
             if not name:
                 return
-            fixture_text = simpledialog.askstring("Fixtures", "Fixture IDs (comma-separated, e.g. F1,F2):", parent=dialog)
+            fixture_text = simpledialog.askstring(
+                "Fixtures",
+                "Fixture IDs — flat: F1,F2  or grouped: [F1,F3],[F2,F4]",
+                parent=dialog,
+            )
             if not fixture_text:
                 return
-            fixtures = [f.strip().upper() for f in fixture_text.split(",") if f.strip()]
+            fixtures = _parse_grouped_target_text(fixture_text)
             self.targets[name.strip()] = fixtures
             self.layout["targets"] = self.targets
             self._save_layouts()
@@ -807,10 +876,15 @@ class DMXLightingEditor:
             new_name = simpledialog.askstring("Edit Target", "Target name:", initialvalue=old_key, parent=dialog)
             if not new_name:
                 return
-            fixture_text = simpledialog.askstring("Edit Fixtures", "Fixture IDs (comma-separated):", initialvalue=", ".join(old_fixtures), parent=dialog)
+            fixture_text = simpledialog.askstring(
+                "Edit Fixtures",
+                "Fixture IDs — flat: F1,F2  or grouped: [F1,F3],[F2,F4]",
+                initialvalue=_format_target_edit(old_fixtures),
+                parent=dialog,
+            )
             if fixture_text is None:
                 return
-            fixtures = [f.strip().upper() for f in fixture_text.split(",") if f.strip()]
+            fixtures = _parse_grouped_target_text(fixture_text)
             new_name = new_name.strip()
             if new_name != old_key:
                 self.targets.pop(old_key, None)
@@ -941,11 +1015,26 @@ class DMXLightingEditor:
         assignment = self._current_assignment()
         effect_name = self.hover_effect_name or assignment.get("effect", "")
         target_name = assignment.get("apply_to", ALL_FIXTURES_TARGET)
-        active_ids = set(self.targets.get(target_name, [fid["id"] for fid in self.fixtures]))
+        target_value = self.targets.get(target_name, [fid["id"] for fid in self.fixtures])
 
-        # Build ordered list of only the active fixture indices for pattern calculation
-        active_fixture_indices = [i for i, f in enumerate(self.fixtures) if f.get("id") in active_ids]
-        total_active = len(active_fixture_indices) or 1
+        # Flatten to get all active fixture IDs
+        active_ids = set(_target_all_fixture_ids(target_value))
+
+        # Build group mapping: fixture_id → slot index for pattern computation
+        # For grouped targets [[F1,F3],[F2,F4]], F1&F3 share slot 0, F2&F4 share slot 1
+        is_grouped = isinstance(target_value, list) and target_value and isinstance(target_value[0], list)
+        fid_to_slot = {}
+        if is_grouped:
+            for slot_idx, group in enumerate(target_value):
+                for fid in group:
+                    fid_to_slot[fid] = slot_idx
+            total_active = len(target_value)
+        else:
+            # Flat list: each fixture is its own slot
+            flat_ids = list(target_value) if target_value else []
+            for slot_idx, fid in enumerate(flat_ids):
+                fid_to_slot[fid] = slot_idx
+            total_active = len(flat_ids) or 1
 
         # Draw beams then fixtures — wide dispersal fan shape
         for i, fixture in enumerate(self.fixtures):
@@ -961,8 +1050,8 @@ class DMXLightingEditor:
             p_right = (x + math.cos(right_angle) * beam_length, y + math.sin(right_angle) * beam_length)
 
             if fid in active_ids:
-                # Position within active set for pattern computation
-                pos_in_active = active_fixture_indices.index(i) if i in active_fixture_indices else 0
+                # Position within active set for pattern computation (grouped or flat)
+                pos_in_active = fid_to_slot.get(fid, 0)
                 color = self._fixture_color(effect_name, pos_in_active, total_active)
             else:
                 color = "#181e28"  # dim off for non-targeted fixtures
