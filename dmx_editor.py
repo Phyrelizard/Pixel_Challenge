@@ -8,7 +8,7 @@ import math
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 
-VISUALIZER_VERSION = "v1.3.0"
+VISUALIZER_VERSION = "v1.4.0"
 ALL_FIXTURES_TARGET = "All Fixtures"
 FIXTURE_HIT_WIDTH = 14
 FIXTURE_HIT_HEIGHT = 12
@@ -163,6 +163,11 @@ class DMXLightingEditor:
         self.preview_timer = None
         self._preview_paused = False
         self._preview_speed_ms = 110  # default animation interval
+
+        # Fade controls state (per-element, synced from assignment)
+        self._fade_enabled = False
+        self._fade_in_ms = 250
+        self._fade_out_ms = 250
 
         self.drag_fixture = None
         self.drag_start = None
@@ -539,13 +544,55 @@ class DMXLightingEditor:
         effect_wrap = tk.Frame(list_row, bg="#242b35")
         effect_wrap.pack(side="left", fill="both", expand=True, padx=(8, 0))
         tk.Label(effect_wrap, text="Effect", bg="#242b35", fg="#cfd8e3", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 4))
-        self.effect_listbox = tk.Listbox(effect_wrap, bg="#111820", fg="#e9f0ff", selectbackground="#8ec5ff", selectforeground="#0a1a2b", activestyle="none", font=("Arial", 12), relief="flat", exportselection=False)
-        eff_scroll = tk.Scrollbar(effect_wrap, command=self.effect_listbox.yview, width=26)
+
+        eff_inner = tk.Frame(effect_wrap, bg="#242b35")
+        eff_inner.pack(fill="both", expand=True)
+        self.effect_listbox = tk.Listbox(eff_inner, bg="#111820", fg="#e9f0ff", selectbackground="#8ec5ff", selectforeground="#0a1a2b", activestyle="none", font=("Arial", 12), relief="flat", exportselection=False)
+        eff_scroll = tk.Scrollbar(eff_inner, command=self.effect_listbox.yview, width=26)
         self.effect_listbox.configure(yscrollcommand=eff_scroll.set)
         self.effect_listbox.pack(side="left", fill="both", expand=True)
         eff_scroll.pack(side="left", fill="y")
         self.effect_listbox.bind("<Motion>", self._on_effect_hover)
         self.effect_listbox.bind("<<ListboxSelect>>", self._on_effect_selected)
+
+        # ── Fade Controls Panel ──
+        fade_frame = tk.Frame(effect_wrap, bg="#2c3441", relief="flat", bd=0)
+        fade_frame.pack(fill="x", pady=(6, 0))
+
+        # Row 1: Fade checkbox
+        fade_hdr = tk.Frame(fade_frame, bg="#2c3441")
+        fade_hdr.pack(fill="x", padx=6, pady=(4, 0))
+        self._fade_var = tk.BooleanVar(value=False)
+        self._fade_cb = tk.Checkbutton(
+            fade_hdr, text="Fade", variable=self._fade_var,
+            bg="#2c3441", fg="white", selectcolor="#111820",
+            activebackground="#2c3441", activeforeground="white",
+            font=("Arial", 12, "bold"), anchor="w",
+            command=self._on_fade_toggle,
+        )
+        self._fade_cb.pack(side="left")
+
+        # Row 2: In / Out controls
+        fade_ctrl = tk.Frame(fade_frame, bg="#2c3441")
+        fade_ctrl.pack(fill="x", padx=6, pady=(2, 6))
+        btn_style = {"bg": "#3b4552", "fg": "white", "activebackground": "#506074", "relief": "flat", "font": ("Arial", 11, "bold"), "width": 2}
+        lbl_style = {"bg": "#2c3441", "fg": "#cfd8e3", "font": ("Arial", 11, "bold")}
+        val_style = {"bg": "#111820", "fg": "#8ec5ff", "font": ("Arial", 12, "bold"), "width": 5, "anchor": "center"}
+
+        tk.Label(fade_ctrl, text="In", **lbl_style).pack(side="left")
+        tk.Button(fade_ctrl, text="▼", command=self._fade_in_down, **btn_style).pack(side="left", padx=(4, 0))
+        self._fade_in_lbl = tk.Label(fade_ctrl, text="250", **val_style)
+        self._fade_in_lbl.pack(side="left", padx=2)
+        tk.Button(fade_ctrl, text="▲", command=self._fade_in_up, **btn_style).pack(side="left")
+
+        tk.Label(fade_ctrl, text="ms", bg="#2c3441", fg="#8899aa", font=("Arial", 9)).pack(side="left", padx=(0, 12))
+
+        tk.Label(fade_ctrl, text="Out", **lbl_style).pack(side="left")
+        tk.Button(fade_ctrl, text="▼", command=self._fade_out_down, **btn_style).pack(side="left", padx=(4, 0))
+        self._fade_out_lbl = tk.Label(fade_ctrl, text="250", **val_style)
+        self._fade_out_lbl.pack(side="left", padx=2)
+        tk.Button(fade_ctrl, text="▲", command=self._fade_out_up, **btn_style).pack(side="left")
+        tk.Label(fade_ctrl, text="ms", bg="#2c3441", fg="#8899aa", font=("Arial", 9)).pack(side="left")
 
         target_wrap = tk.Frame(left, bg="#242b35")
         target_wrap.pack(fill="x", padx=20, pady=(12, 10))
@@ -612,6 +659,7 @@ class DMXLightingEditor:
                 self.effect_listbox.selection_set(e_idx)
                 self.effect_listbox.see(e_idx)
                 self.hover_effect_name = effect_name
+        self._sync_fade_ui()
         self._draw_layout()
         if self.window and self.window.winfo_exists():
             self.window.after_idle(self._end_sync)
@@ -1035,7 +1083,22 @@ class DMXLightingEditor:
                 scene_entry["colors"] = list(palette)
             scenes[effect_name] = scene_entry
 
+        # Attach fade data from current assignment to the scene
+        scene = scenes.get(effect_name, {})
+        if self._fade_enabled:
+            scene["fade"] = {"in_ms": self._fade_in_ms, "out_ms": self._fade_out_ms}
+        else:
+            scene.pop("fade", None)
+
         self.dmx.apply_scene(effect_name)
+        # Also push fade data into active scene data for animation
+        data = getattr(self.dmx, "_active_scene_data", None)
+        if data and self._fade_enabled:
+            data["fade_in_ms"] = self._fade_in_ms
+            data["fade_out_ms"] = self._fade_out_ms
+        elif data:
+            data.pop("fade_in_ms", None)
+            data.pop("fade_out_ms", None)
         if callable(self.on_scene_applied_callback):
             try:
                 self.on_scene_applied_callback()
@@ -1063,6 +1126,73 @@ class DMXLightingEditor:
     def _speed_up(self):
         """Increase animation speed (shorter interval)."""
         self._preview_speed_ms = max(30, self._preview_speed_ms - 40)
+
+    # ── Fade controls ──
+    def _on_fade_toggle(self):
+        """Handle Fade checkbox toggle — persist to current assignment."""
+        self._fade_enabled = self._fade_var.get()
+        assignment = self._current_assignment()
+        assignment["fade_enabled"] = self._fade_enabled
+        self._push_fade_to_dmx()
+
+    def _fade_in_down(self):
+        self._fade_in_ms = max(0, self._fade_in_ms - 125)
+        self._fade_in_lbl.configure(text=str(self._fade_in_ms))
+        self._current_assignment()["fade_in_ms"] = self._fade_in_ms
+        self._push_fade_to_dmx()
+
+    def _fade_in_up(self):
+        self._fade_in_ms = min(1000, self._fade_in_ms + 125)
+        self._fade_in_lbl.configure(text=str(self._fade_in_ms))
+        self._current_assignment()["fade_in_ms"] = self._fade_in_ms
+        self._push_fade_to_dmx()
+
+    def _fade_out_down(self):
+        self._fade_out_ms = max(0, self._fade_out_ms - 125)
+        self._fade_out_lbl.configure(text=str(self._fade_out_ms))
+        self._current_assignment()["fade_out_ms"] = self._fade_out_ms
+        self._push_fade_to_dmx()
+
+    def _fade_out_up(self):
+        self._fade_out_ms = min(1000, self._fade_out_ms + 125)
+        self._fade_out_lbl.configure(text=str(self._fade_out_ms))
+        self._current_assignment()["fade_out_ms"] = self._fade_out_ms
+        self._push_fade_to_dmx()
+
+    def _sync_fade_ui(self):
+        """Refresh fade panel from the current assignment data."""
+        assignment = self._current_assignment()
+        self._fade_enabled = assignment.get("fade_enabled", False)
+        self._fade_in_ms = assignment.get("fade_in_ms", 250)
+        self._fade_out_ms = assignment.get("fade_out_ms", 250)
+        self._fade_var.set(self._fade_enabled)
+        self._fade_in_lbl.configure(text=str(self._fade_in_ms))
+        self._fade_out_lbl.configure(text=str(self._fade_out_ms))
+
+    def _push_fade_to_dmx(self):
+        """Update DMX scene data with current fade settings and refresh preview."""
+        if not self.dmx:
+            return
+        effect_name = self.hover_effect_name
+        if not effect_name:
+            return
+        scenes = getattr(self.dmx, "scenes", {})
+        scene = scenes.get(effect_name)
+        if not scene:
+            return
+        if self._fade_enabled:
+            scene["fade"] = {"in_ms": self._fade_in_ms, "out_ms": self._fade_out_ms}
+        else:
+            scene.pop("fade", None)
+        # Re-apply to update active scene data
+        data = getattr(self.dmx, "_active_scene_data", None)
+        if data:
+            if self._fade_enabled:
+                data["fade_in_ms"] = self._fade_in_ms
+                data["fade_out_ms"] = self._fade_out_ms
+            else:
+                data.pop("fade_in_ms", None)
+                data.pop("fade_out_ms", None)
 
     def _animate_preview(self):
         if not self.window or not self.canvas:

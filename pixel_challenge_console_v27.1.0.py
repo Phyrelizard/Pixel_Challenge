@@ -430,6 +430,11 @@ class DMXService:
                 "pattern": pattern.get("type", "static"),
                 "speed": pattern.get("speed", 100),
             }
+            # Propagate fade envelope data if present
+            fade = scene.get("fade")
+            if fade and isinstance(fade, dict):
+                self._active_scene_data["fade_in_ms"] = fade.get("in_ms", 0)
+                self._active_scene_data["fade_out_ms"] = fade.get("out_ms", 0)
         else:
             self._active_scene_data = None
         self._send_dmx_frame()
@@ -687,6 +692,34 @@ class DMXService:
                 "r": r, "g": g, "b": b, "strobe": strobe_val,
                 "dimmer": clamp8(dimmer_val),
             }
+        # ── Apply fade envelope if enabled ──
+        fade_in_ms = data.get("fade_in_ms", 0)
+        fade_out_ms = data.get("fade_out_ms", 0)
+        if fade_in_ms or fade_out_ms:
+            # Estimate cycle length from pattern type (steps per full cycle)
+            cycle_len = max(n, 8)
+            if pat_type in ("alternating", "strobe"):
+                cycle_len = max(n, 4)
+            elif pat_type in ("chase", "sweep", "bounce"):
+                cycle_len = max(n * 2, 16)
+            elif pat_type in ("fade", "fade_loop", "breathing"):
+                cycle_len = max(len(fc) * 12, 24) if fc else 24
+            elif pat_type in ("wave", "palette_cycle"):
+                cycle_len = max(len(fc) * 8, 16) if fc else 16
+            pos_in_cycle = step % cycle_len
+            # Speed slider maps to 50-500ms per step; use mid estimate (200ms)
+            ms_per_step = 200
+            elapsed_ms = pos_in_cycle * ms_per_step
+            remaining_ms = (cycle_len - pos_in_cycle) * ms_per_step
+            fade_mult = 1.0
+            if fade_in_ms and elapsed_ms < fade_in_ms:
+                fade_mult = min(fade_mult, elapsed_ms / max(fade_in_ms, 1))
+            if fade_out_ms and remaining_ms < fade_out_ms:
+                fade_mult = min(fade_mult, remaining_ms / max(fade_out_ms, 1))
+            if fade_mult < 1.0:
+                for i in range(n):
+                    st = self.fixture_states[i]
+                    st["dimmer"] = clamp8(int(st["dimmer"] * fade_mult))
         self._send_dmx_frame()
 
     def get_scene_names(self) -> list:
@@ -1707,6 +1740,14 @@ class PixelChallengeConsole:
         if not scene_name:
             self.log(f"DMX visual cue unresolved: {element} -> {effect_name}")
             return
+        # Inject fade data from profile assignment into the scene before applying
+        fade_enabled = mapping.get("fade_enabled", False)
+        if fade_enabled and scene_name in self.dmx.scenes:
+            scene = self.dmx.scenes[scene_name]
+            scene["fade"] = {
+                "in_ms": mapping.get("fade_in_ms", 250),
+                "out_ms": mapping.get("fade_out_ms", 250),
+            }
         self._apply_scene_to_target(scene_name, target_name)
         self.refresh_dmx_fixture_cards()
         self.log(f"DMX cue fired: {element}/{action} -> {scene_name} [{target_name}]")
