@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import math
+import re
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 
@@ -590,9 +591,8 @@ class DMXLightingEditor:
                 return []
             if "[" in text and "]" in text:
                 grouped = []
-                normalized = text.replace("], [", "],[").replace("] , [", "],[")
-                for block in normalized.split("],["):
-                    chunk = block.strip().strip("[]")
+                for block in re.findall(r"\[([^\[\]]*)\]", text):
+                    chunk = block.strip()
                     items = [f.strip().upper() for f in chunk.split(",") if f.strip()]
                     if items:
                         grouped.append(items)

@@ -91,6 +91,49 @@ def hsv_rgb(h: float, s: float, v: float):
     return clamp8(r * 255), clamp8(g * 255), clamp8(b * 255)
 
 
+def _default_dimmer_pack_entry() -> dict:
+    return {
+        "model": "Elation DP-DMX4B",
+        "num_ports": 4,
+        "start_address": 64,
+        "port_labels": ["Port 1", "Port 2", "Port 3", "Port 4"],
+    }
+
+
+def _normalize_dimmer_pack_data(packs, allow_empty: bool = True):
+    normalized = []
+    for item in (packs or []):
+        if not isinstance(item, dict):
+            continue
+        model = str(item.get("model", "")).strip() or "Elation DP-DMX4B"
+        try:
+            num_ports = int(item.get("num_ports") or 4)
+        except Exception:
+            num_ports = 4
+        try:
+            start_address = int(item.get("start_address") or 64)
+        except Exception:
+            start_address = 64
+        num_ports = max(1, min(16, num_ports))
+        start_address = max(1, min(512, start_address))
+        labels = item.get("port_labels", [])
+        if isinstance(labels, list):
+            labels = [str(lbl).strip() for lbl in labels if str(lbl).strip()]
+        else:
+            labels = []
+        while len(labels) < num_ports:
+            labels.append(f"Port {len(labels) + 1}")
+        normalized.append({
+            "model": model,
+            "num_ports": num_ports,
+            "start_address": start_address,
+            "port_labels": labels[:num_ports],
+        })
+    if not normalized and not allow_empty:
+        normalized = [_default_dimmer_pack_entry()]
+    return normalized
+
+
 class HostState(Enum):
     IDLE = auto()
     CHECKIN_OPEN = auto()
@@ -358,27 +401,7 @@ class DMXService:
         self.scenes = self._build_default_scenes()
 
     def _normalize_dimmer_packs(self, packs):
-        normalized = []
-        for item in (packs or []):
-            if not isinstance(item, dict):
-                continue
-            model = str(item.get("model", "")).strip() or "Elation DP-DMX4B"
-            num_ports = max(1, min(16, int(item.get("num_ports", 4) or 4)))
-            start_address = max(1, min(512, int(item.get("start_address", 1) or 1)))
-            labels = item.get("port_labels", [])
-            if isinstance(labels, list):
-                labels = [str(x).strip() for x in labels]
-            else:
-                labels = []
-            while len(labels) < num_ports:
-                labels.append(f"Port {len(labels) + 1}")
-            normalized.append({
-                "model": model,
-                "num_ports": num_ports,
-                "start_address": start_address,
-                "port_labels": labels[:num_ports],
-            })
-        return normalized
+        return _normalize_dimmer_pack_data(packs, allow_empty=True)
 
     # ------------------------------------------------------------------
     def _fixture_base_address(self, fixture_index: int) -> int:
@@ -1203,45 +1226,10 @@ class PixelChallengeConsole:
         self.log(f"Starting game: {game_version}")
 
     def _default_dimmer_packs(self):
-        return [
-            {
-                "model": "Elation DP-DMX4B",
-                "num_ports": 4,
-                "start_address": 64,
-                "port_labels": ["Port 1", "Port 2", "Port 3", "Port 4"],
-            }
-        ]
+        return [_default_dimmer_pack_entry()]
 
     def _normalize_dimmer_packs(self, packs):
-        normalized = []
-        for item in (packs or []):
-            if not isinstance(item, dict):
-                continue
-            model = str(item.get("model", "")).strip() or "Elation DP-DMX4B"
-            try:
-                num_ports = int(item.get("num_ports", 4) or 4)
-            except Exception:
-                num_ports = 4
-            try:
-                start_address = int(item.get("start_address", 64) or 64)
-            except Exception:
-                start_address = 64
-            num_ports = max(1, min(16, num_ports))
-            start_address = max(1, min(512, start_address))
-            labels = item.get("port_labels", [])
-            if isinstance(labels, list):
-                labels = [str(lbl).strip() for lbl in labels if str(lbl).strip()]
-            else:
-                labels = []
-            while len(labels) < num_ports:
-                labels.append(f"Port {len(labels) + 1}")
-            normalized.append({
-                "model": model,
-                "num_ports": num_ports,
-                "start_address": start_address,
-                "port_labels": labels[:num_ports],
-            })
-        return normalized
+        return _normalize_dimmer_pack_data(packs, allow_empty=True)
 
     def load_assignments(self):
         if not os.path.exists(ASSIGNMENTS_FILE):
