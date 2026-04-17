@@ -4633,21 +4633,33 @@ class PixelChallengeConsole:
 
         profile_combo.bind("<<ComboboxSelected>>", _on_profile_selected)
 
-        # TEST DMX button
+        # TEST DMX button — tests fixtures AND dimmer packs
         def _test_dmx():
             if not self.dmx:
                 return
             prev = self.dmx.current_scene
             self.dmx.set_all_color(255, 255, 255)
+            # Also flash all dimmer pack ports to full
+            prev_dimmer = []
+            for pi, pack in enumerate(self.dmx.dimmer_packs):
+                ports = pack.get("num_ports", 0)
+                prev_dimmer.append([self.dmx.dimmer_levels[pi][p] if pi < len(self.dmx.dimmer_levels) and p < len(self.dmx.dimmer_levels[pi]) else 0 for p in range(ports)])
+                for port in range(1, ports + 1):
+                    self.dmx.set_dimmer_port(pi, port, 255)
             self.refresh_dmx_fixture_cards()
             def _restore():
                 if prev:
                     self.dmx.apply_scene(prev)
                 else:
                     self.dmx.blackout()
+                # Restore dimmer pack levels
+                for pi, levels in enumerate(prev_dimmer):
+                    for port_idx, level in enumerate(levels):
+                        self.dmx.set_dimmer_port(pi, port_idx + 1, level)
                 self.refresh_dmx_fixture_cards()
             self.root.after(2000, _restore)
-            self.log("DMX TEST: flash white for 2 seconds")
+            pack_count = len(self.dmx.dimmer_packs)
+            self.log(f"DMX TEST: flash white for 2 seconds (fixtures + {pack_count} dimmer pack(s))")
 
         tk.Button(dmx_hw_inner, text="TEST DMX", command=_test_dmx,
                   bg="#cccc00", fg="black", font=("Arial", 11, "bold"),
