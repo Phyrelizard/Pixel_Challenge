@@ -343,7 +343,7 @@ class DMXService:
         self.num_fixtures = num_fixtures
         self.start_address = start_address
         self.channels_per_fixture = channels_per_fixture
-        self.brightness = 255          # master dimmer 0-255 (255 = full)
+        self.brightness = 76           # master dimmer 0-255 (30% default)
         self.current_scene = None
         self.fixture_states = [
             {"r": 0, "g": 0, "b": 0, "strobe": 0, "dimmer": 255}
@@ -728,7 +728,7 @@ class DMXService:
             "countdown_red":   {"fixtures": [{"r": 255, "g": 0,   "b": 0,   "strobe": 0,  "dimmer": 255}] * n},
             "countdown_yellow":{"fixtures": [{"r": 255, "g": 255, "b": 0,   "strobe": 0,  "dimmer": 255}] * n},
             "countdown_green": {"fixtures": [{"r": 0,   "g": 255, "b": 0,   "strobe": 0,  "dimmer": 255}] * n},
-            "results_white":   {"fixtures": [{"r": 255, "g": 255, "b": 255, "strobe": 80, "dimmer": 255}] * n},
+            "results_white":   {"fixtures": [{"r": 255, "g": 255, "b": 255, "strobe": 0,  "dimmer": 255}] * n},
             "test_red":        {"fixtures": [{"r": 255, "g": 0,   "b": 0,   "strobe": 0,  "dimmer": 255}] * n},
             "test_green":      {"fixtures": [{"r": 0,   "g": 255, "b": 0,   "strobe": 0,  "dimmer": 255}] * n},
             "test_blue":       {"fixtures": [{"r": 0,   "g": 0,   "b": 255, "strobe": 0,  "dimmer": 255}] * n},
@@ -912,7 +912,7 @@ class PixelChallengeConsole:
         self.dmx_link_all = tk.BooleanVar(value=True)
         self.dmx_scene = tk.StringVar(value="Cool Blue Static")
         self.dmx_speed = tk.IntVar(value=50)
-        self.dmx_brightness = tk.IntVar(value=63)
+        self.dmx_brightness = tk.IntVar(value=30)
         self.dmx_mode = tk.StringVar(value="auto")  # blackout, gameplay, results, wash, test, manual
 
         # DMX animation state (v26.5.1)
@@ -1093,6 +1093,7 @@ class PixelChallengeConsole:
 
         # Load user-authored DMX scenes and slot assignments (after build_ui)
         self._load_user_scenes_into_dmx()
+        self._load_generated_effects_into_dmx()
         self._load_slot_assignments()
         self._refresh_dmx_scene_combo()
 
@@ -1495,17 +1496,15 @@ class PixelChallengeConsole:
         except Exception as e:
             self.log(f"save_dmx_profiles error: {e}")
 
-    def _build_default_visualizer_assignments(self) -> dict:
+    def _build_default_visualizer_assignments(self, elements=None) -> dict:
+        game_elements = [
+            "Gameplay", "Bonus", "Danger", "Special", "Randomizer",
+            "Overlay 1", "Overlay 2", "Overlay 3", "Overlay 4",
+        ]
+        names = list(elements or game_elements)
         return {
-            "Gameplay": {"effect": "Fire Burst", "apply_to": "All Fixtures"},
-            "Bonus": {"effect": "Gold Victory", "apply_to": "Top Fixtures"},
-            "Danger": {"effect": "Red Alert", "apply_to": "All Fixtures"},
-            "Special": {"effect": "Rainbow Wave", "apply_to": "All Fixtures"},
-            "Randomizer": {"effect": "Ocean Pulse", "apply_to": "All Fixtures"},
-            "Overlay 1": {"effect": "Amber Glow", "apply_to": "Top Left Pair"},
-            "Overlay 2": {"effect": "Sapphire Wave", "apply_to": "Top Right Pair"},
-            "Overlay 3": {"effect": "Neon Rush", "apply_to": "Left Wash Group"},
-            "Overlay 4": {"effect": "Crimson Storm", "apply_to": "Right Wash Group"},
+            name: {"effect": None, "apply_to": "All Fixtures"}
+            for name in names
         }
 
     def load_visualizer_profiles(self) -> dict:
@@ -1515,9 +1514,21 @@ class PixelChallengeConsole:
                     "game": game,
                     "profile_name": "Default Small Rig",
                     "layout_id": "small_rig_8_fixture",
-                    "assignments": self._build_default_visualizer_assignments(),
+                    "assignments": self._build_default_visualizer_assignments(
+                        [
+                            "Idle",
+                            "Check-In Open",
+                            "Game Running",
+                            "Results / Scoreboard",
+                            "Countdown",
+                            "Game Over",
+                            "Attract Mode",
+                        ]
+                        if game == "console"
+                        else None
+                    ),
                 }
-                for game in ("dot_dash", "pixel_pop", "surround", "ascend", "global")
+                for game in ("dot_dash", "pixel_pop", "surround", "ascend", "global", "console")
             ]
         }
         try:
@@ -1771,6 +1782,59 @@ class PixelChallengeConsole:
         except Exception as e:
             self.log(f"DMX: Could not load user scenes: {e}")
 
+    # Generated effects matching the visualizer's built-in effect library
+    _GENERATED_EFFECTS = [
+        ("Ocean Pulse", ["#0A1A5E", "#1B66FF", "#58D9FF"], "pulse", 52),
+        ("Emerald Sweep", ["#0B4F2F", "#14A45E", "#6EFFB1"], "sweep", 45),
+        ("Crimson Storm", ["#2B0000", "#A30000", "#FF2A2A"], "strobe", 82),
+        ("Arctic Shimmer", ["#77E7FF", "#E6FAFF", "#8BC2FF"], "fade", 40),
+        ("Solar Flare", ["#FF6A00", "#FFC100", "#FFE879"], "pulse", 58),
+        ("Violet Cascade", ["#3B0A71", "#7A2BCB", "#C87CFF"], "chase", 63),
+        ("Amber Glow", ["#4A2B00", "#B56700", "#FFC166"], "static", 25),
+        ("Neon Rush", ["#00FFC8", "#11B5FF", "#9F4BFF"], "chase", 70),
+        ("Frost Bite", ["#0D2E5B", "#5AA5FF", "#D0F3FF"], "pulse", 49),
+        ("Lava Flow", ["#4B0A00", "#A61D00", "#FF6A00"], "sweep", 57),
+        ("Electric Surge", ["#00143A", "#00A2FF", "#9BE5FF"], "strobe", 88),
+        ("Midnight Bloom", ["#050A1F", "#322A7A", "#B86BFF"], "fade", 38),
+        ("Copper Sunset", ["#331800", "#B05A22", "#F4B178"], "fade", 34),
+        ("Jade Drift", ["#023329", "#00A387", "#89FFE1"], "sweep", 42),
+        ("Ruby Blitz", ["#350007", "#B00E28", "#FF5A7A"], "alternating", 76),
+        ("Sapphire Wave", ["#09153D", "#1F6DDE", "#7FC6FF"], "wave", 54),
+        ("Phantom Strobe", ["#150022", "#5D17A8", "#E9D4FF"], "strobe", 90),
+        ("Golden Hour", ["#5A2C00", "#E89A1D", "#FFE199"], "fade", 30),
+        ("Inferno Chase", ["#2E0200", "#D73700", "#FFC04A"], "chase", 72),
+        ("Deep Purple Fade", ["#120021", "#562B9B", "#B996FF"], "fade", 39),
+        ("Aurora Ribbon", ["#00D9B6", "#48A4FF", "#BC6CFF"], "sweep", 44),
+        ("Prism Drift", ["#FF4F91", "#7A8CFF", "#62FFE2"], "alternating", 46),
+        ("Steel Rain", ["#2A3748", "#5C7494", "#AEC4E0"], "pulse", 43),
+        ("Rose Ember", ["#3D0F1E", "#B73762", "#FFA3C0"], "fade", 36),
+        ("Ion Drift", ["#00313A", "#00B6D9", "#A5F5FF"], "wave", 60),
+        ("Color Roulette", ["#FF2255", "#00D4FF", "#6BFF5E", "#FFD447", "#B98BFF"], "alternating", 67),
+    ]
+
+    def _load_generated_effects_into_dmx(self):
+        """Register the visualizer's generated effects into DMXService.scenes so
+        they can be resolved by name at runtime via fire_dmx_cue."""
+        if not self.dmx:
+            return
+        n = self.dmx.num_fixtures
+        loaded = 0
+        for name, palette, pat_type, speed in self._GENERATED_EFFECTS:
+            if name in self.dmx.scenes:
+                continue  # user scene takes priority
+            fixtures = []
+            for i in range(n):
+                hex_c = palette[i % len(palette)]
+                r, g, b = _hex_to_rgb(hex_c)
+                fixtures.append({"r": r, "g": g, "b": b, "strobe": 0, "dimmer": 255})
+            entry = {"fixtures": fixtures, "colors": list(palette)}
+            if pat_type != "static":
+                entry["pattern"] = {"type": pat_type, "speed": speed}
+            self.dmx.scenes[name] = entry
+            loaded += 1
+        if loaded:
+            self.log(f"Loaded {loaded} generated effect(s) into DMX service")
+
     def _load_slot_assignments(self):
         """Load slot button assignments from dmx_scenes.json button_assignment data."""
         self._dmx_slot_scenes = [""] * 6
@@ -2015,6 +2079,15 @@ class PixelChallengeConsole:
         else:
             self.falcon.set_brightness(int(self.theme_brightness_percent.get()))
 
+    # Map HostState values to console profile element names
+    _STATE_TO_CONSOLE_ELEMENT = {
+        HostState.IDLE: "Idle",
+        HostState.CHECKIN_OPEN: "Check-In Open",
+        HostState.GAME_RUNNING: "Game Running",
+        HostState.RESULTS_READY: "Results / Scoreboard",
+        HostState.COUNTDOWN: "Countdown",
+    }
+
     def set_state(self, new_state: HostState, reason: str = ""):
         self.host_state = new_state
         self.state_var.set(f"STATE: {self.host_state.name}")
@@ -2022,6 +2095,28 @@ class PixelChallengeConsole:
             self.log(f"HostState -> {self.host_state.name}: {reason}")
         self.refresh_checkin_button()
         self.apply_brightness_for_state()
+        # Fire console DMX cue for state transitions
+        element = self._STATE_TO_CONSOLE_ELEMENT.get(new_state)
+        if element:
+            self._fire_console_dmx_cue(element)
+
+    def _fire_console_dmx_cue(self, element: str):
+        """Fire a DMX cue from the console visualizer profile."""
+        if not self.dmx:
+            return
+        profile = self._visualizer_profile_for_game("console")
+        if not profile:
+            return
+        mapping = profile.get("assignments", {}).get(element)
+        if not mapping or not mapping.get("effect"):
+            return
+        scene_name = self._resolve_scene_name_for_effect(mapping["effect"])
+        if not scene_name:
+            return
+        target_name = mapping.get("apply_to", "All Fixtures")
+        self._apply_scene_to_target(scene_name, target_name)
+        self.refresh_dmx_fixture_cards()
+        self.log(f"Console DMX cue: {element} -> {scene_name} [{target_name}]")
 
     def current_game(self):
         return self.games.get(self.selected_game.get())
@@ -2945,13 +3040,30 @@ class PixelChallengeConsole:
                     self.log(f"Game complete! Winner: Player {result.winner_player_id}")
                     self.record_score_history(result)
                     payload = self.build_scoreboard_payload(result, title="Final Results")
-                    # Apply DMX results scene — use SCORE-assigned scene or fallback (v27.1.0)
+                    # Apply DMX results scene — try console profile element first,
+                    # then SCORE-assigned scene, then fallback (v27.5.0)
                     if self.dmx:
-                        score_scene = getattr(self, '_dmx_fixed_scenes', {}).get("SCORE", "")
-                        if score_scene and score_scene in self.dmx.scenes:
-                            self._apply_scene_with_animation(score_scene)
-                            self.log(f"DMX results scene: {score_scene}")
-                        else:
+                        results_applied = False
+                        # Try console visualizer profile "Results / Scoreboard" element
+                        console_profile = self._visualizer_profile_for_game("console")
+                        if console_profile:
+                            r_assign = console_profile.get("assignments", {}).get("Results / Scoreboard")
+                            if r_assign and r_assign.get("effect"):
+                                scene_name = self._resolve_scene_name_for_effect(r_assign["effect"])
+                                if scene_name:
+                                    target_name = r_assign.get("apply_to", "All Fixtures")
+                                    self._apply_scene_to_target(scene_name, target_name)
+                                    self.log(f"DMX results via console profile: {r_assign['effect']} [{target_name}]")
+                                    results_applied = True
+                        # Fallback to SCORE fixed scene
+                        if not results_applied:
+                            score_scene = getattr(self, '_dmx_fixed_scenes', {}).get("SCORE", "")
+                            if score_scene and score_scene in self.dmx.scenes:
+                                self._apply_scene_with_animation(score_scene)
+                                self.log(f"DMX results scene: {score_scene}")
+                                results_applied = True
+                        # Last-resort fallback — static white, no strobe
+                        if not results_applied:
                             self.dmx.apply_scene("results_white")
                         self.refresh_dmx_fixture_cards()
                     self.show_scoreboard_temporarily(seconds=30, payload=payload, final=True)
@@ -4114,6 +4226,7 @@ class PixelChallengeConsole:
                 pass
         # Reload user scenes into DMXService and refresh UI
         self._load_user_scenes_into_dmx()
+        self._load_generated_effects_into_dmx()
         self.visualizer_profiles = self.load_visualizer_profiles()
         self.visualizer_layouts = self.load_visualizer_layouts()
         self._refresh_dmx_scene_combo()

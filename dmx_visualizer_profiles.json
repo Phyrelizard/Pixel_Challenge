@@ -6,40 +6,40 @@
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
-          "effect": "Green Chase Up",
+          "effect": null,
           "apply_to": "All Fixtures"
         },
         "Bonus": {
-          "effect": "Gold Victory",
-          "apply_to": "Top Fixtures"
+          "effect": null,
+          "apply_to": "All Fixtures"
         },
         "Danger": {
-          "effect": "Red Alert",
+          "effect": null,
           "apply_to": "All Fixtures"
         },
         "Special": {
-          "effect": "Rainbow Wave",
+          "effect": null,
           "apply_to": "All Fixtures"
         },
         "Randomizer": {
-          "effect": "Ocean Pulse",
+          "effect": null,
           "apply_to": "All Fixtures"
         },
         "Overlay 1": {
-          "effect": "Amber Glow",
-          "apply_to": "Top Left Pair"
+          "effect": null,
+          "apply_to": "All Fixtures"
         },
         "Overlay 2": {
-          "effect": "Sapphire Wave",
-          "apply_to": "Top Right Pair"
+          "effect": null,
+          "apply_to": "All Fixtures"
         },
         "Overlay 3": {
-          "effect": "Neon Rush",
-          "apply_to": "Left Wash Group"
+          "effect": null,
+          "apply_to": "All Fixtures"
         },
         "Overlay 4": {
-          "effect": "Crimson Storm",
-          "apply_to": "Right Wash Group"
+          "effect": null,
+          "apply_to": "All Fixtures"
         }
       }
     },
@@ -49,40 +49,40 @@
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
-          "effect": "Crimson Storm",
+          "effect": null,
           "apply_to": "All Fixtures"
         },
         "Bonus": {
-          "effect": "Golden Hour",
-          "apply_to": "Top Fixtures"
+          "effect": null,
+          "apply_to": "All Fixtures"
         },
         "Danger": {
-          "effect": "Phantom Strobe",
+          "effect": null,
           "apply_to": "All Fixtures"
         },
         "Special": {
-          "effect": "Violet Cascade",
+          "effect": null,
           "apply_to": "All Fixtures"
         },
         "Randomizer": {
-          "effect": "Color Roulette",
+          "effect": null,
           "apply_to": "All Fixtures"
         },
         "Overlay 1": {
-          "effect": "Jade Drift",
-          "apply_to": "Top Left Pair"
+          "effect": null,
+          "apply_to": "All Fixtures"
         },
         "Overlay 2": {
-          "effect": "Electric Surge",
-          "apply_to": "Top Right Pair"
+          "effect": null,
+          "apply_to": "All Fixtures"
         },
         "Overlay 3": {
-          "effect": "Ruby Blitz",
-          "apply_to": "Left Wash Group"
+          "effect": null,
+          "apply_to": "All Fixtures"
         },
         "Overlay 4": {
-          "effect": "Inferno Chase",
-          "apply_to": "Right Wash Group"
+          "effect": null,
+          "apply_to": "All Fixtures"
         }
       }
     },
@@ -92,40 +92,40 @@
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
-          "effect": "Cool Blue Static",
+          "effect": null,
           "apply_to": "All Fixtures"
         },
         "Bonus": {
-          "effect": "Solar Flare",
-          "apply_to": "Top Fixtures"
+          "effect": null,
+          "apply_to": "All Fixtures"
         },
         "Danger": {
-          "effect": "Red Alert",
+          "effect": null,
           "apply_to": "All Fixtures"
         },
         "Special": {
-          "effect": "Emerald Sweep",
+          "effect": null,
           "apply_to": "All Fixtures"
         },
         "Randomizer": {
-          "effect": "Prism Drift",
+          "effect": null,
           "apply_to": "All Fixtures"
         },
         "Overlay 1": {
-          "effect": "Arctic Shimmer",
-          "apply_to": "Top Left Pair"
+          "effect": null,
+          "apply_to": "All Fixtures"
         },
         "Overlay 2": {
-          "effect": "Deep Purple Fade",
-          "apply_to": "Top Right Pair"
+          "effect": null,
+          "apply_to": "All Fixtures"
         },
         "Overlay 3": {
-          "effect": "Ion Drift",
-          "apply_to": "Left Wash Group"
+          "effect": null,
+          "apply_to": "All Fixtures"
         },
         "Overlay 4": {
-          "effect": "Lava Flow",
-          "apply_to": "Right Wash Group"
+          "effect": null,
+          "apply_to": "All Fixtures"
         }
       }
     },
@@ -135,40 +135,40 @@
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
-          "effect": "Lava Pulse",
+          "effect": null,
           "apply_to": "All Fixtures"
         },
         "Bonus": {
-          "effect": "Gold Victory (Copy)",
-          "apply_to": "Top Fixtures"
+          "effect": null,
+          "apply_to": "All Fixtures"
         },
         "Danger": {
-          "effect": "Crimson Storm",
+          "effect": null,
           "apply_to": "All Fixtures"
         },
         "Special": {
-          "effect": "Aurora Ribbon",
+          "effect": null,
           "apply_to": "All Fixtures"
         },
         "Randomizer": {
-          "effect": "New test Scene",
+          "effect": null,
           "apply_to": "All Fixtures"
         },
         "Overlay 1": {
-          "effect": "Copper Sunset",
-          "apply_to": "Top Left Pair"
+          "effect": null,
+          "apply_to": "All Fixtures"
         },
         "Overlay 2": {
-          "effect": "Steel Rain",
-          "apply_to": "Top Right Pair"
+          "effect": null,
+          "apply_to": "All Fixtures"
         },
         "Overlay 3": {
-          "effect": "Rose Ember",
-          "apply_to": "Left Wash Group"
+          "effect": null,
+          "apply_to": "All Fixtures"
         },
         "Overlay 4": {
-          "effect": "Midnight Bloom",
-          "apply_to": "Right Wash Group"
+          "effect": null,
+          "apply_to": "All Fixtures"
         }
       }
     },
@@ -178,40 +178,75 @@
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
-          "effect": "Ocean Pulse",
+          "effect": null,
           "apply_to": "All Fixtures"
         },
         "Bonus": {
-          "effect": "Gold Victory",
-          "apply_to": "Top Fixtures"
+          "effect": null,
+          "apply_to": "All Fixtures"
         },
         "Danger": {
-          "effect": "Red Alert",
+          "effect": null,
           "apply_to": "All Fixtures"
         },
         "Special": {
-          "effect": "Rainbow Wave",
+          "effect": null,
           "apply_to": "All Fixtures"
         },
         "Randomizer": {
-          "effect": "Color Roulette",
+          "effect": null,
           "apply_to": "All Fixtures"
         },
         "Overlay 1": {
-          "effect": "Amber Blaze",
-          "apply_to": "Top Left Pair"
+          "effect": null,
+          "apply_to": "All Fixtures"
         },
         "Overlay 2": {
-          "effect": "Sapphire Wave",
-          "apply_to": "Top Right Pair"
+          "effect": null,
+          "apply_to": "All Fixtures"
         },
         "Overlay 3": {
-          "effect": "Neon Rush",
-          "apply_to": "Left Wash Group"
+          "effect": null,
+          "apply_to": "All Fixtures"
         },
         "Overlay 4": {
-          "effect": "Electric Surge",
-          "apply_to": "Top Left Pair"
+          "effect": null,
+          "apply_to": "All Fixtures"
+        }
+      }
+    },
+    {
+      "game": "console",
+      "profile_name": "Default Small Rig",
+      "layout_id": "small_rig_8_fixture",
+      "assignments": {
+        "Idle": {
+          "effect": null,
+          "apply_to": "All Fixtures"
+        },
+        "Check-In Open": {
+          "effect": null,
+          "apply_to": "All Fixtures"
+        },
+        "Game Running": {
+          "effect": null,
+          "apply_to": "All Fixtures"
+        },
+        "Results / Scoreboard": {
+          "effect": null,
+          "apply_to": "All Fixtures"
+        },
+        "Countdown": {
+          "effect": null,
+          "apply_to": "All Fixtures"
+        },
+        "Game Over": {
+          "effect": null,
+          "apply_to": "All Fixtures"
+        },
+        "Attract Mode": {
+          "effect": null,
+          "apply_to": "All Fixtures"
         }
       }
     }
