@@ -1047,9 +1047,6 @@ class DMXLightingEditor:
         self._preview_paused = not self._preview_paused
         if self._preview_paused:
             self._pause_btn.configure(text="▶", bg="#cf8f2b")
-            # Also pause DMX scene animation in console
-            if self.dmx and hasattr(self.dmx, "_active_scene_data"):
-                self._paused_scene_data = getattr(self.dmx, "_active_scene_data", None)
         else:
             self._pause_btn.configure(text="⏸", bg="#3b4552")
             # Resume DMX scene animation
