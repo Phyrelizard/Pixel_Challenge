@@ -522,7 +522,8 @@ class DMXLightingEditor:
         if effect_name:
             names = [e["name"] for e in self.effects]
             if effect_name in names:
-                e_idx = names.index(effect_name) + 1
+                no_effect_offset = 1 if self.effect_listbox.size() and self.effect_listbox.get(0) == NO_EFFECT_LABEL else 0
+                e_idx = names.index(effect_name) + no_effect_offset
                 self.effect_listbox.selection_set(e_idx)
                 self.effect_listbox.see(e_idx)
                 self.hover_effect_name = effect_name
@@ -543,23 +544,24 @@ class DMXLightingEditor:
         for effect in self.effects:
             self.effect_listbox.insert("end", effect["name"])
 
-    def _on_effect_hover(self, event):
-        return
-
     def _on_effect_selected(self, event=None):
         if self._syncing:
             return
         if not self.effect_listbox.curselection():
             return
         selected_idx = self.effect_listbox.curselection()[0]
+        no_effect_offset = 1 if self.effect_listbox.size() and self.effect_listbox.get(0) == NO_EFFECT_LABEL else 0
         assignment = self._current_assignment()
         assignment["apply_to"] = self.apply_target_var.get() or ALL_FIXTURES_TARGET
-        if selected_idx == 0:
+        if no_effect_offset and selected_idx == 0:
             assignment["effect"] = None
             self.hover_effect_name = None
             self._draw_layout()
             return
-        effect = self.effects[selected_idx - 1]
+        effect_index = selected_idx - no_effect_offset
+        if not (0 <= effect_index < len(self.effects)):
+            return
+        effect = self.effects[effect_index]
         assignment["effect"] = effect["name"]
         self.hover_effect_name = effect["name"]
         self._preview_dmx_effect(effect["name"])
