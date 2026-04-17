@@ -564,17 +564,37 @@ class DMXService:
                     dimmer_val = 0
             elif pat_type == "pulse":
                 import math
+                # Pulse: cycle through palette colors with sine brightness modulation
+                if fc:
+                    color_idx = (step // 4) % len(fc)
+                    hex_c = fc[color_idx]
+                    r, g, b = _hex_to_rgb(hex_c)
                 phase = (step * 0.15 + i * 0.3) % (2 * math.pi)
                 dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
             elif pat_type == "chase":
+                # Chase: shift palette colors across fixtures over time
+                if fc:
+                    shifted_idx = (i + step) % len(fc)
+                    hex_c = fc[shifted_idx]
+                    r, g, b = _hex_to_rgb(hex_c)
                 active = step % max(n, 1)
-                dimmer_val = self.brightness if i == active else int(self.brightness * 0.05)
+                dimmer_val = self.brightness if i == active else int(self.brightness * 0.25)
             elif pat_type == "sweep":
+                # Sweep: gradient spotlight moves across fixtures with palette colors
+                if fc:
+                    shifted_idx = (i + step) % len(fc)
+                    hex_c = fc[shifted_idx]
+                    r, g, b = _hex_to_rgb(hex_c)
                 pos = step % max(n, 1)
                 dist = abs(i - pos)
                 falloff = max(0, 1.0 - dist / max(n * 0.3, 1))
-                dimmer_val = int(self.brightness * falloff)
+                dimmer_val = int(self.brightness * max(0.15, falloff))
             elif pat_type == "bounce":
+                # Bounce: spotlight forward then backward with palette colors
+                if fc:
+                    shifted_idx = (i + step) % len(fc)
+                    hex_c = fc[shifted_idx]
+                    r, g, b = _hex_to_rgb(hex_c)
                 half = max(n, 1)
                 pos = step % (2 * half)
                 if pos >= half:
@@ -583,19 +603,51 @@ class DMXService:
                 falloff = max(0, 1.0 - dist / max(n * 0.3, 1))
                 dimmer_val = int(self.brightness * falloff)
             elif pat_type == "alternating":
+                # Alternating: switch palette colors across fixtures, swap on step
                 flip = step % 2
-                dimmer_val = self.brightness if (i + flip) % 2 == 0 else int(self.brightness * 0.1)
+                if fc:
+                    slot = (i + flip) % len(fc)
+                    hex_c = fc[slot]
+                    r, g, b = _hex_to_rgb(hex_c)
+                dimmer_val = self.brightness if (i + flip) % 2 == 0 else int(self.brightness * 0.6)
             elif pat_type == "palette_cycle":
                 shifted_idx = (i + step) % len(fc) if fc else 0
                 hex_c = fc[shifted_idx] if fc else "#000000"
                 r, g, b = _hex_to_rgb(hex_c)
+            elif pat_type == "wave":
+                # Wave: phase-shifted palette cycle across fixtures
+                if fc:
+                    shifted_idx = (i + step) % len(fc)
+                    hex_c = fc[shifted_idx]
+                    r, g, b = _hex_to_rgb(hex_c)
+                else:
+                    import math as _m
+                    phase = (step * 0.2 - i * 0.4) % (2 * _m.pi)
+                    dimmer_val = int(self.brightness * (0.5 + 0.5 * _m.sin(phase)))
             elif pat_type == "random_flash":
                 import random
-                dimmer_val = self.brightness if random.random() > 0.6 else 0
-            elif pat_type == "fade_loop":
+                # Random flash: randomly pick a palette color and flash on/off
+                if fc:
+                    hex_c = fc[random.randint(0, len(fc) - 1)]
+                    r, g, b = _hex_to_rgb(hex_c)
+                dimmer_val = self.brightness if random.random() > 0.5 else 0
+            elif pat_type == "fade_loop" or pat_type == "fade":
                 import math
-                phase = (step * 0.1) % (2 * math.pi)
-                dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
+                # Fade: cycle through palette colors smoothly over time
+                if fc:
+                    cycle_len = len(fc)
+                    pos = (step * 0.08) % cycle_len
+                    idx_a = int(pos) % cycle_len
+                    idx_b = (idx_a + 1) % cycle_len
+                    frac = pos - int(pos)
+                    ra, ga, ba = _hex_to_rgb(fc[idx_a])
+                    rb, gb, bb = _hex_to_rgb(fc[idx_b])
+                    r = int(ra + (rb - ra) * frac)
+                    g = int(ga + (gb - ga) * frac)
+                    b = int(ba + (bb - ba) * frac)
+                else:
+                    phase = (step * 0.1) % (2 * math.pi)
+                    dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
             elif pat_type == "sparkle":
                 import random
                 dimmer_val = self.brightness if random.random() > 0.8 else int(self.brightness * 0.1)
@@ -1093,6 +1145,7 @@ class PixelChallengeConsole:
 
         # Load user-authored DMX scenes and slot assignments (after build_ui)
         self._load_user_scenes_into_dmx()
+        self._load_generated_effects_into_dmx()
         self._load_slot_assignments()
         self._refresh_dmx_scene_combo()
 
@@ -1770,6 +1823,59 @@ class PixelChallengeConsole:
                 self.log(f"Loaded {loaded} user scene(s) from dmx_scenes.json")
         except Exception as e:
             self.log(f"DMX: Could not load user scenes: {e}")
+
+    # Identical generated-effect definitions from dmx_editor.py _build_effect_library
+    _GENERATED_EFFECTS = [
+        ("Ocean Pulse", ["#0A1A5E", "#1B66FF", "#58D9FF"], "pulse", 52),
+        ("Emerald Sweep", ["#0B4F2F", "#14A45E", "#6EFFB1"], "sweep", 45),
+        ("Crimson Storm", ["#2B0000", "#A30000", "#FF2A2A"], "strobe", 82),
+        ("Arctic Shimmer", ["#77E7FF", "#E6FAFF", "#8BC2FF"], "fade", 40),
+        ("Solar Flare", ["#FF6A00", "#FFC100", "#FFE879"], "pulse", 58),
+        ("Violet Cascade", ["#3B0A71", "#7A2BCB", "#C87CFF"], "chase", 63),
+        ("Amber Glow", ["#4A2B00", "#B56700", "#FFC166"], "static", 25),
+        ("Neon Rush", ["#00FFC8", "#11B5FF", "#9F4BFF"], "chase", 70),
+        ("Frost Bite", ["#0D2E5B", "#5AA5FF", "#D0F3FF"], "pulse", 49),
+        ("Lava Flow", ["#4B0A00", "#A61D00", "#FF6A00"], "sweep", 57),
+        ("Electric Surge", ["#00143A", "#00A2FF", "#9BE5FF"], "strobe", 88),
+        ("Midnight Bloom", ["#050A1F", "#322A7A", "#B86BFF"], "fade", 38),
+        ("Copper Sunset", ["#331800", "#B05A22", "#F4B178"], "fade", 34),
+        ("Jade Drift", ["#023329", "#00A387", "#89FFE1"], "sweep", 42),
+        ("Ruby Blitz", ["#350007", "#B00E28", "#FF5A7A"], "alternating", 76),
+        ("Sapphire Wave", ["#09153D", "#1F6DDE", "#7FC6FF"], "wave", 54),
+        ("Phantom Strobe", ["#150022", "#5D17A8", "#E9D4FF"], "strobe", 90),
+        ("Golden Hour", ["#5A2C00", "#E89A1D", "#FFE199"], "fade", 30),
+        ("Inferno Chase", ["#2E0200", "#D73700", "#FFC04A"], "chase", 72),
+        ("Deep Purple Fade", ["#120021", "#562B9B", "#B996FF"], "fade", 39),
+        ("Aurora Ribbon", ["#00D9B6", "#48A4FF", "#BC6CFF"], "sweep", 44),
+        ("Prism Drift", ["#FF4F91", "#7A8CFF", "#62FFE2"], "alternating", 46),
+        ("Steel Rain", ["#2A3748", "#5C7494", "#AEC4E0"], "pulse", 43),
+        ("Rose Ember", ["#3D0F1E", "#B73762", "#FFA3C0"], "fade", 36),
+        ("Ion Drift", ["#00313A", "#00B6D9", "#A5F5FF"], "wave", 60),
+        ("Color Roulette", ["#FF2255", "#00D4FF", "#6BFF5E", "#FFD447", "#B98BFF"], "alternating", 67),
+    ]
+
+    def _load_generated_effects_into_dmx(self):
+        """Register visualizer built-in effects into DMXService so they work at runtime."""
+        if not self.dmx:
+            return
+        num = self.dmx.num_fixtures
+        loaded = 0
+        for name, palette, pat_type, speed in self._GENERATED_EFFECTS:
+            if name in self.dmx.scenes:
+                continue  # user scene with same name takes priority
+            fixtures = []
+            for i in range(num):
+                hex_c = palette[i % len(palette)]
+                r, g, b = _hex_to_rgb(hex_c)
+                fixtures.append({"r": r, "g": g, "b": b, "strobe": 0, "dimmer": 255})
+            scene_entry = {"fixtures": fixtures}
+            if pat_type != "static":
+                scene_entry["pattern"] = {"type": pat_type, "speed": speed}
+                scene_entry["colors"] = list(palette)
+            self.dmx.scenes[name] = scene_entry
+            loaded += 1
+        if loaded:
+            self.log(f"DMX: Registered {loaded} generated effect(s).")
 
     def _load_slot_assignments(self):
         """Load slot button assignments from dmx_scenes.json button_assignment data."""
@@ -4114,6 +4220,7 @@ class PixelChallengeConsole:
                 pass
         # Reload user scenes into DMXService and refresh UI
         self._load_user_scenes_into_dmx()
+        self._load_generated_effects_into_dmx()
         self.visualizer_profiles = self.load_visualizer_profiles()
         self.visualizer_layouts = self.load_visualizer_layouts()
         self._refresh_dmx_scene_combo()

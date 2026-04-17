@@ -8,7 +8,7 @@ import math
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 
-VISUALIZER_VERSION = "v1.2.0"
+VISUALIZER_VERSION = "v1.3.0"
 ALL_FIXTURES_TARGET = "All Fixtures"
 FIXTURE_HIT_WIDTH = 14
 FIXTURE_HIT_HEIGHT = 12
@@ -102,6 +102,14 @@ def _brief_description(effect: dict) -> str:
     return ", ".join(names) if names else ""
 
 
+def _hex_to_rgb(hex_color: str):
+    """Convert '#RRGGBB' to (r, g, b) ints."""
+    h = hex_color.lstrip("#")
+    if len(h) != 6:
+        return (0, 0, 0)
+    return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+
+
 class DMXLightingEditor:
     def __init__(
         self,
@@ -153,6 +161,8 @@ class DMXLightingEditor:
         self.hover_effect_name = None
         self.preview_phase = 0
         self.preview_timer = None
+        self._preview_paused = False
+        self._preview_speed_ms = 110  # default animation interval
 
         self.drag_fixture = None
         self.drag_start = None
@@ -540,8 +550,14 @@ class DMXLightingEditor:
         target_wrap = tk.Frame(left, bg="#242b35")
         target_wrap.pack(fill="x", padx=20, pady=(12, 10))
         tk.Label(target_wrap, text="Apply To", bg="#242b35", fg="#cfd8e3", font=("Arial", 12, "bold")).pack(side="left", padx=(0, 10))
-        self.target_button = tk.Button(target_wrap, textvariable=self.apply_target_var, bg="#2e3845", fg="white", activebackground="#4b6078", relief="flat", font=("Arial", 12), command=self._open_target_dropup)
+        self.target_button = tk.Button(target_wrap, textvariable=self.apply_target_var, bg="#2e3845", fg="white", activebackground="#4b6078", relief="flat", font=("Arial", 11), command=self._open_target_dropup)
         self.target_button.pack(side="left", fill="x", expand=True, ipady=4)
+        self._pause_btn = tk.Button(target_wrap, text="⏸", bg="#3b4552", fg="white", activebackground="#506074", relief="flat", font=("Arial", 13, "bold"), width=3, command=self._toggle_pause)
+        self._pause_btn.pack(side="left", padx=(8, 0), ipady=2)
+        self._speed_down_btn = tk.Button(target_wrap, text="▼", bg="#3b4552", fg="white", activebackground="#506074", relief="flat", font=("Arial", 13, "bold"), width=3, command=self._speed_down)
+        self._speed_down_btn.pack(side="left", padx=(4, 0), ipady=2)
+        self._speed_up_btn = tk.Button(target_wrap, text="▲", bg="#3b4552", fg="white", activebackground="#506074", relief="flat", font=("Arial", 13, "bold"), width=3, command=self._speed_up)
+        self._speed_up_btn.pack(side="left", padx=(4, 0), ipady=2)
 
         button_row = tk.Frame(left, bg="#242b35")
         button_row.pack(fill="x", padx=20, pady=(0, 18))
@@ -988,15 +1004,68 @@ class DMXLightingEditor:
         self._draw_layout()
 
     def _preview_dmx_effect(self, effect_name):
+        """Send the selected effect to DMX fixtures.
+
+        For user-saved scenes already in dmx.scenes, just apply.
+        For generated/built-in visualizer effects not in dmx.scenes,
+        synthesize a scene dict from the effect palette + pattern and
+        inject it so animate_scene_step() can drive the pattern.
+        """
         if not self.dmx:
             return
-        if effect_name in getattr(self.dmx, "scenes", {}):
-            self.dmx.apply_scene(effect_name)
+        scenes = getattr(self.dmx, "scenes", {})
+
+        # If not already registered, synthesize from visualizer effect data
+        if effect_name not in scenes:
+            effect = self.effects_by_name.get(effect_name)
+            if not effect:
+                return
+            palette = effect.get("palette") or ["#000000"]
+            pat_type = effect.get("pattern_type", "static")
+            speed = effect.get("speed", 50)
+            num = getattr(self.dmx, "num_fixtures", 8)
+            fixtures = []
+            for i in range(num):
+                hex_c = palette[i % len(palette)]
+                r, g, b = _hex_to_rgb(hex_c)
+                fixtures.append({"r": r, "g": g, "b": b, "strobe": 0, "dimmer": 255})
+            scene_entry = {"fixtures": fixtures}
+            if pat_type != "static":
+                scene_entry["pattern"] = {"type": pat_type, "speed": speed}
+                scene_entry["colors"] = list(palette)
+            scenes[effect_name] = scene_entry
+
+        self.dmx.apply_scene(effect_name)
+        if callable(self.on_scene_applied_callback):
+            try:
+                self.on_scene_applied_callback()
+            except Exception:
+                pass
+
+    def _toggle_pause(self):
+        """Pause / resume the layout preview animation and DMX scene animation."""
+        self._preview_paused = not self._preview_paused
+        if self._preview_paused:
+            self._pause_btn.configure(text="▶", bg="#cf8f2b")
+            # Also pause DMX scene animation in console
+            if self.dmx and hasattr(self.dmx, "_active_scene_data"):
+                self._paused_scene_data = getattr(self.dmx, "_active_scene_data", None)
+        else:
+            self._pause_btn.configure(text="⏸", bg="#3b4552")
+            # Resume DMX scene animation
             if callable(self.on_scene_applied_callback):
                 try:
                     self.on_scene_applied_callback()
                 except Exception:
                     pass
+
+    def _speed_down(self):
+        """Decrease animation speed (longer interval)."""
+        self._preview_speed_ms = min(500, self._preview_speed_ms + 40)
+
+    def _speed_up(self):
+        """Increase animation speed (shorter interval)."""
+        self._preview_speed_ms = max(30, self._preview_speed_ms - 40)
 
     def _animate_preview(self):
         if not self.window or not self.canvas:
@@ -1006,9 +1075,10 @@ class DMXLightingEditor:
             if not self.window.winfo_exists():
                 self.preview_timer = None
                 return
-            self.preview_phase += 0.35
-            self._draw_layout()
-            self.preview_timer = self.window.after(110, self._animate_preview)
+            if not self._preview_paused:
+                self.preview_phase += 0.35
+                self._draw_layout()
+            self.preview_timer = self.window.after(self._preview_speed_ms, self._animate_preview)
         except Exception:
             self.preview_timer = None
 
