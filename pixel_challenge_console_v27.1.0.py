@@ -350,6 +350,15 @@ class DMXService:
             for _ in range(num_fixtures)
         ]
         self.scenes = self._build_default_scenes()
+        # Per-fixture crossfade state for smooth color transitions
+        self._fade_prev_rgb = [(0, 0, 0)] * num_fixtures  # previous RGB per fixture
+        self._fade_target_rgb = [(0, 0, 0)] * num_fixtures
+        self._fade_target_dimmer = [255] * num_fixtures
+        self._fade_target_strobe = [0] * num_fixtures
+        self._fade_elapsed_ms = 0       # ms elapsed within current crossfade
+        self._fade_duration_ms = 0      # total ms for current crossfade (0 = disabled)
+        self._fade_timer = None         # tk after handle for sub-tick
+        self._fade_root = None          # tk root reference for after() calls
 
     # ------------------------------------------------------------------
     def _fixture_base_address(self, fixture_index: int) -> int:
@@ -545,6 +554,7 @@ class DMXService:
         """Compute one animation frame for the active scene pattern and send to fixtures.
 
         Call this repeatedly from a timer to animate patterns like chase, pulse, sweep.
+        When fade is enabled, color transitions are smoothly interpolated per-fixture.
         """
         data = getattr(self, "_active_scene_data", None)
         if not data:
@@ -554,6 +564,11 @@ class DMXService:
         if pat_type == "static":
             return  # no animation needed
         n = self.num_fixtures
+
+        # Compute target RGB, dimmer, and strobe for each fixture this step
+        target_rgb = []
+        target_dimmer = []
+        target_strobe = []
         for i in range(n):
             if fc:
                 hex_c = fc[i % len(fc)]
@@ -688,41 +703,67 @@ class DMXService:
                     dimmer_val = int(self.brightness * max(0, 1.0 - (cycle - 2) / 8.0))
                 else:
                     dimmer_val = 0
-            self.fixture_states[i] = {
-                "r": r, "g": g, "b": b, "strobe": strobe_val,
-                "dimmer": clamp8(dimmer_val),
-            }
-        # ── Apply fade envelope if enabled ──
+            target_rgb.append((r, g, b))
+            target_dimmer.append(clamp8(dimmer_val))
+            target_strobe.append(strobe_val)
+
+        # ── Per-fixture color crossfade ──
         fade_in_ms = data.get("fade_in_ms", 0)
         fade_out_ms = data.get("fade_out_ms", 0)
-        if fade_in_ms or fade_out_ms:
-            # Estimate cycle length from pattern type (steps per full cycle)
-            palette_len = len(fc) if fc else 1
-            cycle_len = max(n, 8)
-            if pat_type in ("alternating", "strobe"):
-                cycle_len = max(n, 4)
-            elif pat_type in ("chase", "sweep", "bounce"):
-                cycle_len = max(n * 2, 16)
-            elif pat_type in ("fade", "fade_loop", "breathing"):
-                cycle_len = max(palette_len * 12, 24)
-            elif pat_type in ("wave", "palette_cycle"):
-                cycle_len = max(palette_len * 8, 16)
-            pos_in_cycle = step % cycle_len
-            # Use actual speed data to estimate ms per step
-            speed_pct = data.get("speed", 50)
-            ms_per_step = max(50, 500 - speed_pct * 4)
-            elapsed_ms = pos_in_cycle * ms_per_step
-            remaining_ms = (cycle_len - pos_in_cycle) * ms_per_step
-            fade_mult = 1.0
-            if fade_in_ms and elapsed_ms < fade_in_ms:
-                fade_mult = min(fade_mult, elapsed_ms / max(fade_in_ms, 1))
-            if fade_out_ms and remaining_ms < fade_out_ms:
-                fade_mult = min(fade_mult, remaining_ms / max(fade_out_ms, 1))
-            if fade_mult < 1.0:
-                for i in range(n):
-                    st = self.fixture_states[i]
-                    st["dimmer"] = clamp8(int(st["dimmer"] * fade_mult))
+        fade_ms = max(fade_in_ms, fade_out_ms)
+
+        if fade_ms > 0:
+            # Snapshot current fixture RGB as the "from" state before updating
+            self._fade_prev_rgb = [
+                (s.get("r", 0), s.get("g", 0), s.get("b", 0))
+                for s in self.fixture_states
+            ]
+            self._fade_target_rgb = target_rgb
+            self._fade_target_dimmer = target_dimmer
+            self._fade_target_strobe = target_strobe
+            self._fade_duration_ms = fade_ms
+            self._fade_elapsed_ms = 0
+            # Don't send frame yet — the sub-tick loop handles it
+        else:
+            # No fade — instant color change (original behavior)
+            for i in range(n):
+                r, g, b = target_rgb[i]
+                self.fixture_states[i] = {
+                    "r": r, "g": g, "b": b,
+                    "strobe": target_strobe[i],
+                    "dimmer": target_dimmer[i],
+                }
+            self._send_dmx_frame()
+
+    def fade_subtick(self, interval_ms: int = 20):
+        """Advance crossfade interpolation by interval_ms and send a DMX frame.
+
+        Call from a fast timer (e.g. every 20ms) to produce smooth color
+        transitions.  Returns True while the crossfade is still in progress,
+        False when complete (caller can stop its timer).
+        """
+        if self._fade_duration_ms <= 0:
+            return False
+        self._fade_elapsed_ms += interval_ms
+        t = min(1.0, self._fade_elapsed_ms / max(self._fade_duration_ms, 1))
+        n = self.num_fixtures
+        for i in range(n):
+            pr, pg, pb = self._fade_prev_rgb[i] if i < len(self._fade_prev_rgb) else (0, 0, 0)
+            tr, tg, tb = self._fade_target_rgb[i] if i < len(self._fade_target_rgb) else (0, 0, 0)
+            r = int(pr + (tr - pr) * t)
+            g = int(pg + (tg - pg) * t)
+            b = int(pb + (tb - pb) * t)
+            td = self._fade_target_dimmer[i] if i < len(self._fade_target_dimmer) else self.brightness
+            ts = self._fade_target_strobe[i] if i < len(self._fade_target_strobe) else 0
+            self.fixture_states[i] = {
+                "r": clamp8(r), "g": clamp8(g), "b": clamp8(b),
+                "strobe": ts, "dimmer": td,
+            }
         self._send_dmx_frame()
+        if t >= 1.0:
+            self._fade_duration_ms = 0
+            return False
+        return True
 
     def get_scene_names(self) -> list:
         """Return list of available scene names."""
@@ -2037,6 +2078,14 @@ class PixelChallengeConsole:
             except Exception:
                 pass
             self._scene_anim_timer = None
+        # Also cancel any crossfade sub-tick timer
+        fade_timer = getattr(self, "_fade_subtick_timer", None)
+        if fade_timer is not None:
+            try:
+                self.root.after_cancel(fade_timer)
+            except Exception:
+                pass
+            self._fade_subtick_timer = None
 
     def _scene_anim_tick(self):
         """Run one scene pattern animation frame and schedule the next."""
@@ -2049,7 +2098,38 @@ class PixelChallengeConsole:
         # Speed slider (0-100) maps to interval: 100=fast(50ms) 0=slow(500ms)
         speed = self.dmx_speed.get()
         interval = max(50, 500 - speed * 4)
-        self._scene_anim_timer = self.root.after(interval, self._scene_anim_tick)
+        # If crossfade is active, run sub-ticks until fade completes, then schedule next step
+        if self.dmx._fade_duration_ms > 0:
+            self._run_fade_subtick(interval)
+        else:
+            self._scene_anim_timer = self.root.after(interval, self._scene_anim_tick)
+
+    def _run_fade_subtick(self, step_interval_ms: int):
+        """Drive the crossfade interpolation with fast sub-ticks (~20ms).
+
+        When the fade completes (or step interval elapses), schedule the
+        next main animation step.
+        """
+        SUBTICK_MS = 20
+        if not self.dmx or self.dmx._fade_duration_ms <= 0:
+            # Fade complete — schedule next main step
+            self._fade_subtick_timer = None
+            self._scene_anim_timer = self.root.after(
+                max(1, step_interval_ms - self.dmx._fade_elapsed_ms if self.dmx else step_interval_ms),
+                self._scene_anim_tick,
+            )
+            return
+        still_fading = self.dmx.fade_subtick(SUBTICK_MS)
+        self.refresh_dmx_fixture_cards()
+        if still_fading:
+            self._fade_subtick_timer = self.root.after(
+                SUBTICK_MS,
+                lambda: self._run_fade_subtick(step_interval_ms),
+            )
+        else:
+            self._fade_subtick_timer = None
+            remaining = max(1, step_interval_ms - self.dmx._fade_elapsed_ms)
+            self._scene_anim_timer = self.root.after(remaining, self._scene_anim_tick)
 
     def _on_dmx_override_fixture(self, fixture_index: int, fixture_label: str):
         """Handle OVERRIDE button on a fixture card — open color chooser."""

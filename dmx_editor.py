@@ -1174,7 +1174,12 @@ class DMXLightingEditor:
         self._fade_out_lbl.configure(text=str(self._fade_out_ms))
 
     def _push_fade_to_dmx(self):
-        """Update DMX scene data with current fade settings and refresh preview."""
+        """Update DMX scene data with current fade settings and refresh preview.
+
+        Changes take effect immediately for the running animation — the next
+        animate_scene_step() call reads fade_in_ms / fade_out_ms from the
+        active scene data dict.
+        """
         if not self.dmx:
             return
         effect_name = self.hover_effect_name
@@ -1188,7 +1193,7 @@ class DMXLightingEditor:
             scene["fade"] = {"in_ms": self._fade_in_ms, "out_ms": self._fade_out_ms}
         else:
             scene.pop("fade", None)
-        # Re-apply to update active scene data
+        # Push into active scene data so the running animation picks it up
         data = getattr(self.dmx, "_active_scene_data", None)
         if data:
             if self._fade_enabled:
@@ -1197,6 +1202,12 @@ class DMXLightingEditor:
             else:
                 data.pop("fade_in_ms", None)
                 data.pop("fade_out_ms", None)
+        # Notify the console to restart animation with updated fade settings
+        if callable(self.on_scene_applied_callback):
+            try:
+                self.on_scene_applied_callback()
+            except Exception:
+                pass
 
     def _animate_preview(self):
         if not self.window or not self.canvas:
