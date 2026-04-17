@@ -336,7 +336,8 @@ class DMXService:
     """Controls DMX fixtures via sACN universe shared with FalconService."""
 
     def __init__(self, falcon_service, dmx_universe: int, profile: dict,
-                 num_fixtures: int, start_address: int, channels_per_fixture: int):
+                 num_fixtures: int, start_address: int, channels_per_fixture: int,
+                 dimmer_packs=None):
         self.falcon = falcon_service   # shares the sACN sender
         self.universe = dmx_universe
         self.profile = profile         # channel_map dict e.g. {"red": 1, "green": 2, ...}
@@ -349,7 +350,35 @@ class DMXService:
             {"r": 0, "g": 0, "b": 0, "strobe": 0, "dimmer": 255}
             for _ in range(num_fixtures)
         ]
+        self.dimmer_packs = self._normalize_dimmer_packs(dimmer_packs)
+        self.dimmer_levels = [
+            [0 for _ in range(pack.get("num_ports", 0))]
+            for pack in self.dimmer_packs
+        ]
         self.scenes = self._build_default_scenes()
+
+    def _normalize_dimmer_packs(self, packs):
+        normalized = []
+        for item in (packs or []):
+            if not isinstance(item, dict):
+                continue
+            model = str(item.get("model", "")).strip() or "Elation DP-DMX4B"
+            num_ports = max(1, min(16, int(item.get("num_ports", 4) or 4)))
+            start_address = max(1, min(512, int(item.get("start_address", 1) or 1)))
+            labels = item.get("port_labels", [])
+            if isinstance(labels, list):
+                labels = [str(x).strip() for x in labels]
+            else:
+                labels = []
+            while len(labels) < num_ports:
+                labels.append(f"Port {len(labels) + 1}")
+            normalized.append({
+                "model": model,
+                "num_ports": num_ports,
+                "start_address": start_address,
+                "port_labels": labels[:num_ports],
+            })
+        return normalized
 
     # ------------------------------------------------------------------
     def _fixture_base_address(self, fixture_index: int) -> int:
@@ -400,6 +429,19 @@ class DMXService:
         """All fixtures off — set dimmer to 0 on all."""
         for i in range(self.num_fixtures):
             self.fixture_states[i] = {"r": 0, "g": 0, "b": 0, "strobe": 0, "dimmer": 0}
+        for pack_levels in self.dimmer_levels:
+            for idx in range(len(pack_levels)):
+                pack_levels[idx] = 0
+        self._send_dmx_frame()
+
+    def set_dimmer_port(self, pack_index: int, port: int, level: int):
+        """Set a dimmer pack output level (0-255)."""
+        if not (0 <= pack_index < len(self.dimmer_levels)):
+            return
+        port_idx = int(port) - 1
+        if not (0 <= port_idx < len(self.dimmer_levels[pack_index])):
+            return
+        self.dimmer_levels[pack_index][port_idx] = clamp8(level)
         self._send_dmx_frame()
 
     def apply_scene(self, scene_name: str):
@@ -675,6 +717,14 @@ class DMXService:
                 _safe_set(dim_off, state.get("dimmer", 255))   # dimmer on CH7
                 _safe_set(dsp_off, 0)                          # dimmer speed off
 
+            for pack_index, pack in enumerate(self.dimmer_packs):
+                start = int(pack.get("start_address", 1)) - 1
+                levels = self.dimmer_levels[pack_index] if pack_index < len(self.dimmer_levels) else []
+                for port_idx, level in enumerate(levels):
+                    addr = start + port_idx
+                    if 0 <= addr < 512:
+                        buf[addr] = clamp8(level)
+
             self.falcon.sender[self.universe].dmx_data = bytes(buf)
         except Exception as e:
             print(f"DMXService send error: {e}")
@@ -930,6 +980,7 @@ class PixelChallengeConsole:
         self.dmx_channels_per_fixture_var = tk.IntVar(value=8)
         self.dmx_start_address = tk.IntVar(value=1)
         self.dmx_profile_id = tk.StringVar(value="venue_thintri38")
+        self.dmx_dimmer_packs = self._default_dimmer_packs()
 
         self.checkin_open = False
         self.players_confirmed = False
@@ -1151,6 +1202,47 @@ class PixelChallengeConsole:
             pass
         self.log(f"Starting game: {game_version}")
 
+    def _default_dimmer_packs(self):
+        return [
+            {
+                "model": "Elation DP-DMX4B",
+                "num_ports": 4,
+                "start_address": 64,
+                "port_labels": ["Port 1", "Port 2", "Port 3", "Port 4"],
+            }
+        ]
+
+    def _normalize_dimmer_packs(self, packs):
+        normalized = []
+        for item in (packs or []):
+            if not isinstance(item, dict):
+                continue
+            model = str(item.get("model", "")).strip() or "Elation DP-DMX4B"
+            try:
+                num_ports = int(item.get("num_ports", 4) or 4)
+            except Exception:
+                num_ports = 4
+            try:
+                start_address = int(item.get("start_address", 64) or 64)
+            except Exception:
+                start_address = 64
+            num_ports = max(1, min(16, num_ports))
+            start_address = max(1, min(512, start_address))
+            labels = item.get("port_labels", [])
+            if isinstance(labels, list):
+                labels = [str(lbl).strip() for lbl in labels if str(lbl).strip()]
+            else:
+                labels = []
+            while len(labels) < num_ports:
+                labels.append(f"Port {len(labels) + 1}")
+            normalized.append({
+                "model": model,
+                "num_ports": num_ports,
+                "start_address": start_address,
+                "port_labels": labels[:num_ports],
+            })
+        return normalized
+
     def load_assignments(self):
         if not os.path.exists(ASSIGNMENTS_FILE):
             return {}
@@ -1241,6 +1333,8 @@ class PixelChallengeConsole:
             self.dmx_channels_per_fixture_var.set(int(data.get("dmx_channels_per_fixture", 8)))
             self.dmx_start_address.set(int(data.get("dmx_start_address", 1)))
             self.dmx_profile_id.set(data.get("dmx_profile_id", "venue_thintri38"))
+            if "dmx_dimmer_packs" in data:
+                self.dmx_dimmer_packs = self._normalize_dimmer_packs(data.get("dmx_dimmer_packs"))
         except Exception:
             pass
 
@@ -1288,6 +1382,7 @@ class PixelChallengeConsole:
             "dmx_channels_per_fixture": int(self.dmx_channels_per_fixture_var.get()),
             "dmx_start_address": int(self.dmx_start_address.get()),
             "dmx_profile_id": self.dmx_profile_id.get(),
+            "dmx_dimmer_packs": self._normalize_dimmer_packs(self.dmx_dimmer_packs),
         }
         try:
             with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
@@ -1679,6 +1774,7 @@ class PixelChallengeConsole:
             num_fixtures=self.dmx_num_fixtures.get(),
             start_address=self.dmx_start_address.get(),
             channels_per_fixture=self.dmx_channels_per_fixture_var.get(),
+            dimmer_packs=self.dmx_dimmer_packs,
         )
 
     def on_dmx_brightness_changed(self, value):
@@ -4568,6 +4664,132 @@ class PixelChallengeConsole:
         tk.Button(dmx_hw_inner, text="TEST DMX", command=_test_dmx,
                   bg="#cccc00", fg="black", font=("Arial", 11, "bold"),
                   width=14, cursor="hand2").grid(row=0, column=2, rowspan=2, padx=(20, 0), sticky="n")
+
+        # === DMX Dimmer Packs ===
+        dimmer_frame = tk.LabelFrame(self.setup_window, text="DMX Dimmer Packs",
+                                     bg="#1a1a2e", fg="#ffd74f", font=("Arial", 11, "bold"))
+        dimmer_frame.pack(fill="x", padx=20, pady=(0, 8))
+        dimmer_inner = tk.Frame(dimmer_frame, bg="#1a1a2e")
+        dimmer_inner.pack(fill="x", padx=10, pady=6)
+
+        dimmer_listbox = tk.Listbox(
+            dimmer_inner, height=3, bg="#2a2a3c", fg="white",
+            selectbackground="#5544cc", font=("Arial", 10), width=56
+        )
+        dimmer_listbox.pack(side="left", fill="x", expand=True, padx=(0, 8))
+
+        dimmer_btn_col = tk.Frame(dimmer_inner, bg="#1a1a2e")
+        dimmer_btn_col.pack(side="left", fill="y")
+
+        def _refresh_dimmer_list():
+            dimmer_listbox.delete(0, "end")
+            self.dmx_dimmer_packs = self._normalize_dimmer_packs(self.dmx_dimmer_packs)
+            for pack in self.dmx_dimmer_packs:
+                model = pack.get("model", "Dimmer")
+                start = pack.get("start_address", 1)
+                ports = pack.get("num_ports", 4)
+                dimmer_listbox.insert("end", f"{model} | Start {start} | {ports} ports")
+
+        def _open_dimmer_dialog(index=None):
+            current = None
+            if index is not None and 0 <= index < len(self.dmx_dimmer_packs):
+                current = dict(self.dmx_dimmer_packs[index])
+
+            dlg = tk.Toplevel(self.setup_window, bg="#1a1a2e")
+            dlg.title("Dimmer Pack" if current else "Add Dimmer Pack")
+            dlg.geometry("460x280")
+            dlg.transient(self.setup_window)
+            dlg.grab_set()
+
+            form = tk.Frame(dlg, bg="#1a1a2e")
+            form.pack(fill="both", expand=True, padx=16, pady=12)
+
+            model_var = tk.StringVar(value=(current or {}).get("model", "Elation DP-DMX4B"))
+            ports_var = tk.IntVar(value=int((current or {}).get("num_ports", 4) or 4))
+            start_var = tk.IntVar(value=int((current or {}).get("start_address", 64) or 64))
+            labels_default = (current or {}).get("port_labels", [])
+            labels_var = tk.StringVar(value=", ".join(labels_default))
+
+            tk.Label(form, text="Model", bg="#1a1a2e", fg="white", font=("Arial", 10)).grid(row=0, column=0, sticky="e", padx=(0, 8), pady=4)
+            tk.Entry(form, textvariable=model_var, width=30, bg="#3a3a5c", fg="white", insertbackground="white", font=("Arial", 11)).grid(row=0, column=1, sticky="w", pady=4)
+
+            tk.Label(form, text="Number of Ports", bg="#1a1a2e", fg="white", font=("Arial", 10)).grid(row=1, column=0, sticky="e", padx=(0, 8), pady=4)
+            tk.Spinbox(form, from_=1, to=16, textvariable=ports_var, width=8, font=("Arial", 11),
+                       bg="#3a3a5c", fg="white", buttonbackground="#2a2a44", insertbackground="white").grid(row=1, column=1, sticky="w", pady=4)
+
+            tk.Label(form, text="DMX Start Address", bg="#1a1a2e", fg="white", font=("Arial", 10)).grid(row=2, column=0, sticky="e", padx=(0, 8), pady=4)
+            tk.Spinbox(form, from_=1, to=512, textvariable=start_var, width=8, font=("Arial", 11),
+                       bg="#3a3a5c", fg="white", buttonbackground="#2a2a44", insertbackground="white").grid(row=2, column=1, sticky="w", pady=4)
+
+            tk.Label(form, text="Port Labels", bg="#1a1a2e", fg="white", font=("Arial", 10)).grid(row=3, column=0, sticky="ne", padx=(0, 8), pady=4)
+            tk.Entry(form, textvariable=labels_var, width=36, bg="#3a3a5c", fg="white",
+                     insertbackground="white", font=("Arial", 10)).grid(row=3, column=1, sticky="w", pady=4)
+            tk.Label(form, text="Comma-separated (optional)", bg="#1a1a2e", fg="#aaaaaa",
+                     font=("Arial", 9, "italic")).grid(row=4, column=1, sticky="w", pady=(0, 4))
+
+            def _save_dimmer():
+                model = model_var.get().strip() or "Elation DP-DMX4B"
+                num_ports = max(1, min(16, int(ports_var.get() or 4)))
+                start_address = max(1, min(512, int(start_var.get() or 64)))
+                labels = [x.strip() for x in labels_var.get().split(",") if x.strip()]
+                while len(labels) < num_ports:
+                    labels.append(f"Port {len(labels) + 1}")
+                pack = {
+                    "model": model,
+                    "num_ports": num_ports,
+                    "start_address": start_address,
+                    "port_labels": labels[:num_ports],
+                }
+                if index is None:
+                    self.dmx_dimmer_packs.append(pack)
+                else:
+                    self.dmx_dimmer_packs[index] = pack
+                self.dmx_dimmer_packs = self._normalize_dimmer_packs(self.dmx_dimmer_packs)
+                _refresh_dimmer_list()
+                dlg.grab_release()
+                dlg.destroy()
+
+            btn_row = tk.Frame(form, bg="#1a1a2e")
+            btn_row.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(12, 0))
+            tk.Button(btn_row, text="SAVE", command=_save_dimmer, bg="#2ea62e", fg="white",
+                      font=("Arial", 11, "bold"), width=10, cursor="hand2").pack(side="left")
+            tk.Button(btn_row, text="CANCEL", command=lambda: (dlg.grab_release(), dlg.destroy()),
+                      bg="#c93b1e", fg="white", font=("Arial", 11, "bold"), width=10, cursor="hand2").pack(side="right")
+
+        def _add_dimmer():
+            _open_dimmer_dialog()
+
+        def _edit_dimmer():
+            sel = dimmer_listbox.curselection()
+            if not sel:
+                return
+            _open_dimmer_dialog(sel[0])
+
+        def _remove_dimmer():
+            sel = dimmer_listbox.curselection()
+            if not sel:
+                return
+            idx = sel[0]
+            if not (0 <= idx < len(self.dmx_dimmer_packs)):
+                return
+            pack = self.dmx_dimmer_packs[idx]
+            if not messagebox.askyesno("Remove Dimmer", f"Remove '{pack.get('model', 'Dimmer')}'?"):
+                return
+            self.dmx_dimmer_packs.pop(idx)
+            self.dmx_dimmer_packs = self._normalize_dimmer_packs(self.dmx_dimmer_packs)
+            _refresh_dimmer_list()
+
+        tk.Button(dimmer_btn_col, text="ADD DIMMER", command=_add_dimmer,
+                  bg="#1b63ff", fg="white", font=("Arial", 10, "bold"),
+                  width=12, cursor="hand2").pack(pady=3)
+        tk.Button(dimmer_btn_col, text="EDIT", command=_edit_dimmer,
+                  bg="#30445e", fg="white", font=("Arial", 10, "bold"),
+                  width=12, cursor="hand2").pack(pady=3)
+        tk.Button(dimmer_btn_col, text="REMOVE", command=_remove_dimmer,
+                  bg="#c93b1e", fg="white", font=("Arial", 10, "bold"),
+                  width=12, cursor="hand2").pack(pady=3)
+
+        _refresh_dimmer_list()
 
         # Manage Fixture Profiles
         dmx_prof_frame = tk.LabelFrame(self.setup_window, text="Manage Fixture Profiles",

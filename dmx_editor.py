@@ -115,6 +115,10 @@ class DMXLightingEditor:
         except Exception:
             pass
         style.configure("Viz.TCombobox", fieldbackground="#2b3440", background="#2b3440", foreground="white")
+        self.window.option_add("*TCombobox*Listbox.background", "#1a212b")
+        self.window.option_add("*TCombobox*Listbox.foreground", "white")
+        self.window.option_add("*TCombobox*Listbox.selectBackground", "#8ec5ff")
+        self.window.option_add("*TCombobox*Listbox.selectForeground", "#0a1a2b")
 
         var_master = self.parent if self._embedded else self.window
         self.game_var = tk.StringVar(master=var_master, value=self.current_game)
@@ -573,36 +577,96 @@ class DMXLightingEditor:
         lst = tk.Listbox(dialog, bg="#111820", fg="white", font=("Arial", 11), selectbackground="#8ec5ff", selectforeground="#0a1a2b")
         lst.pack(fill="both", expand=True, padx=12, pady=(0, 8))
 
+        def _format_target_value(value):
+            if isinstance(value, list) and value and all(isinstance(g, list) for g in value):
+                return ", ".join(f"[{', '.join(str(fid) for fid in group)}]" for group in value)
+            if isinstance(value, list):
+                return ", ".join(str(fid) for fid in value)
+            return ""
+
+        def _parse_target_value(raw_text):
+            text = (raw_text or "").strip()
+            if not text:
+                return []
+            if "[" in text and "]" in text:
+                grouped = []
+                normalized = text.replace("], [", "],[").replace("] , [", "],[")
+                for block in normalized.split("],["):
+                    chunk = block.strip().strip("[]")
+                    items = [f.strip().upper() for f in chunk.split(",") if f.strip()]
+                    if items:
+                        grouped.append(items)
+                return grouped
+            return [f.strip().upper() for f in text.split(",") if f.strip()]
+
+        def _selected_target_name():
+            sel = lst.curselection()
+            if not sel:
+                return None
+            names = list(self.targets.keys())
+            idx = sel[0]
+            if 0 <= idx < len(names):
+                return names[idx]
+            return None
+
         def refresh():
             lst.delete(0, "end")
             for k, v in self.targets.items():
-                lst.insert("end", f"{k}: {', '.join(v)}")
+                lst.insert("end", f"{k}: {_format_target_value(v)}")
 
         refresh()
 
         controls = tk.Frame(dialog, bg="#202833")
         controls.pack(fill="x", padx=12, pady=8)
         tk.Button(controls, text="Add", bg="#2f9b4e", fg="white", relief="flat", command=lambda: add_target()).pack(side="left", padx=(0, 8), ipady=4, ipadx=10)
-        tk.Button(controls, text="Delete", bg="#30445e", fg="white", relief="flat", command=lambda: delete_target()).pack(side="left", ipady=4, ipadx=10)
+        tk.Button(controls, text="Edit", bg="#30445e", fg="white", relief="flat", command=lambda: edit_target()).pack(side="left", padx=(0, 8), ipady=4, ipadx=10)
+        tk.Button(controls, text="Save", bg="#1b63ff", fg="white", relief="flat", command=lambda: save_targets()).pack(side="left", padx=(0, 8), ipady=4, ipadx=10)
+        tk.Button(controls, text="Remove", bg="#30445e", fg="white", relief="flat", command=lambda: delete_target()).pack(side="left", ipady=4, ipadx=10)
 
         def add_target():
             name = simpledialog.askstring("Target Name", "New target name:", parent=dialog)
             if not name:
                 return
-            fixture_text = simpledialog.askstring("Fixtures", "Fixture IDs (comma-separated, e.g. F1,F2):", parent=dialog)
+            fixture_text = simpledialog.askstring("Fixtures", "Fixture IDs (comma-separated, e.g. F1,F2 — or grouped: [F1,F3],[F2],[F4]):", parent=dialog)
             if not fixture_text:
                 return
-            fixtures = [f.strip().upper() for f in fixture_text.split(",") if f.strip()]
+            fixtures = _parse_target_value(fixture_text)
             self.targets[name.strip()] = fixtures
             self.layout["targets"] = self.targets
             self._save_layouts()
             refresh()
 
-        def delete_target():
-            if not lst.curselection():
+        def edit_target():
+            key = _selected_target_name()
+            if not key:
                 return
-            line = lst.get(lst.curselection()[0])
-            key = line.split(":", 1)[0]
+            if key == ALL_FIXTURES_TARGET:
+                messagebox.showwarning("Edit Target", "'All Fixtures' cannot be edited.", parent=dialog)
+                return
+            current = self.targets.get(key, [])
+            fixture_text = simpledialog.askstring(
+                "Edit Fixtures",
+                "Fixture IDs (comma-separated, e.g. F1,F2 — or grouped: [F1,F3],[F2],[F4]):",
+                initialvalue=_format_target_value(current),
+                parent=dialog,
+            )
+            if fixture_text is None:
+                return
+            fixtures = _parse_target_value(fixture_text)
+            self.targets[key] = fixtures
+            self.layout["targets"] = self.targets
+            self._save_layouts()
+            refresh()
+
+        def save_targets():
+            self.layout["targets"] = self.targets
+            self._save_layouts()
+            messagebox.showinfo("Targets", "Targets saved.", parent=dialog)
+
+        def delete_target():
+            key = _selected_target_name()
+            if not key:
+                return
             if key == ALL_FIXTURES_TARGET:
                 return
             self.targets.pop(key, None)
