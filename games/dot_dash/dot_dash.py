@@ -316,6 +316,7 @@ class DotDashSession(GameSession):
                     ps.phase = "return"
                     ps.return_head_index = self.lane_pixel_count - 1
                     self.host.play_sound("dd_lane_switch")
+                    self.host.visual_event("Overlay 2", "on")  # turnaround success accent
                     self.host.log(f"[GAME] P{ps.player_id} TURNAROUND! Returning...")
 
             elif ps.phase == "return":
@@ -331,6 +332,7 @@ class DotDashSession(GameSession):
         else:
             # WRONG BUTTON
             self.host.play_sound("dd_shot_hit_wrong")
+            self.host.visual_event("Overlay 3", "on")  # miss/penalty accent
             self.host.log(f"[GAME] P{ps.player_id} wrong! Pressed {color_name}, expected {expected_color}")
 
         # Update display
@@ -368,6 +370,7 @@ class DotDashSession(GameSession):
             ps.first_finisher = True
             self.host.log(f"[GAME] P{ps.player_id} WINS! Time: {completion_time:.2f}s")
             self.host.play_sound("dd_lane_clear")
+            self.host.visual_event("Overlay 2", "on")  # winner/success accent
         else:
             self.host.log(f"[GAME] P{ps.player_id} finished. Time: {completion_time:.2f}s")
             self.host.play_sound("dd_snake_reached_end")
@@ -410,6 +413,7 @@ class DotDashSession(GameSession):
                     self.phase = GamePhase.ROUND_COMPLETE
                     self.completed_at = now_monotonic
                     self.host.play_sound("dd_round_end")
+                    self.host.visual_event("Overlay 4", "on")  # game-over / completion accent
                     self.host.log("[GAME] Round complete!")
                 
             self._update_viewer()
@@ -439,6 +443,8 @@ class DotDashSession(GameSession):
 
         self.host.log("[GAME] GO! GO! GO!")
         self.host.play_sound("dd_music_gameplay")
+        self.host.visual_event("Gameplay", "on")
+        self.host.visual_event("Overlay 1", "on")  # round-start accent
 
         for ps in self.state.values():
             ps.phase = "armed"
@@ -466,6 +472,7 @@ class DotDashSession(GameSession):
                     ps.finished_at = self.round_deadline
                     self.host.log(f"[GAME] P{ps.player_id} TIMED OUT!")
             self.host.play_sound("timeout")
+            self.host.visual_event("Danger", "on")  # timeout danger state
 
     def _all_finished(self) -> bool:
         """Check if all players have finished."""

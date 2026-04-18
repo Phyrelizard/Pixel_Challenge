@@ -428,6 +428,8 @@ class SurroundSession(GameSession):
         self.host.log(f"[SURROUND] Phase set to PLAYING, {len(self.players)} player(s)")
         self.host.play_sound("su_round_start")
         self.host.play_sound("su_music_gameplay")
+        self.host.visual_event("Gameplay", "on")
+        self.host.visual_event("Overlay 1", "on")  # round-start accent
         self.round_start_time = current_time
         self.last_tick_time = current_time
         
@@ -461,6 +463,7 @@ class SurroundSession(GameSession):
         if hasattr(self.host, 'stop_music'):
             self.host.stop_music()
         self.host.play_sound("su_round_end")
+        self.host.visual_event("Overlay 4", "on")  # game-over / completion accent
         
         # Calculate final scores
         for pid, ps in self.player_states.items():
@@ -864,6 +867,7 @@ class SurroundSession(GameSession):
             return
         
         self.host.play_sound("su_bonus_start")
+        self.host.visual_event("Bonus", "on")  # egg hatch bonus event
         spawn_row = egg.row
         baby_config = self.baby_snakes_config
         
@@ -952,11 +956,13 @@ class SurroundSession(GameSession):
 
                     self._check_extra_life(player_id)
                     self.host.play_sound("su_shot_hit_correct")
+                    self.host.visual_event("Overlay 2", "on")  # hit/destroy success accent
                     return True
                 else:
                     ps.record_shot(hit=False, wrong_color=True)
                     ps.add_score(self.scoring_config.get("wrong_color_penalty", -5))
                     self.host.play_sound("su_shot_hit_wrong")
+                    self.host.visual_event("Overlay 3", "on")  # wrong-color penalty accent
                     return True
         
         # Check baby snakes
@@ -1079,6 +1085,7 @@ class SurroundSession(GameSession):
         alive = ps.take_damage(current_time)
         ps.add_score(self.scoring_config.get("player_hit_penalty", -20))
         self.host.play_sound("su_snake_warning")
+        self.host.visual_event("Danger", "on")  # player hit danger state
         
         if not alive and self.mode == 2:
             # Player died in Mode 2

@@ -1,56 +1,13 @@
 {
   "profiles": [
     {
-      "game": "dot_dash",
-      "profile_name": "Default Small Rig",
-      "layout_id": "small_rig_8_fixture",
-      "assignments": {
-        "Gameplay": {
-          "effect": "Green Chase Up",
-          "apply_to": "All Fixtures"
-        },
-        "Bonus": {
-          "effect": "Gold Victory",
-          "apply_to": "Top Fixtures"
-        },
-        "Danger": {
-          "effect": "Red Alert",
-          "apply_to": "All Fixtures"
-        },
-        "Special": {
-          "effect": "Rainbow Wave",
-          "apply_to": "All Fixtures"
-        },
-        "Randomizer": {
-          "effect": "Ocean Pulse",
-          "apply_to": "All Fixtures"
-        },
-        "Overlay 1": {
-          "effect": "Amber Glow",
-          "apply_to": "Top Left Pair"
-        },
-        "Overlay 2": {
-          "effect": "Sapphire Wave",
-          "apply_to": "Top Right Pair"
-        },
-        "Overlay 3": {
-          "effect": "Neon Rush",
-          "apply_to": "Left Wash Group"
-        },
-        "Overlay 4": {
-          "effect": "Crimson Storm",
-          "apply_to": "Right Wash Group"
-        }
-      }
-    },
-    {
       "game": "pixel_pop",
       "profile_name": "Default Small Rig",
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
-          "effect": "Crimson Storm",
-          "apply_to": "All Fixtures"
+          "effect": "Amber Blaze",
+          "apply_to": "vertupchase"
         },
         "Bonus": {
           "effect": "Golden Hour",
@@ -73,7 +30,7 @@
           "apply_to": "Top Left Pair"
         },
         "Overlay 2": {
-          "effect": "Electric Surge",
+          "effect": "Crimson Storm",
           "apply_to": "Top Right Pair"
         },
         "Overlay 3": {
@@ -81,7 +38,7 @@
           "apply_to": "Left Wash Group"
         },
         "Overlay 4": {
-          "effect": "Inferno Chase",
+          "effect": "Solar Flare",
           "apply_to": "Right Wash Group"
         }
       }
@@ -173,13 +130,16 @@
       }
     },
     {
-      "game": "global",
+      "game": "splash",
       "profile_name": "Default Small Rig",
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
-          "effect": "Ocean Pulse",
-          "apply_to": "All Fixtures"
+          "effect": "Solar Flare",
+          "apply_to": "LR PAIR",
+          "fade_enabled": true,
+          "fade_in_ms": 250,
+          "fade_out_ms": 0
         },
         "Bonus": {
           "effect": "Gold Victory",
@@ -202,8 +162,8 @@
           "apply_to": "Top Left Pair"
         },
         "Overlay 2": {
-          "effect": "Sapphire Wave",
-          "apply_to": "Top Right Pair"
+          "effect": "Rainbow Wave",
+          "apply_to": "turn"
         },
         "Overlay 3": {
           "effect": "Neon Rush",
@@ -212,6 +172,233 @@
         "Overlay 4": {
           "effect": "Electric Surge",
           "apply_to": "Top Left Pair"
+        }
+      }
+    },
+    {
+      "game": "dot_dash",
+      "profile_name": "Default Small Rig",
+      "layout_id": "small_rig_8_fixture",
+      "assignments": {
+        "Gameplay": {
+          "effect": "Fire Burst",
+          "apply_to": "LR PAIR",
+          "fade_enabled": false,
+          "fade_in_ms": 125,
+          "fade_out_ms": 125
+        },
+        "Bonus": {
+          "effect": "Gold Victory",
+          "apply_to": "Top Fixtures"
+        },
+        "Danger": {
+          "effect": "Red Alert",
+          "apply_to": "All Fixtures"
+        },
+        "Special": {
+          "effect": "Rainbow Wave",
+          "apply_to": "All Fixtures"
+        },
+        "Randomizer": {
+          "effect": "Color Roulette",
+          "apply_to": "All Fixtures"
+        },
+        "Overlay 1": {
+          "effect": "Amber Glow",
+          "apply_to": "Top Left Pair"
+        },
+        "Overlay 2": {
+          "effect": "Midnight Bloom",
+          "apply_to": "turn"
+        },
+        "Overlay 3": {
+          "effect": "Neon Rush",
+          "apply_to": "Left Wash Group"
+        },
+        "Overlay 4": {
+          "effect": "Solar Flare",
+          "apply_to": "LR PAIR"
+        }
+      }
+    },
+    {
+      "game": "dot_dash",
+      "profile_name": "dotdash fire test",
+      "layout_id": "small_rig_8_fixture",
+      "assignments": {
+        "Gameplay": {
+          "effect": "Fire Burst (Copy)",
+          "apply_to": "All Fixtures"
+        },
+        "Bonus": {
+          "effect": "Gold Victory",
+          "apply_to": "Top Fixtures"
+        },
+        "Danger": {
+          "effect": "Red Alert",
+          "apply_to": "All Fixtures"
+        },
+        "Special": {
+          "effect": "Rainbow Wave",
+          "apply_to": "All Fixtures"
+        },
+        "Randomizer": {
+          "effect": "Color Roulette",
+          "apply_to": "All Fixtures"
+        },
+        "Overlay 1": {
+          "effect": "Amber Glow",
+          "apply_to": "Top Left Pair"
+        },
+        "Overlay 2": {
+          "effect": "Sapphire Wave",
+          "apply_to": "Top Right Pair"
+        },
+        "Overlay 3": {
+          "effect": "Neon Rush",
+          "apply_to": "Left Wash Group"
+        },
+        "Overlay 4": {
+          "effect": "Crimson Storm",
+          "apply_to": "Right Wash Group"
+        }
+      }
+    },
+    {
+      "game": "splash",
+      "profile_name": "ssolarflare",
+      "layout_id": "small_rig_8_fixture",
+      "assignments": {
+        "Gameplay": {
+          "effect": "Solar Flare",
+          "apply_to": "LR PAIR",
+          "fade_enabled": true,
+          "fade_in_ms": 250,
+          "fade_out_ms": 0
+        },
+        "Bonus": {
+          "effect": "Gold Victory",
+          "apply_to": "Top Fixtures"
+        },
+        "Danger": {
+          "effect": "Red Alert",
+          "apply_to": "All Fixtures"
+        },
+        "Special": {
+          "effect": "Rainbow Wave",
+          "apply_to": "All Fixtures"
+        },
+        "Randomizer": {
+          "effect": "Color Roulette",
+          "apply_to": "All Fixtures"
+        },
+        "Overlay 1": {
+          "effect": "Amber Blaze",
+          "apply_to": "Top Left Pair"
+        },
+        "Overlay 2": {
+          "effect": "Rainbow Wave",
+          "apply_to": "turn"
+        },
+        "Overlay 3": {
+          "effect": "Neon Rush",
+          "apply_to": "Left Wash Group"
+        },
+        "Overlay 4": {
+          "effect": "Electric Surge",
+          "apply_to": "Top Left Pair"
+        }
+      }
+    },
+    {
+      "game": "dot_dash",
+      "profile_name": "test",
+      "layout_id": "small_rig_8_fixture",
+      "assignments": {
+        "Gameplay": {
+          "effect": "Amber Blaze",
+          "apply_to": "1-3",
+          "fade_enabled": false,
+          "fade_in_ms": 125,
+          "fade_out_ms": 125
+        },
+        "Bonus": {
+          "effect": "Gold Victory",
+          "apply_to": "Top Fixtures"
+        },
+        "Danger": {
+          "effect": "Red Alert",
+          "apply_to": "All Fixtures"
+        },
+        "Special": {
+          "effect": "Rainbow Wave",
+          "apply_to": "All Fixtures"
+        },
+        "Randomizer": {
+          "effect": "Color Roulette",
+          "apply_to": "All Fixtures"
+        },
+        "Overlay 1": {
+          "effect": "Amber Glow",
+          "apply_to": "Top Left Pair"
+        },
+        "Overlay 2": {
+          "effect": "Cool Blue Static",
+          "apply_to": "turn"
+        },
+        "Overlay 3": {
+          "effect": "Neon Rush",
+          "apply_to": "Left Wash Group"
+        },
+        "Overlay 4": {
+          "effect": "Solar Flare",
+          "apply_to": "LR PAIR"
+        }
+      }
+    },
+    {
+      "game": "dot_dash",
+      "profile_name": "test2",
+      "layout_id": "small_rig_8_fixture",
+      "assignments": {
+        "Gameplay": {
+          "effect": "Arctic Shimmer",
+          "apply_to": "1-3",
+          "fade_enabled": false,
+          "fade_in_ms": 125,
+          "fade_out_ms": 125
+        },
+        "Bonus": {
+          "effect": "Gold Victory",
+          "apply_to": "Top Fixtures"
+        },
+        "Danger": {
+          "effect": "Red Alert",
+          "apply_to": "All Fixtures"
+        },
+        "Special": {
+          "effect": "Rainbow Wave",
+          "apply_to": "All Fixtures"
+        },
+        "Randomizer": {
+          "effect": "Color Roulette",
+          "apply_to": "All Fixtures"
+        },
+        "Overlay 1": {
+          "effect": "Amber Glow",
+          "apply_to": "Top Left Pair"
+        },
+        "Overlay 2": {
+          "effect": "Midnight Bloom",
+          "apply_to": "turn"
+        },
+        "Overlay 3": {
+          "effect": "Neon Rush",
+          "apply_to": "Left Wash Group"
+        },
+        "Overlay 4": {
+          "effect": "Solar Flare",
+          "apply_to": "LR PAIR"
         }
       }
     }

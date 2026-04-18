@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v26.7.0
+Pixel Challenge Host Console v27.1.0
 
 """
 
@@ -27,7 +27,7 @@ from games.base import PlayerConfig
 from sla import SLAStore, SLACalibration
 from dmx_editor import DMXLightingEditor
 
-VERSION_LABEL = "v26.7.0"
+VERSION_LABEL = "v27.1.0"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 DEFAULT_FALCON_IP = "192.168.2.113"
@@ -41,6 +41,8 @@ GAMES_ROOT = "/home/ledgame/easter_game/games"
 DMX_PROFILES_FILE = "/home/ledgame/easter_game/dmx_fixture_profiles.json"
 DMX_SCENES_FILE = "/home/ledgame/easter_game/dmx_scenes.json"
 DMX_SAVED_COLORS_FILE = "/home/ledgame/easter_game/dmx_saved_colors.json"
+DMX_VISUALIZER_PROFILES_FILE = "/home/ledgame/easter_game/dmx_visualizer_profiles.json"
+DMX_VISUALIZER_LAYOUTS_FILE = "/home/ledgame/easter_game/dmx_visualizer_layouts.json"
 
 # Game module versions are now read from GameMeta.version in each game module
 
@@ -348,6 +350,15 @@ class DMXService:
             for _ in range(num_fixtures)
         ]
         self.scenes = self._build_default_scenes()
+        # Per-fixture crossfade state for smooth color transitions
+        self._fade_prev_rgb = [(0, 0, 0)] * num_fixtures  # previous RGB per fixture
+        self._fade_target_rgb = [(0, 0, 0)] * num_fixtures
+        self._fade_target_dimmer = [255] * num_fixtures
+        self._fade_target_strobe = [0] * num_fixtures
+        self._fade_elapsed_ms = 0       # ms elapsed within current crossfade
+        self._fade_duration_ms = 0      # total ms for current crossfade (0 = disabled)
+        self._fade_timer = None         # tk after handle for sub-tick
+        self._fade_root = None          # tk root reference for after() calls
 
     # ------------------------------------------------------------------
     def _fixture_base_address(self, fixture_index: int) -> int:
@@ -428,6 +439,11 @@ class DMXService:
                 "pattern": pattern.get("type", "static"),
                 "speed": pattern.get("speed", 100),
             }
+            # Propagate fade envelope data if present
+            fade = scene.get("fade")
+            if fade and isinstance(fade, dict):
+                self._active_scene_data["fade_in_ms"] = fade.get("in_ms", 0)
+                self._active_scene_data["fade_out_ms"] = fade.get("out_ms", 0)
         else:
             self._active_scene_data = None
         self._send_dmx_frame()
@@ -538,6 +554,7 @@ class DMXService:
         """Compute one animation frame for the active scene pattern and send to fixtures.
 
         Call this repeatedly from a timer to animate patterns like chase, pulse, sweep.
+        When fade is enabled, color transitions are smoothly interpolated per-fixture.
         """
         data = getattr(self, "_active_scene_data", None)
         if not data:
@@ -547,6 +564,11 @@ class DMXService:
         if pat_type == "static":
             return  # no animation needed
         n = self.num_fixtures
+
+        # Compute target RGB, dimmer, and strobe for each fixture this step
+        target_rgb = []
+        target_dimmer = []
+        target_strobe = []
         for i in range(n):
             if fc:
                 hex_c = fc[i % len(fc)]
@@ -562,17 +584,37 @@ class DMXService:
                     dimmer_val = 0
             elif pat_type == "pulse":
                 import math
+                # Pulse: cycle through palette colors with sine brightness modulation
+                if fc:
+                    color_idx = (step // 4) % len(fc)
+                    hex_c = fc[color_idx]
+                    r, g, b = _hex_to_rgb(hex_c)
                 phase = (step * 0.15 + i * 0.3) % (2 * math.pi)
                 dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
             elif pat_type == "chase":
+                # Chase: shift palette colors across fixtures over time
+                if fc:
+                    shifted_idx = (i + step) % len(fc)
+                    hex_c = fc[shifted_idx]
+                    r, g, b = _hex_to_rgb(hex_c)
                 active = step % max(n, 1)
-                dimmer_val = self.brightness if i == active else int(self.brightness * 0.05)
+                dimmer_val = self.brightness if i == active else int(self.brightness * 0.25)
             elif pat_type == "sweep":
+                # Sweep: gradient spotlight moves across fixtures with palette colors
+                if fc:
+                    shifted_idx = (i + step) % len(fc)
+                    hex_c = fc[shifted_idx]
+                    r, g, b = _hex_to_rgb(hex_c)
                 pos = step % max(n, 1)
                 dist = abs(i - pos)
                 falloff = max(0, 1.0 - dist / max(n * 0.3, 1))
-                dimmer_val = int(self.brightness * falloff)
+                dimmer_val = int(self.brightness * max(0.15, falloff))
             elif pat_type == "bounce":
+                # Bounce: spotlight forward then backward with palette colors
+                if fc:
+                    shifted_idx = (i + step) % len(fc)
+                    hex_c = fc[shifted_idx]
+                    r, g, b = _hex_to_rgb(hex_c)
                 half = max(n, 1)
                 pos = step % (2 * half)
                 if pos >= half:
@@ -581,19 +623,51 @@ class DMXService:
                 falloff = max(0, 1.0 - dist / max(n * 0.3, 1))
                 dimmer_val = int(self.brightness * falloff)
             elif pat_type == "alternating":
+                # Alternating: switch palette colors across fixtures, swap on step
                 flip = step % 2
-                dimmer_val = self.brightness if (i + flip) % 2 == 0 else int(self.brightness * 0.1)
+                if fc:
+                    slot = (i + flip) % len(fc)
+                    hex_c = fc[slot]
+                    r, g, b = _hex_to_rgb(hex_c)
+                dimmer_val = self.brightness if (i + flip) % 2 == 0 else int(self.brightness * 0.6)
             elif pat_type == "palette_cycle":
                 shifted_idx = (i + step) % len(fc) if fc else 0
                 hex_c = fc[shifted_idx] if fc else "#000000"
                 r, g, b = _hex_to_rgb(hex_c)
+            elif pat_type == "wave":
+                # Wave: phase-shifted palette cycle across fixtures
+                if fc:
+                    shifted_idx = (i + step) % len(fc)
+                    hex_c = fc[shifted_idx]
+                    r, g, b = _hex_to_rgb(hex_c)
+                else:
+                    import math as _m
+                    phase = (step * 0.2 - i * 0.4) % (2 * _m.pi)
+                    dimmer_val = int(self.brightness * (0.5 + 0.5 * _m.sin(phase)))
             elif pat_type == "random_flash":
                 import random
-                dimmer_val = self.brightness if random.random() > 0.6 else 0
-            elif pat_type == "fade_loop":
+                # Random flash: randomly pick a palette color and flash on/off
+                if fc:
+                    hex_c = fc[random.randint(0, len(fc) - 1)]
+                    r, g, b = _hex_to_rgb(hex_c)
+                dimmer_val = self.brightness if random.random() > 0.5 else 0
+            elif pat_type == "fade_loop" or pat_type == "fade":
                 import math
-                phase = (step * 0.1) % (2 * math.pi)
-                dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
+                # Fade: cycle through palette colors smoothly over time
+                if fc:
+                    cycle_len = len(fc)
+                    pos = (step * 0.08) % cycle_len
+                    idx_a = int(pos) % cycle_len
+                    idx_b = (idx_a + 1) % cycle_len
+                    frac = pos - int(pos)
+                    ra, ga, ba = _hex_to_rgb(fc[idx_a])
+                    rb, gb, bb = _hex_to_rgb(fc[idx_b])
+                    r = int(ra + (rb - ra) * frac)
+                    g = int(ga + (gb - ga) * frac)
+                    b = int(ba + (bb - ba) * frac)
+                else:
+                    phase = (step * 0.1) % (2 * math.pi)
+                    dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
             elif pat_type == "sparkle":
                 import random
                 dimmer_val = self.brightness if random.random() > 0.8 else int(self.brightness * 0.1)
@@ -629,11 +703,67 @@ class DMXService:
                     dimmer_val = int(self.brightness * max(0, 1.0 - (cycle - 2) / 8.0))
                 else:
                     dimmer_val = 0
+            target_rgb.append((r, g, b))
+            target_dimmer.append(clamp8(dimmer_val))
+            target_strobe.append(strobe_val)
+
+        # ── Per-fixture color crossfade ──
+        fade_in_ms = data.get("fade_in_ms", 0)
+        fade_out_ms = data.get("fade_out_ms", 0)
+        fade_ms = max(fade_in_ms, fade_out_ms)
+
+        if fade_ms > 0:
+            # Snapshot current fixture RGB as the "from" state before updating
+            self._fade_prev_rgb = [
+                (s.get("r", 0), s.get("g", 0), s.get("b", 0))
+                for s in self.fixture_states
+            ]
+            self._fade_target_rgb = target_rgb
+            self._fade_target_dimmer = target_dimmer
+            self._fade_target_strobe = target_strobe
+            self._fade_duration_ms = fade_ms
+            self._fade_elapsed_ms = 0
+            # Don't send frame yet — the sub-tick loop handles it
+        else:
+            # No fade — instant color change (original behavior)
+            for i in range(n):
+                r, g, b = target_rgb[i]
+                self.fixture_states[i] = {
+                    "r": r, "g": g, "b": b,
+                    "strobe": target_strobe[i],
+                    "dimmer": target_dimmer[i],
+                }
+            self._send_dmx_frame()
+
+    def fade_subtick(self, interval_ms: int = 20):
+        """Advance crossfade interpolation by interval_ms and send a DMX frame.
+
+        Call from a fast timer (e.g. every 20ms) to produce smooth color
+        transitions.  Returns True while the crossfade is still in progress,
+        False when complete (caller can stop its timer).
+        """
+        if self._fade_duration_ms <= 0:
+            return False
+        self._fade_elapsed_ms += interval_ms
+        t = min(1.0, self._fade_elapsed_ms / max(self._fade_duration_ms, 1))
+        n = self.num_fixtures
+        for i in range(n):
+            pr, pg, pb = self._fade_prev_rgb[i] if i < len(self._fade_prev_rgb) else (0, 0, 0)
+            tr, tg, tb = self._fade_target_rgb[i] if i < len(self._fade_target_rgb) else (0, 0, 0)
+            r = int(pr + (tr - pr) * t)
+            g = int(pg + (tg - pg) * t)
+            b = int(pb + (tb - pb) * t)
+            td = self._fade_target_dimmer[i] if i < len(self._fade_target_dimmer) else self.brightness
+            ts = self._fade_target_strobe[i] if i < len(self._fade_target_strobe) else 0
             self.fixture_states[i] = {
-                "r": r, "g": g, "b": b, "strobe": strobe_val,
-                "dimmer": clamp8(dimmer_val),
+                "r": clamp8(r), "g": clamp8(g), "b": clamp8(b),
+                "strobe": ts, "dimmer": td,
             }
         self._send_dmx_frame()
+        if t >= 1.0:
+            self._fade_duration_ms = 0
+            return False
+        return True
 
     def get_scene_names(self) -> list:
         """Return list of available scene names."""
@@ -1054,6 +1184,8 @@ class PixelChallengeConsole:
         # Load fixture profiles and create DMX service (v25.3.0)
         self.dmx_profiles = self.load_dmx_profiles()
         self.dmx = self._create_dmx_service()
+        self.visualizer_profiles = self.load_visualizer_profiles()
+        self.visualizer_layouts = self.load_visualizer_layouts()
         # Swatch canvas references updated by refresh_dmx_fixture_cards()
         self.dmx_fixture_swatches = []
 
@@ -1089,6 +1221,7 @@ class PixelChallengeConsole:
 
         # Load user-authored DMX scenes and slot assignments (after build_ui)
         self._load_user_scenes_into_dmx()
+        self._load_generated_effects_into_dmx()
         self._load_slot_assignments()
         self._refresh_dmx_scene_combo()
 
@@ -1491,6 +1624,177 @@ class PixelChallengeConsole:
         except Exception as e:
             self.log(f"save_dmx_profiles error: {e}")
 
+    def _build_default_visualizer_assignments(self) -> dict:
+        return {
+            "Gameplay": {"effect": "Fire Burst", "apply_to": "All Fixtures"},
+            "Bonus": {"effect": "Gold Victory", "apply_to": "Top Fixtures"},
+            "Danger": {"effect": "Red Alert", "apply_to": "All Fixtures"},
+            "Special": {"effect": "Rainbow Wave", "apply_to": "All Fixtures"},
+            "Randomizer": {"effect": "Ocean Pulse", "apply_to": "All Fixtures"},
+            "Overlay 1": {"effect": "Amber Glow", "apply_to": "Top Left Pair"},
+            "Overlay 2": {"effect": "Sapphire Wave", "apply_to": "Top Right Pair"},
+            "Overlay 3": {"effect": "Neon Rush", "apply_to": "Left Wash Group"},
+            "Overlay 4": {"effect": "Crimson Storm", "apply_to": "Right Wash Group"},
+        }
+
+    def load_visualizer_profiles(self) -> dict:
+        default = {
+            "profiles": [
+                {
+                    "game": game,
+                    "profile_name": "Default Small Rig",
+                    "layout_id": "small_rig_8_fixture",
+                    "assignments": self._build_default_visualizer_assignments(),
+                }
+                for game in ("dot_dash", "pixel_pop", "surround", "ascend", "global")
+            ]
+        }
+        try:
+            if not os.path.exists(DMX_VISUALIZER_PROFILES_FILE):
+                os.makedirs(os.path.dirname(DMX_VISUALIZER_PROFILES_FILE), exist_ok=True)
+                with open(DMX_VISUALIZER_PROFILES_FILE, "w", encoding="utf-8") as f:
+                    json.dump(default, f, indent=2)
+                return default
+            with open(DMX_VISUALIZER_PROFILES_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict) and isinstance(data.get("profiles"), list):
+                return data
+        except Exception as e:
+            self.log(f"load_visualizer_profiles error: {e}")
+        return default
+
+    def load_visualizer_layouts(self) -> dict:
+        default = {
+            "layouts": [
+                {
+                    "layout_id": "small_rig_8_fixture",
+                    "name": "Default Small Rig",
+                    "fixtures": [
+                        {"id": "F1", "type": "wash", "x": 80, "y": 580, "direction": "left"},
+                        {"id": "F2", "type": "wash", "x": 80, "y": 420, "direction": "left"},
+                        {"id": "F3", "type": "top", "x": 250, "y": 100, "direction": "down"},
+                        {"id": "F4", "type": "top", "x": 370, "y": 100, "direction": "down"},
+                        {"id": "F5", "type": "top", "x": 490, "y": 100, "direction": "down"},
+                        {"id": "F6", "type": "top", "x": 610, "y": 100, "direction": "down"},
+                        {"id": "F7", "type": "wash", "x": 780, "y": 420, "direction": "right"},
+                        {"id": "F8", "type": "wash", "x": 780, "y": 580, "direction": "right"},
+                    ],
+                    "targets": {
+                        "All Fixtures": ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"],
+                        "Left Wash Group": ["F1", "F2"],
+                        "Right Wash Group": ["F7", "F8"],
+                        "Top Fixtures": ["F3", "F4", "F5", "F6"],
+                        "Top Left Pair": ["F3", "F4"],
+                        "Top Right Pair": ["F5", "F6"],
+                    },
+                }
+            ]
+        }
+        try:
+            if not os.path.exists(DMX_VISUALIZER_LAYOUTS_FILE):
+                os.makedirs(os.path.dirname(DMX_VISUALIZER_LAYOUTS_FILE), exist_ok=True)
+                with open(DMX_VISUALIZER_LAYOUTS_FILE, "w", encoding="utf-8") as f:
+                    json.dump(default, f, indent=2)
+                return default
+            with open(DMX_VISUALIZER_LAYOUTS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict) and isinstance(data.get("layouts"), list):
+                return data
+        except Exception as e:
+            self.log(f"load_visualizer_layouts error: {e}")
+        return default
+
+    def _visualizer_profile_for_game(self, game_key: str) -> dict | None:
+        if not isinstance(self.visualizer_profiles, dict):
+            return None
+        profiles = self.visualizer_profiles.get("profiles", [])
+        for item in profiles:
+            if item.get("game") == game_key:
+                return item
+        for item in profiles:
+            if item.get("game") == "global":
+                return item
+        return None
+
+    def _resolve_scene_name_for_effect(self, effect_name: str) -> str | None:
+        if not self.dmx or not effect_name:
+            return None
+        if effect_name in self.dmx.scenes:
+            return effect_name
+        target_norm = effect_name.lower().strip()
+        for name in self.dmx.scenes.keys():
+            if name.lower().strip() == target_norm:
+                return name
+        for name in self.dmx.scenes.keys():
+            if target_norm in name.lower() or name.lower() in target_norm:
+                return name
+        return None
+
+    def _target_fixture_indexes(self, target_name: str) -> list[int]:
+        layouts = self.visualizer_layouts.get("layouts", []) if isinstance(self.visualizer_layouts, dict) else []
+        targets = layouts[0].get("targets", {}) if layouts and isinstance(layouts[0], dict) else {}
+        fixture_ids = targets.get(target_name, [])
+        indexes = []
+        for fid in fixture_ids:
+            if isinstance(fid, str) and fid.upper().startswith("F"):
+                try:
+                    idx = int(fid[1:]) - 1
+                    if idx >= 0:
+                        indexes.append(idx)
+                except Exception:
+                    pass
+        return indexes
+
+    def _apply_scene_to_target(self, scene_name: str, target_name: str):
+        """Apply a scene and mask fixtures outside the selected visualizer target."""
+        self._apply_scene_with_animation(scene_name)
+        if not target_name or target_name == "All Fixtures":
+            return
+        included = set(self._target_fixture_indexes(target_name))
+        if not included:
+            return
+        self._stop_scene_animation()
+        for i in range(self.dmx.num_fixtures):
+            if i not in included:
+                self.dmx.set_fixture_color(i, 0, 0, 0)
+                self.dmx.set_fixture_strobe(i, 0)
+
+    def fire_dmx_cue(self, element: str, action: str = "on"):
+        """Resolve gameplay visual cue to DMX scene output.
+
+        element: named profile element (e.g. Gameplay, Bonus, Danger, Overlay 1-4).
+        action: cue action state; only 'on', 'start', and 'trigger' execute output.
+        """
+        if action not in {"on", "start", "trigger"}:
+            return
+        if not self.dmx:
+            return
+        game_key = self.current_game_key()
+        profile = self._visualizer_profile_for_game(game_key)
+        if not profile:
+            return
+        assignments = profile.get("assignments", {})
+        mapping = assignments.get(element) or assignments.get(str(element).strip())
+        if not mapping:
+            return
+        effect_name = mapping.get("effect", "")
+        target_name = mapping.get("apply_to", "All Fixtures")
+        scene_name = self._resolve_scene_name_for_effect(effect_name)
+        if not scene_name:
+            self.log(f"DMX visual cue unresolved: {element} -> {effect_name}")
+            return
+        # Inject fade data from profile assignment into the scene before applying
+        fade_enabled = mapping.get("fade_enabled", False)
+        if fade_enabled and scene_name in self.dmx.scenes:
+            scene = self.dmx.scenes[scene_name]
+            scene["fade"] = {
+                "in_ms": mapping.get("fade_in_ms", 250),
+                "out_ms": mapping.get("fade_out_ms", 250),
+            }
+        self._apply_scene_to_target(scene_name, target_name)
+        self.refresh_dmx_fixture_cards()
+        self.log(f"DMX cue fired: {element}/{action} -> {scene_name} [{target_name}]")
+
     def get_active_profile(self) -> "dict | None":
         """Get the currently selected fixture profile dict (including channel_map)."""
         profile_id = self.dmx_profile_id.get()
@@ -1603,6 +1907,59 @@ class PixelChallengeConsole:
                 self.log(f"Loaded {loaded} user scene(s) from dmx_scenes.json")
         except Exception as e:
             self.log(f"DMX: Could not load user scenes: {e}")
+
+    # Identical generated-effect definitions from dmx_editor.py _build_effect_library
+    _GENERATED_EFFECTS = [
+        ("Ocean Pulse", ["#0A1A5E", "#1B66FF", "#58D9FF"], "pulse", 52),
+        ("Emerald Sweep", ["#0B4F2F", "#14A45E", "#6EFFB1"], "sweep", 45),
+        ("Crimson Storm", ["#2B0000", "#A30000", "#FF2A2A"], "strobe", 82),
+        ("Arctic Shimmer", ["#77E7FF", "#E6FAFF", "#8BC2FF"], "fade", 40),
+        ("Solar Flare", ["#FF6A00", "#FFC100", "#FFE879"], "pulse", 58),
+        ("Violet Cascade", ["#3B0A71", "#7A2BCB", "#C87CFF"], "chase", 63),
+        ("Amber Glow", ["#4A2B00", "#B56700", "#FFC166"], "static", 25),
+        ("Neon Rush", ["#00FFC8", "#11B5FF", "#9F4BFF"], "chase", 70),
+        ("Frost Bite", ["#0D2E5B", "#5AA5FF", "#D0F3FF"], "pulse", 49),
+        ("Lava Flow", ["#4B0A00", "#A61D00", "#FF6A00"], "sweep", 57),
+        ("Electric Surge", ["#00143A", "#00A2FF", "#9BE5FF"], "strobe", 88),
+        ("Midnight Bloom", ["#050A1F", "#322A7A", "#B86BFF"], "fade", 38),
+        ("Copper Sunset", ["#331800", "#B05A22", "#F4B178"], "fade", 34),
+        ("Jade Drift", ["#023329", "#00A387", "#89FFE1"], "sweep", 42),
+        ("Ruby Blitz", ["#350007", "#B00E28", "#FF5A7A"], "alternating", 76),
+        ("Sapphire Wave", ["#09153D", "#1F6DDE", "#7FC6FF"], "wave", 54),
+        ("Phantom Strobe", ["#150022", "#5D17A8", "#E9D4FF"], "strobe", 90),
+        ("Golden Hour", ["#5A2C00", "#E89A1D", "#FFE199"], "fade", 30),
+        ("Inferno Chase", ["#2E0200", "#D73700", "#FFC04A"], "chase", 72),
+        ("Deep Purple Fade", ["#120021", "#562B9B", "#B996FF"], "fade", 39),
+        ("Aurora Ribbon", ["#00D9B6", "#48A4FF", "#BC6CFF"], "sweep", 44),
+        ("Prism Drift", ["#FF4F91", "#7A8CFF", "#62FFE2"], "alternating", 46),
+        ("Steel Rain", ["#2A3748", "#5C7494", "#AEC4E0"], "pulse", 43),
+        ("Rose Ember", ["#3D0F1E", "#B73762", "#FFA3C0"], "fade", 36),
+        ("Ion Drift", ["#00313A", "#00B6D9", "#A5F5FF"], "wave", 60),
+        ("Color Roulette", ["#FF2255", "#00D4FF", "#6BFF5E", "#FFD447", "#B98BFF"], "alternating", 67),
+    ]
+
+    def _load_generated_effects_into_dmx(self):
+        """Register visualizer built-in effects into DMXService so they work at runtime."""
+        if not self.dmx:
+            return
+        num = self.dmx.num_fixtures
+        loaded = 0
+        for name, palette, pat_type, speed in self._GENERATED_EFFECTS:
+            if name in self.dmx.scenes:
+                continue  # user scene with same name takes priority
+            fixtures = []
+            for i in range(num):
+                hex_c = palette[i % len(palette)]
+                r, g, b = _hex_to_rgb(hex_c)
+                fixtures.append({"r": r, "g": g, "b": b, "strobe": 0, "dimmer": 255})
+            scene_entry = {"fixtures": fixtures}
+            if pat_type != "static":
+                scene_entry["pattern"] = {"type": pat_type, "speed": speed}
+                scene_entry["colors"] = list(palette)
+            self.dmx.scenes[name] = scene_entry
+            loaded += 1
+        if loaded:
+            self.log(f"DMX: Registered {loaded} generated effect(s).")
 
     def _load_slot_assignments(self):
         """Load slot button assignments from dmx_scenes.json button_assignment data."""
@@ -1721,6 +2078,14 @@ class PixelChallengeConsole:
             except Exception:
                 pass
             self._scene_anim_timer = None
+        # Also cancel any crossfade sub-tick timer
+        fade_timer = getattr(self, "_fade_subtick_timer", None)
+        if fade_timer is not None:
+            try:
+                self.root.after_cancel(fade_timer)
+            except Exception:
+                pass
+            self._fade_subtick_timer = None
 
     def _scene_anim_tick(self):
         """Run one scene pattern animation frame and schedule the next."""
@@ -1733,7 +2098,39 @@ class PixelChallengeConsole:
         # Speed slider (0-100) maps to interval: 100=fast(50ms) 0=slow(500ms)
         speed = self.dmx_speed.get()
         interval = max(50, 500 - speed * 4)
-        self._scene_anim_timer = self.root.after(interval, self._scene_anim_tick)
+        # If crossfade is active, run sub-ticks until fade completes, then schedule next step
+        if self.dmx._fade_duration_ms > 0:
+            self._run_fade_subtick(interval)
+        else:
+            self._scene_anim_timer = self.root.after(interval, self._scene_anim_tick)
+
+    def _run_fade_subtick(self, step_interval_ms: int):
+        """Drive the crossfade interpolation with fast sub-ticks (~20ms).
+
+        When the fade completes (or step interval elapses), schedule the
+        next main animation step.
+        """
+        SUBTICK_MS = 20
+        if not self.dmx or self.dmx._fade_duration_ms <= 0:
+            # Fade complete — schedule next main step
+            self._fade_subtick_timer = None
+            elapsed = self.dmx._fade_elapsed_ms if self.dmx else 0
+            self._scene_anim_timer = self.root.after(
+                max(1, step_interval_ms - elapsed),
+                self._scene_anim_tick,
+            )
+            return
+        still_fading = self.dmx.fade_subtick(SUBTICK_MS)
+        self.refresh_dmx_fixture_cards()
+        if still_fading:
+            self._fade_subtick_timer = self.root.after(
+                SUBTICK_MS,
+                lambda: self._run_fade_subtick(step_interval_ms),
+            )
+        else:
+            self._fade_subtick_timer = None
+            remaining = max(1, step_interval_ms - self.dmx._fade_elapsed_ms)
+            self._scene_anim_timer = self.root.after(remaining, self._scene_anim_tick)
 
     def _on_dmx_override_fixture(self, fixture_index: int, fixture_label: str):
         """Handle OVERRIDE button on a fixture card — open color chooser."""
@@ -2778,7 +3175,7 @@ class PixelChallengeConsole:
                     self.log(f"Game complete! Winner: Player {result.winner_player_id}")
                     self.record_score_history(result)
                     payload = self.build_scoreboard_payload(result, title="Final Results")
-                    # Apply DMX results scene — use SCORE-assigned scene or fallback (v26.7.0)
+                    # Apply DMX results scene — use SCORE-assigned scene or fallback (v27.1.0)
                     if self.dmx:
                         score_scene = getattr(self, '_dmx_fixed_scenes', {}).get("SCORE", "")
                         if score_scene and score_scene in self.dmx.scenes:
@@ -3010,6 +3407,9 @@ class PixelChallengeConsole:
         # Signal game to transition from READY to RUNNING
         if self.game_manager.is_running():
             self.game_manager.signal_start()
+
+        # Visualizer cue handoff for gameplay start
+        self.fire_dmx_cue("Gameplay", "on")
         
         self.game_tick_active = True
         self.root.after(33, self.game_tick)
@@ -3065,6 +3465,7 @@ class PixelChallengeConsole:
     # =========================================================================
     def on_game_selected(self, event=None):
         game_name = self.selected_game.get()
+        self.visualizer_profiles = self.load_visualizer_profiles()
         self.current_intro_index = -1
         self.cancel_viewer_return()
         self.show_selected_game_splash()
@@ -3943,6 +4344,9 @@ class PixelChallengeConsole:
                 pass
         # Reload user scenes into DMXService and refresh UI
         self._load_user_scenes_into_dmx()
+        self._load_generated_effects_into_dmx()
+        self.visualizer_profiles = self.load_visualizer_profiles()
+        self.visualizer_layouts = self.load_visualizer_layouts()
         self._refresh_dmx_scene_combo()
         self._load_slot_assignments()
         self.refresh_dmx_fixture_cards()
