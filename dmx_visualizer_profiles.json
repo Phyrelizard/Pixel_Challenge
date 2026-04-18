@@ -6,40 +6,40 @@
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
-          "effect": "Amber Blaze",
-          "apply_to": "vertupchase"
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
         },
         "Bonus": {
-          "effect": "Golden Hour",
-          "apply_to": "Top Fixtures"
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
         },
         "Danger": {
-          "effect": "Phantom Strobe",
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
           "apply_to": "All Fixtures"
         },
         "Special": {
-          "effect": "Violet Cascade",
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
           "apply_to": "All Fixtures"
         },
         "Randomizer": {
-          "effect": "Color Roulette",
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
           "apply_to": "All Fixtures"
         },
         "Overlay 1": {
-          "effect": "Jade Drift",
-          "apply_to": "Top Left Pair"
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
         },
         "Overlay 2": {
-          "effect": "Crimson Storm",
-          "apply_to": "Top Right Pair"
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
         },
         "Overlay 3": {
-          "effect": "Ruby Blitz",
-          "apply_to": "Left Wash Group"
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
         },
         "Overlay 4": {
-          "effect": "Solar Flare",
-          "apply_to": "Right Wash Group"
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
         }
       }
     },
@@ -69,7 +69,7 @@
           "apply_to": "All Fixtures"
         },
         "Overlay 1": {
-          "effect": "Arctic Shimmer",
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
           "apply_to": "Top Left Pair"
         },
         "Overlay 2": {
@@ -181,43 +181,43 @@
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
-          "effect": "Fire Burst",
-          "apply_to": "LR PAIR",
+          "effect": "Neon Rush",
+          "apply_to": "All Fixtures",
           "fade_enabled": false,
           "fade_in_ms": 125,
           "fade_out_ms": 125
         },
         "Bonus": {
-          "effect": "Gold Victory",
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
           "apply_to": "Top Fixtures"
         },
         "Danger": {
-          "effect": "Red Alert",
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
           "apply_to": "All Fixtures"
         },
         "Special": {
-          "effect": "Rainbow Wave",
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
           "apply_to": "All Fixtures"
         },
         "Randomizer": {
-          "effect": "Color Roulette",
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
           "apply_to": "All Fixtures"
         },
         "Overlay 1": {
-          "effect": "Amber Glow",
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
           "apply_to": "Top Left Pair"
         },
         "Overlay 2": {
-          "effect": "Midnight Bloom",
-          "apply_to": "turn"
+          "effect": "Sapphire Wave",
+          "apply_to": "All Fixtures"
         },
         "Overlay 3": {
-          "effect": "Neon Rush",
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
           "apply_to": "Left Wash Group"
         },
         "Overlay 4": {
-          "effect": "Solar Flare",
-          "apply_to": "LR PAIR"
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
         }
       }
     },
@@ -399,6 +399,176 @@
         "Overlay 4": {
           "effect": "Solar Flare",
           "apply_to": "LR PAIR"
+        }
+      }
+    },
+    {
+      "game": "dot_dash",
+      "profile_name": "dot dash no effects",
+      "layout_id": "small_rig_8_fixture",
+      "assignments": {
+        "Gameplay": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures",
+          "fade_enabled": false,
+          "fade_in_ms": 125,
+          "fade_out_ms": 125
+        },
+        "Bonus": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
+        },
+        "Danger": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
+        },
+        "Special": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
+        },
+        "Randomizer": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
+        },
+        "Overlay 1": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
+        },
+        "Overlay 2": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
+        },
+        "Overlay 3": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
+        },
+        "Overlay 4": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
+        }
+      }
+    },
+    {
+      "game": "pixel_pop",
+      "profile_name": "pixel pop no effects",
+      "layout_id": "small_rig_8_fixture",
+      "assignments": {
+        "Gameplay": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
+        },
+        "Bonus": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
+        },
+        "Danger": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
+        },
+        "Special": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
+        },
+        "Randomizer": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
+        },
+        "Overlay 1": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
+        },
+        "Overlay 2": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
+        },
+        "Overlay 3": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
+        },
+        "Overlay 4": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
+        }
+      }
+    },
+    {
+      "game": "console",
+      "profile_name": "Default Small Rig",
+      "layout_id": "small_rig_8_fixture",
+      "assignments": {
+        "Idle": {
+          "effect": "Rainbow Wave",
+          "apply_to": "All Fixtures"
+        },
+        "Check-In Open": {
+          "effect": null,
+          "apply_to": "All Fixtures"
+        },
+        "Game Running": {
+          "effect": null,
+          "apply_to": "All Fixtures"
+        },
+        "Results / Scoreboard": {
+          "effect": "Team Sync",
+          "apply_to": "All Fixtures"
+        },
+        "Countdown": {
+          "effect": null,
+          "apply_to": "All Fixtures"
+        },
+        "Game Over": {
+          "effect": null,
+          "apply_to": "All Fixtures"
+        },
+        "Attract Mode": {
+          "effect": null,
+          "apply_to": "All Fixtures"
+        }
+      }
+    },
+    {
+      "game": "dot_dash",
+      "profile_name": "dd test",
+      "layout_id": "small_rig_8_fixture",
+      "assignments": {
+        "Gameplay": {
+          "effect": "Neon Rush",
+          "apply_to": "All Fixtures",
+          "fade_enabled": false,
+          "fade_in_ms": 125,
+          "fade_out_ms": 125
+        },
+        "Bonus": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "Top Fixtures"
+        },
+        "Danger": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
+        },
+        "Special": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
+        },
+        "Randomizer": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
+        },
+        "Overlay 1": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "Top Left Pair"
+        },
+        "Overlay 2": {
+          "effect": "Sapphire Wave",
+          "apply_to": "All Fixtures"
+        },
+        "Overlay 3": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "Left Wash Group"
+        },
+        "Overlay 4": {
+          "effect": "\u2500\u2500 STATIC \u2500\u2500",
+          "apply_to": "All Fixtures"
         }
       }
     }

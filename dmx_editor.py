@@ -8,8 +8,9 @@ import math
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 
-VISUALIZER_VERSION = "v1.4.0"
+VISUALIZER_VERSION = "v1.4.2"
 ALL_FIXTURES_TARGET = "All Fixtures"
+NO_EFFECT_LABEL = "— No Effect —"
 FIXTURE_HIT_WIDTH = 14
 FIXTURE_HIT_HEIGHT = 12
 FADE_STEP_MS = 125
@@ -210,10 +211,20 @@ class DMXLightingEditor:
         self.visualizer_profiles_file = os.path.join(scene_base, "dmx_visualizer_profiles.json")
         self.visualizer_layouts_file = os.path.join(scene_base, "dmx_visualizer_layouts.json")
 
-        self.elements = [
+        self.game_elements = [
             "Gameplay", "Bonus", "Danger", "Special", "Randomizer",
             "Overlay 1", "Overlay 2", "Overlay 3", "Overlay 4",
         ]
+        self.console_elements = [
+            "Idle",
+            "Check-In Open",
+            "Game Running",
+            "Results / Scoreboard",
+            "Countdown",
+            "Game Over",
+            "Attract Mode",
+        ]
+        self.elements = list(self.game_elements)
         self.directions = ["up", "up-right", "right", "down-right", "down", "down-left", "left", "up-left"]
 
         self.window = None
@@ -222,6 +233,8 @@ class DMXLightingEditor:
         self.canvas = None
         self.effect_listbox = None
         self.element_listbox = None
+        self.profile_combo = None
+        self._effect_index_map = []
 
         self.hover_effect_name = None
         self.preview_phase = 0
@@ -290,6 +303,7 @@ class DMXLightingEditor:
         self.apply_target_var = tk.StringVar(master=var_master, value=self._current_assignment().get("apply_to", ALL_FIXTURES_TARGET))
 
         self._build_ui()
+        self._refresh_profile_combo()
         self._refresh_effect_list()
         self._sync_element_selection(0)
         self._animate_preview()
@@ -467,37 +481,31 @@ class DMXLightingEditor:
             ordered.extend(effects_in_cat)
         return ordered
 
-    def _default_assignments(self):
-        defaults = {
-            "Gameplay": {"effect": "Ocean Pulse", "apply_to": ALL_FIXTURES_TARGET},
-            "Bonus": {"effect": "Gold Victory", "apply_to": "Top Fixtures"},
-            "Danger": {"effect": "Red Alert", "apply_to": ALL_FIXTURES_TARGET},
-            "Special": {"effect": "Rainbow Wave", "apply_to": ALL_FIXTURES_TARGET},
-            "Randomizer": {"effect": "Color Roulette", "apply_to": ALL_FIXTURES_TARGET},
-            "Overlay 1": {"effect": "Amber Glow", "apply_to": "Top Left Pair"},
-            "Overlay 2": {"effect": "Sapphire Wave", "apply_to": "Top Right Pair"},
-            "Overlay 3": {"effect": "Neon Rush", "apply_to": "Left Wash Group"},
-            "Overlay 4": {"effect": "Crimson Storm", "apply_to": "Right Wash Group"},
-        }
-        for key, value in defaults.items():
-            if value["effect"] not in self.effects_by_name and self.effects:
-                defaults[key]["effect"] = self.effects[0]["name"]
-        return defaults
+    def _default_assignments(self, elements=None):
+        names = list(elements or self.game_elements)
+        return {name: {"effect": None, "apply_to": ALL_FIXTURES_TARGET} for name in names}
+
+    def _elements_for_game(self, game_key: str):
+        if game_key == "console":
+            return list(self.console_elements)
+        return list(self.game_elements)
+
+    def _set_elements_for_game(self, game_key: str):
+        self.elements = self._elements_for_game(game_key)
 
     def _seed_profiles(self):
-        games = ["dot_dash", "pixel_pop", "surround", "ascend", "global"]
-        return {
-            "profiles": [
+        profiles = []
+        for game in ("dot_dash", "pixel_pop", "surround", "ascend", "global", "console"):
+            profiles.append(
                 {
                     "game": game,
                     "profile_name": "Default Small Rig",
                     "layout_id": "small_rig_8_fixture",
-                    "assignments": self._default_assignments(),
+                    "assignments": self._default_assignments(self._elements_for_game(game)),
                 }
-                for game in games
-            ]
-        }
-
+            )
+        return {"profiles": profiles}
+    
     def _load_profiles(self):
         seeded = self._seed_profiles()
         try:
@@ -521,10 +529,14 @@ class DMXLightingEditor:
         except Exception as e:
             messagebox.showerror("DMX Visualizer", f"Could not save profiles: {e}")
 
-    def _resolve_profile(self, game_key: str):
+    def _resolve_profile(self, game_key: str, profile_name: str | None = None):
         for item in self.profiles_data.get("profiles", []):
-            if item.get("game") == game_key:
+            if item.get("game") == game_key and (profile_name is None or item.get("profile_name") == profile_name):
                 return item
+        if profile_name is not None:
+            for item in self.profiles_data.get("profiles", []):
+                if item.get("game") == game_key:
+                    return item
         for item in self.profiles_data.get("profiles", []):
             if item.get("game") == "global":
                 return item
@@ -532,7 +544,7 @@ class DMXLightingEditor:
             "game": game_key,
             "profile_name": "Default Small Rig",
             "layout_id": "small_rig_8_fixture",
-            "assignments": self._default_assignments(),
+            "assignments": self._default_assignments(self._elements_for_game(game_key)),
         }
         self.profiles_data.setdefault("profiles", []).append(profile)
         return profile
@@ -547,9 +559,22 @@ class DMXLightingEditor:
     def _current_assignment(self):
         assignments = self.active_profile.setdefault("assignments", {})
         element = self._selected_element_name()
-        default_effect = self.effects[0]["name"] if self.effects else ""
-        assignments.setdefault(element, {"effect": default_effect, "apply_to": ALL_FIXTURES_TARGET})
+        assignments.setdefault(element, {"effect": None, "apply_to": ALL_FIXTURES_TARGET})
         return assignments[element]
+
+    def _get_profile_names_for_game(self, game_key):
+        return [p["profile_name"] for p in self.profiles_data.get("profiles", []) if p.get("game") == game_key]
+
+    def _refresh_profile_combo(self):
+        game_key = self._game_key(self.game_var.get())
+        names = self._get_profile_names_for_game(game_key)
+        self.profile_combo["values"] = names
+        current = self.profile_name_var.get().strip()
+        if current in names:
+            self.profile_combo.set(current)
+        elif names:
+            self.profile_name_var.set(names[0])
+            self.profile_combo.set(names[0])
 
     # ------------------------------------------------------------------
     # UI
@@ -580,7 +605,9 @@ class DMXLightingEditor:
 
         # Game
         tk.Label(left, text="Game", bg="#242b35", fg="#cfd8e3", anchor="w", font=("Arial", 12, "bold")).pack(fill="x", padx=20)
-        games = self.game_list or ["dot_dash", "pixel_pop", "surround", "ascend", "global"]
+        games = list(self.game_list or ["dot_dash", "pixel_pop", "surround", "ascend", "global"])
+        if "console" not in [str(g).strip().lower() for g in games]:
+            games.append("console")
         self.game_combo = ttk.Combobox(left, textvariable=self.game_var, values=games, state="readonly", style="Viz.TCombobox", font=("Arial", 12))
         self.game_combo.pack(fill="x", padx=20, pady=(4, 14))
         self.game_combo.bind("<<ComboboxSelected>>", self._on_game_changed)
@@ -588,7 +615,9 @@ class DMXLightingEditor:
         profile_row = tk.Frame(left, bg="#242b35")
         profile_row.pack(fill="x", padx=20, pady=(0, 12))
         tk.Label(profile_row, text="Profile", bg="#242b35", fg="#cfd8e3", font=("Arial", 12, "bold")).pack(side="left", padx=(0, 8))
-        tk.Entry(profile_row, textvariable=self.profile_name_var, bg="#1a212b", fg="white", insertbackground="white", relief="flat", font=("Arial", 12)).pack(side="left", fill="x", expand=True)
+        self.profile_combo = ttk.Combobox(profile_row, textvariable=self.profile_name_var, state="readonly", style="Viz.TCombobox", font=("Arial", 12))
+        self.profile_combo.pack(side="left", fill="x", expand=True)
+        self.profile_combo.bind("<<ComboboxSelected>>", self._on_profile_changed)
         tk.Button(profile_row, text="TARGETS", bg="#3b4552", fg="white", activebackground="#506074", relief="flat", font=("Arial", 11, "bold"), command=self._open_targets_dialog).pack(side="left", padx=(10, 0), ipady=4, ipadx=8)
 
         list_row = tk.Frame(left, bg="#242b35")
@@ -673,9 +702,10 @@ class DMXLightingEditor:
 
         button_row = tk.Frame(left, bg="#242b35")
         button_row.pack(fill="x", padx=20, pady=(0, 18))
-        tk.Button(button_row, text="SAVE PROFILE", bg="#2f9b4e", fg="white", relief="flat", font=("Arial", 11, "bold"), command=self._save_profile).pack(side="left", expand=True, fill="x", padx=(0, 8), ipady=6)
-        tk.Button(button_row, text="SAVE AS", bg="#cf8f2b", fg="white", relief="flat", font=("Arial", 11, "bold"), command=self._save_as_profile).pack(side="left", expand=True, fill="x", padx=8, ipady=6)
-        tk.Button(button_row, text="DELETE PROFILE", bg="#30445e", fg="white", relief="flat", font=("Arial", 11, "bold"), command=self._delete_profile).pack(side="left", expand=True, fill="x", padx=(8, 0), ipady=6)
+        tk.Button(button_row, text="SAVE PROFILE", bg="#2f9b4e", fg="white", relief="flat", font=("Arial", 11, "bold"), command=self._save_profile).pack(side="left", expand=True, fill="x", padx=(0, 6), ipady=6)
+        tk.Button(button_row, text="SAVE AS", bg="#cf8f2b", fg="white", relief="flat", font=("Arial", 11, "bold"), command=self._save_as_profile).pack(side="left", expand=True, fill="x", padx=6, ipady=6)
+        tk.Button(button_row, text="RESET GAME", bg="#8c3f22", fg="white", relief="flat", font=("Arial", 11, "bold"), command=self._reset_selected_game_effects).pack(side="left", expand=True, fill="x", padx=6, ipady=6)
+        tk.Button(button_row, text="DELETE PROFILE", bg="#30445e", fg="white", relief="flat", font=("Arial", 11, "bold"), command=self._delete_profile).pack(side="left", expand=True, fill="x", padx=(6, 0), ipady=6)
 
         canvas_wrap = tk.Frame(right, bg="#202833")
         canvas_wrap.pack(fill="both", expand=True, padx=18, pady=(0, 18))
@@ -699,9 +729,26 @@ class DMXLightingEditor:
                 pass
 
     def _on_game_changed(self, event=None):
-        self.active_profile = self._resolve_profile(self._game_key(self.game_var.get()))
+        game_key = self._game_key(self.game_var.get())
+        self._set_elements_for_game(game_key)
+        self.element_listbox.delete(0, "end")
+        for item in self.elements:
+            self.element_listbox.insert("end", item)
+        self._refresh_profile_combo()
+        names = list(self.profile_combo["values"]) if self.profile_combo else []
+        selected_name = names[0] if names else "Default Small Rig"
+        self.active_profile = self._resolve_profile(game_key, selected_name)
         self.profile_name_var.set(self.active_profile.get("profile_name", "Default Small Rig"))
-        self._sync_element_selection(self.element_listbox.curselection()[0] if self.element_listbox.curselection() else 0)
+        self._refresh_profile_combo()
+        self._sync_element_selection(0)
+
+    def _on_profile_changed(self, event=None):
+        game_key = self._game_key(self.game_var.get())
+        profile_name = self.profile_name_var.get().strip()
+        self.active_profile = self._resolve_profile(game_key, profile_name)
+        self.profile_name_var.set(self.active_profile.get("profile_name", "Default Small Rig"))
+        idx = self.element_listbox.curselection()[0] if self.element_listbox and self.element_listbox.curselection() else 0
+        self._sync_element_selection(idx)
 
     def _on_element_selected(self, event=None):
         if self._syncing or not self.element_listbox:
@@ -715,15 +762,23 @@ class DMXLightingEditor:
         self.element_listbox.selection_set(idx)
         assignment = self._current_assignment()
         self.apply_target_var.set(assignment.get("apply_to", ALL_FIXTURES_TARGET))
-        effect_name = assignment.get("effect", "")
+        effect_name = assignment.get("effect")
+        self.effect_listbox.selection_clear(0, "end")
         if effect_name:
-            names = [e["name"] for e in self.effects]
-            if effect_name in names:
-                e_idx = names.index(effect_name)
-                self.effect_listbox.selection_clear(0, "end")
-                self.effect_listbox.selection_set(e_idx)
-                self.effect_listbox.see(e_idx)
-                self.hover_effect_name = effect_name
+            for lb_idx, eff_idx in enumerate(self._effect_index_map):
+                if eff_idx >= 0 and eff_idx < len(self.effects) and self.effects[eff_idx]["name"] == effect_name:
+                    self.effect_listbox.selection_set(lb_idx)
+                    self.effect_listbox.see(lb_idx)
+                    self.hover_effect_name = effect_name
+                    break
+            else:
+                self.effect_listbox.selection_set(0)
+                self.effect_listbox.see(0)
+                self.hover_effect_name = None
+        else:
+            self.effect_listbox.selection_set(0)
+            self.effect_listbox.see(0)
+            self.hover_effect_name = None
         self._sync_fade_ui()
         self._draw_layout()
         if self.window and self.window.winfo_exists():
@@ -734,19 +789,30 @@ class DMXLightingEditor:
 
     def _refresh_effect_list(self):
         self.effect_listbox.delete(0, "end")
-        for i, effect in enumerate(self.effects):
+        self._effect_index_map = []
+
+        self.effect_listbox.insert("end", NO_EFFECT_LABEL)
+        self.effect_listbox.itemconfig(0, fg="#d8dee9", selectbackground="#8ec5ff", selectforeground="#0a1a2b")
+        self._effect_index_map.append(-1)
+
+        for effect_idx, effect in enumerate(self.effects):
+            listbox_idx = self.effect_listbox.size()
             if effect.get("_is_header"):
                 self.effect_listbox.insert("end", effect["name"])
-                self.effect_listbox.itemconfig(i, fg="#88ccdd", selectbackground="#111820", selectforeground="#88ccdd")
+                self.effect_listbox.itemconfig(listbox_idx, fg="#88ccdd", selectbackground="#111820", selectforeground="#88ccdd")
+                self._effect_index_map.append(-2)
             else:
                 desc = _brief_description(effect)
                 label = f"{effect['name']}  ({desc})" if desc else effect["name"]
                 self.effect_listbox.insert("end", label)
+                self._effect_index_map.append(effect_idx)
 
     def _on_effect_hover(self, event):
         idx = self.effect_listbox.nearest(event.y)
-        if 0 <= idx < len(self.effects) and idx not in self._effect_category_headers:
-            self.hover_effect_name = self.effects[idx]["name"]
+        if 0 <= idx < len(self._effect_index_map):
+            eff_idx = self._effect_index_map[idx]
+            if eff_idx >= 0:
+                self.hover_effect_name = self.effects[eff_idx]["name"]
 
     def _on_effect_selected(self, event=None):
         if self._syncing:
@@ -754,14 +820,25 @@ class DMXLightingEditor:
         if not self.effect_listbox.curselection():
             return
         idx = self.effect_listbox.curselection()[0]
-        # Skip category headers
-        if idx in self._effect_category_headers:
+        if not (0 <= idx < len(self._effect_index_map)):
+            return
+
+        eff_idx = self._effect_index_map[idx]
+        if eff_idx == -2:
             self.effect_listbox.selection_clear(idx)
             return
-        effect = self.effects[idx]
+
         assignment = self._current_assignment()
-        assignment["effect"] = effect["name"]
         assignment["apply_to"] = self.apply_target_var.get() or ALL_FIXTURES_TARGET
+
+        if eff_idx == -1:
+            assignment["effect"] = None
+            self.hover_effect_name = None
+            self._draw_layout()
+            return
+
+        effect = self.effects[eff_idx]
+        assignment["effect"] = effect["name"]
         self.hover_effect_name = effect["name"]
         self._preview_dmx_effect(effect["name"])
 
@@ -786,6 +863,7 @@ class DMXLightingEditor:
         self.active_profile["profile_name"] = self.profile_name_var.get().strip() or "Default Small Rig"
         self.active_profile["layout_id"] = "small_rig_8_fixture"
         self._save_profiles()
+        self._refresh_profile_combo()
         messagebox.showinfo("DMX Visualizer", "Profile saved.")
 
     def _save_as_profile(self):
@@ -802,7 +880,37 @@ class DMXLightingEditor:
         self.active_profile = cloned
         self.profile_name_var.set(cloned["profile_name"])
         self._save_profiles()
+        self._refresh_profile_combo()
         messagebox.showinfo("DMX Visualizer", "Profile saved as new profile.")
+
+    def _reset_selected_game_effects(self):
+        game_label = self.game_var.get().strip() or "Current Game"
+        game_key = self._game_key(game_label)
+        game_elements = self._elements_for_game(game_key)
+        profiles = self.profiles_data.get("profiles", [])
+        matching_profiles = [p for p in profiles if p.get("game") == game_key]
+
+        if not matching_profiles:
+            messagebox.showinfo("DMX Visualizer", f"No saved profiles were found for {game_label}.", parent=self.window)
+            return
+
+        if not messagebox.askyesno(
+            "Reset Game Effects",
+            f"Reset all saved element assignments for {game_label}?\n\nThis clears every profile for this game back to No Effect.",
+            parent=self.window,
+        ):
+            return
+
+        for profile in matching_profiles:
+            profile["assignments"] = self._default_assignments(game_elements)
+
+        current_profile_name = self.profile_name_var.get().strip()
+        self.active_profile = self._resolve_profile(game_key, current_profile_name)
+        self.profile_name_var.set(self.active_profile.get("profile_name", "Default Small Rig"))
+        self._save_profiles()
+        self._refresh_profile_combo()
+        self._sync_element_selection(0)
+        messagebox.showinfo("DMX Visualizer", f"{game_label} was reset to No Effect for all elements.", parent=self.window)
 
     def _delete_profile(self):
         if not messagebox.askyesno("Delete Profile", "Delete current profile?", parent=self.window):
@@ -816,6 +924,7 @@ class DMXLightingEditor:
         self.active_profile = self._resolve_profile(game_key)
         self.profile_name_var.set(self.active_profile.get("profile_name", "Default Small Rig"))
         self._save_profiles()
+        self._refresh_profile_combo()
         self._sync_element_selection(0)
 
     def _open_targets_dialog(self):

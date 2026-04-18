@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v28.1.0
+Pixel Challenge Host Console v28.2.0
 
 """
 
@@ -27,7 +27,7 @@ from games.base import PlayerConfig
 from sla import SLAStore, SLACalibration
 from dmx_editor import DMXLightingEditor
 
-VERSION_LABEL = "v28.1.0"
+VERSION_LABEL = "v28.2.0"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 DEFAULT_FALCON_IP = "192.168.2.113"
