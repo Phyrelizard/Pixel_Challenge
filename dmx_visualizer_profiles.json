@@ -2,7 +2,7 @@
   "profiles": [
     {
       "game": "pixel_pop",
-      "profile_name": "Default Small Rig",
+      "profile_name": "Default",
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
@@ -45,7 +45,7 @@
     },
     {
       "game": "surround",
-      "profile_name": "Default Small Rig",
+      "profile_name": "Default",
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
@@ -88,7 +88,7 @@
     },
     {
       "game": "ascend",
-      "profile_name": "Default Small Rig",
+      "profile_name": "Default",
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
@@ -131,7 +131,7 @@
     },
     {
       "game": "splash",
-      "profile_name": "Default Small Rig",
+      "profile_name": "Default",
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
@@ -177,12 +177,12 @@
     },
     {
       "game": "dot_dash",
-      "profile_name": "Default Small Rig",
+      "profile_name": "Default",
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
           "effect": "Neon Rush",
-          "apply_to": "All Fixtures",
+          "apply_to": "LR PAIR",
           "fade_enabled": false,
           "fade_in_ms": 125,
           "fade_out_ms": 125
@@ -209,7 +209,10 @@
         },
         "Overlay 2": {
           "effect": "Sapphire Wave",
-          "apply_to": "All Fixtures"
+          "apply_to": "All Fixtures",
+          "fade_enabled": true,
+          "fade_in_ms": 125,
+          "fade_out_ms": 125
         },
         "Overlay 3": {
           "effect": "\u2500\u2500 STATIC \u2500\u2500",
@@ -493,15 +496,18 @@
     },
     {
       "game": "console",
-      "profile_name": "Default Small Rig",
+      "profile_name": "Default",
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Idle": {
           "effect": "Rainbow Wave",
-          "apply_to": "All Fixtures"
+          "apply_to": "All Fixtures",
+          "fade_enabled": true,
+          "fade_in_ms": 375,
+          "fade_out_ms": 125
         },
         "Check-In Open": {
-          "effect": null,
+          "effect": "Amber Glow",
           "apply_to": "All Fixtures"
         },
         "Game Running": {
@@ -513,7 +519,7 @@
           "apply_to": "All Fixtures"
         },
         "Countdown": {
-          "effect": null,
+          "effect": "Midnight Bloom",
           "apply_to": "All Fixtures"
         },
         "Game Over": {
@@ -521,7 +527,7 @@
           "apply_to": "All Fixtures"
         },
         "Attract Mode": {
-          "effect": null,
+          "effect": "Prism Drift",
           "apply_to": "All Fixtures"
         }
       }
@@ -532,11 +538,11 @@
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
-          "effect": "Neon Rush",
+          "effect": "Rainbow Wave",
           "apply_to": "All Fixtures",
-          "fade_enabled": false,
-          "fade_in_ms": 125,
-          "fade_out_ms": 125
+          "fade_enabled": true,
+          "fade_in_ms": 500,
+          "fade_out_ms": 500
         },
         "Bonus": {
           "effect": "\u2500\u2500 STATIC \u2500\u2500",
@@ -569,6 +575,47 @@
         "Overlay 4": {
           "effect": "\u2500\u2500 STATIC \u2500\u2500",
           "apply_to": "All Fixtures"
+        }
+      }
+    },
+    {
+      "game": "console",
+      "profile_name": "test 1",
+      "layout_id": "small_rig_8_fixture",
+      "assignments": {
+        "Idle": {
+          "effect": "Rainbow Wave",
+          "apply_to": "All Fixtures",
+          "fade_enabled": true,
+          "fade_in_ms": 375,
+          "fade_out_ms": 125
+        },
+        "Check-In Open": {
+          "effect": "Amber Glow",
+          "apply_to": "All Fixtures"
+        },
+        "Game Running": {
+          "effect": null,
+          "apply_to": "All Fixtures"
+        },
+        "Results / Scoreboard": {
+          "effect": "Team Sync",
+          "apply_to": "All Fixtures"
+        },
+        "Countdown": {
+          "effect": "Midnight Bloom",
+          "apply_to": "All Fixtures"
+        },
+        "Game Over": {
+          "effect": null,
+          "apply_to": "All Fixtures"
+        },
+        "Attract Mode": {
+          "effect": "Prism Drift",
+          "apply_to": "All Fixtures",
+          "fade_enabled": true,
+          "fade_in_ms": 1000,
+          "fade_out_ms": 1000
         }
       }
     }
