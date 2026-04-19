@@ -1,5 +1,5 @@
 {
-  "auto_enabled": true,
+  "auto_enabled": false,
   "cycle_enabled": true,
   "cycle_seconds": 20,
   "per_theme_speed": {
@@ -15,9 +15,9 @@
     "Lane Chase RL": 3
   },
   "selected_themes": [
+    "Color Wash",
     "Lane Chase LR",
-    "Rainbow Pulse",
-    "Color Wash"
+    "Rainbow Pulse"
   ],
   "sash_left_attract_bottom": 576,
   "sash_center_ctrl": 401,
@@ -26,7 +26,7 @@
   "sash_center_mixer": 644,
   "sash_mixer_height": null,
   "falcon_brightness": 20,
-  "gameplay_brightness": 72,
+  "gameplay_brightness": 70,
   "music_volume": 0,
   "sfx_volume": 35,
   "voice_volume": 12,

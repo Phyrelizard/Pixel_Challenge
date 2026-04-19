@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v28.3.0
+Pixel Challenge Host Console v28.4.0
 
 """
 
@@ -27,7 +27,7 @@ from games.base import PlayerConfig
 from sla import SLAStore, SLACalibration
 from dmx_editor import DMXLightingEditor
 
-VERSION_LABEL = "v28.3.0"
+VERSION_LABEL = "v28.4.0"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 DEFAULT_FALCON_IP = "192.168.2.113"
@@ -2739,6 +2739,7 @@ class PixelChallengeConsole:
         if self.dmx:
             self.dmx.apply_scene("warm_amber")
             self.refresh_dmx_fixture_cards()
+        self.set_state(HostState.IDLE, "Returned to splash after results screen")
         self.show_selected_game_splash()
         # Re-kick attract if AUTO is on
         if self.auto_enabled.get():
