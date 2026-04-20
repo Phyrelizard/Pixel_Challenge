@@ -8,7 +8,7 @@ import math
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 
-VISUALIZER_VERSION = "v1.4.3"
+VISUALIZER_VERSION = "v1.4.2"
 ALL_FIXTURES_TARGET = "All Fixtures"
 NO_EFFECT_LABEL = "— No Effect —"
 FIXTURE_HIT_WIDTH = 14
@@ -17,10 +17,6 @@ FADE_STEP_MS = 125
 FADE_MIN_MS = 0
 FADE_MAX_MS = 1000
 FADE_DEFAULT_MS = 250
-STROBE_SPEED_STEP = 5
-STROBE_SPEED_MIN = 16
-STROBE_SPEED_MAX = 255
-STROBE_SPEED_DEFAULT = 90
 
 # Category ordering for the effect list
 _CATEGORY_ORDER = [
@@ -251,10 +247,6 @@ class DMXLightingEditor:
         self._fade_in_ms = FADE_DEFAULT_MS
         self._fade_out_ms = FADE_DEFAULT_MS
 
-        # Strobe controls state (per-element, only enabled for strobe effects)
-        self._strobe_speed = STROBE_SPEED_DEFAULT
-        self._strobe_enabled = False
-
         self.drag_fixture = None
         self.drag_start = None
         self.dragging = False
@@ -419,6 +411,7 @@ class DMXLightingEditor:
         generated = [
             ("Ocean Pulse", ["#0A1A5E", "#1B66FF", "#58D9FF"], "pulse", 52),
             ("Emerald Sweep", ["#0B4F2F", "#14A45E", "#6EFFB1"], "sweep", 45),
+            ("Crimson Storm", ["#2B0000", "#A30000", "#FF2A2A"], "strobe", 82),
             ("Arctic Shimmer", ["#77E7FF", "#E6FAFF", "#8BC2FF"], "fade", 40),
             ("Solar Flare", ["#FF6A00", "#FFC100", "#FFE879"], "pulse", 58),
             ("Violet Cascade", ["#3B0A71", "#7A2BCB", "#C87CFF"], "chase", 63),
@@ -426,14 +419,13 @@ class DMXLightingEditor:
             ("Neon Rush", ["#00FFC8", "#11B5FF", "#9F4BFF"], "chase", 70),
             ("Frost Bite", ["#0D2E5B", "#5AA5FF", "#D0F3FF"], "pulse", 49),
             ("Lava Flow", ["#4B0A00", "#A61D00", "#FF6A00"], "sweep", 57),
-            ("Electric Surge", ["#00D4FF", "#48A4FF", "#A5F5FF"], "strobe", 88),
+            ("Electric Surge", ["#00143A", "#00A2FF", "#9BE5FF"], "strobe", 88),
             ("Midnight Bloom", ["#050A1F", "#322A7A", "#B86BFF"], "fade", 38),
             ("Copper Sunset", ["#331800", "#B05A22", "#F4B178"], "fade", 34),
             ("Jade Drift", ["#023329", "#00A387", "#89FFE1"], "sweep", 42),
             ("Ruby Blitz", ["#350007", "#B00E28", "#FF5A7A"], "alternating", 76),
             ("Sapphire Wave", ["#09153D", "#1F6DDE", "#7FC6FF"], "wave", 54),
-            ("Phantom Strobe", ["#FF4FD8", "#FF8AF0", "#FFD6FA"], "strobe", 90),
-            ("Snowstorm", ["#FFFFFF"], "strobe", 90),
+            ("Phantom Strobe", ["#150022", "#5D17A8", "#E9D4FF"], "strobe", 90),
             ("Golden Hour", ["#5A2C00", "#E89A1D", "#FFE199"], "fade", 30),
             ("Inferno Chase", ["#2E0200", "#D73700", "#FFC04A"], "chase", 72),
             ("Deep Purple Fade", ["#120021", "#562B9B", "#B996FF"], "fade", 39),
@@ -631,9 +623,8 @@ class DMXLightingEditor:
         list_row = tk.Frame(left, bg="#242b35")
         list_row.pack(fill="both", expand=True, padx=20)
 
-        elem_wrap = tk.Frame(list_row, bg="#242b35", width=235)
-        elem_wrap.pack(side="left", fill="both", expand=False, padx=(0, 8))
-        elem_wrap.pack_propagate(False)
+        elem_wrap = tk.Frame(list_row, bg="#242b35")
+        elem_wrap.pack(side="left", fill="both", expand=True, padx=(0, 8))
         tk.Label(elem_wrap, text="Element", bg="#242b35", fg="#cfd8e3", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 4))
         self.element_listbox = tk.Listbox(elem_wrap, bg="#111820", fg="#e9f0ff", selectbackground="#8ec5ff", selectforeground="#0a1a2b", activestyle="none", font=("Arial", 12), relief="flat", exportselection=False)
         elem_scroll = tk.Scrollbar(elem_wrap, command=self.element_listbox.yview, width=26)
@@ -695,17 +686,7 @@ class DMXLightingEditor:
         self._fade_out_lbl = tk.Label(fade_ctrl, text="250", **val_style)
         self._fade_out_lbl.pack(side="left", padx=2)
         tk.Button(fade_ctrl, text="▲", command=self._fade_out_up, **btn_style).pack(side="left")
-        tk.Label(fade_ctrl, text="ms", bg="#2c3441", fg="#8899aa", font=("Arial", 9)).pack(side="left", padx=(0, 12))
-
-        tk.Label(fade_ctrl, text="Strobe", **lbl_style).pack(side="left")
-        self._strobe_down_btn = tk.Button(fade_ctrl, text="▼", command=self._strobe_speed_down, **btn_style)
-        self._strobe_down_btn.pack(side="left", padx=(4, 0))
-        self._strobe_speed_lbl = tk.Label(fade_ctrl, text="—", **val_style)
-        self._strobe_speed_lbl.pack(side="left", padx=2)
-        self._strobe_up_btn = tk.Button(fade_ctrl, text="▲", command=self._strobe_speed_up, **btn_style)
-        self._strobe_up_btn.pack(side="left")
-        self._strobe_unit_lbl = tk.Label(fade_ctrl, text="spd", bg="#2c3441", fg="#8899aa", font=("Arial", 9))
-        self._strobe_unit_lbl.pack(side="left")
+        tk.Label(fade_ctrl, text="ms", bg="#2c3441", fg="#8899aa", font=("Arial", 9)).pack(side="left")
 
         target_wrap = tk.Frame(left, bg="#242b35")
         target_wrap.pack(fill="x", padx=20, pady=(12, 10))
@@ -799,7 +780,6 @@ class DMXLightingEditor:
             self.effect_listbox.see(0)
             self.hover_effect_name = None
         self._sync_fade_ui()
-        self._sync_strobe_ui()
         self._draw_layout()
         if self.window and self.window.winfo_exists():
             self.window.after_idle(self._end_sync)
@@ -854,84 +834,13 @@ class DMXLightingEditor:
         if eff_idx == -1:
             assignment["effect"] = None
             self.hover_effect_name = None
-            self._sync_strobe_ui()
             self._draw_layout()
             return
 
         effect = self.effects[eff_idx]
         assignment["effect"] = effect["name"]
         self.hover_effect_name = effect["name"]
-        self._sync_strobe_ui(effect["name"])
         self._preview_dmx_effect(effect["name"])
-
-
-    def _selected_effect_name(self) -> str | None:
-        assignment = self._current_assignment()
-        return assignment.get("effect")
-
-    def _effect_is_strobe(self, effect_name: str | None = None) -> bool:
-        if not effect_name:
-            effect_name = self._selected_effect_name()
-        effect = self.effects_by_name.get(effect_name) if effect_name else None
-        return bool(effect and effect.get("pattern_type") == "strobe")
-
-    def _default_effect_speed(self, effect_name: str | None = None) -> int:
-        if not effect_name:
-            effect_name = self._selected_effect_name()
-        effect = self.effects_by_name.get(effect_name) if effect_name else None
-        speed = effect.get("speed", STROBE_SPEED_DEFAULT) if effect else STROBE_SPEED_DEFAULT
-        return max(STROBE_SPEED_MIN, min(STROBE_SPEED_MAX, int(speed)))
-
-    def _set_strobe_controls_enabled(self, enabled: bool):
-        self._strobe_enabled = enabled
-        btn_state = "normal" if enabled else "disabled"
-        val_fg = "#8ec5ff" if enabled else "#607081"
-        unit_fg = "#8899aa" if enabled else "#4d5b69"
-        btn_bg = "#3b4552" if enabled else "#27303a"
-        btn_active = "#506074" if enabled else "#27303a"
-
-        for button in (self._strobe_down_btn, self._strobe_up_btn):
-            button.configure(
-                state=btn_state,
-                bg=btn_bg,
-                activebackground=btn_active,
-                disabledforeground="#7b8a98",
-            )
-        self._strobe_speed_lbl.configure(fg=val_fg)
-        self._strobe_unit_lbl.configure(fg=unit_fg)
-
-    def _sync_strobe_ui(self, effect_name: str | None = None):
-        if not effect_name:
-            effect_name = self._selected_effect_name()
-        assignment = self._current_assignment()
-        if self._effect_is_strobe(effect_name):
-            speed = assignment.get("strobe_speed", self._default_effect_speed(effect_name))
-            speed = max(STROBE_SPEED_MIN, min(STROBE_SPEED_MAX, int(speed)))
-            self._strobe_speed = speed
-            self._strobe_speed_lbl.configure(text=str(speed))
-            self._set_strobe_controls_enabled(True)
-        else:
-            self._strobe_speed = assignment.get("strobe_speed", self._default_effect_speed(effect_name))
-            self._strobe_speed_lbl.configure(text="—")
-            self._set_strobe_controls_enabled(False)
-
-    def _strobe_speed_down(self):
-        if not self._effect_is_strobe():
-            return
-        self._strobe_speed = max(STROBE_SPEED_MIN, self._strobe_speed - STROBE_SPEED_STEP)
-        self._strobe_speed_lbl.configure(text=str(self._strobe_speed))
-        assignment = self._current_assignment()
-        assignment["strobe_speed"] = self._strobe_speed
-        self._push_strobe_speed_to_dmx()
-
-    def _strobe_speed_up(self):
-        if not self._effect_is_strobe():
-            return
-        self._strobe_speed = min(STROBE_SPEED_MAX, self._strobe_speed + STROBE_SPEED_STEP)
-        self._strobe_speed_lbl.configure(text=str(self._strobe_speed))
-        assignment = self._current_assignment()
-        assignment["strobe_speed"] = self._strobe_speed
-        self._push_strobe_speed_to_dmx()
 
     def _open_target_dropup(self):
         menu = tk.Menu(self.window, tearoff=0, bg="#1f2732", fg="white", activebackground="#8ec5ff", activeforeground="#0a1a2b")
@@ -1366,9 +1275,8 @@ class DMXLightingEditor:
             speed = effect.get("speed", 50)
             num = getattr(self.dmx, "num_fixtures", 8)
             fixtures = []
-            shared_hex = palette[0] if pat_type == "strobe" else None
             for i in range(num):
-                hex_c = shared_hex if shared_hex is not None else palette[i % len(palette)]
+                hex_c = palette[i % len(palette)]
                 r, g, b = _hex_to_rgb(hex_c)
                 fixtures.append({"r": r, "g": g, "b": b, "strobe": 0, "dimmer": 255})
             scene_entry = {"fixtures": fixtures}
@@ -1379,13 +1287,6 @@ class DMXLightingEditor:
 
         # Attach fade data from current assignment to the scene
         scene = scenes.get(effect_name, {})
-        assignment = self._current_assignment()
-        if self._effect_is_strobe(effect_name):
-            strobe_speed = assignment.get("strobe_speed", self._default_effect_speed(effect_name))
-            strobe_speed = max(STROBE_SPEED_MIN, min(STROBE_SPEED_MAX, int(strobe_speed)))
-            assignment["strobe_speed"] = strobe_speed
-            scene.setdefault("pattern", {})["type"] = "strobe"
-            scene["pattern"]["speed"] = strobe_speed
         if self._fade_enabled:
             scene["fade"] = {"in_ms": self._fade_in_ms, "out_ms": self._fade_out_ms}
         else:
@@ -1400,8 +1301,6 @@ class DMXLightingEditor:
         elif data:
             data.pop("fade_in_ms", None)
             data.pop("fade_out_ms", None)
-        if data and self._effect_is_strobe(effect_name):
-            data["speed"] = self._current_assignment().get("strobe_speed", self._default_effect_speed(effect_name))
         if callable(self.on_scene_applied_callback):
             try:
                 self.on_scene_applied_callback()
@@ -1481,7 +1380,7 @@ class DMXLightingEditor:
         """
         if not self.dmx:
             return
-        effect_name = self._selected_effect_name() or self.hover_effect_name
+        effect_name = self.hover_effect_name
         if not effect_name:
             return
         scenes = getattr(self.dmx, "scenes", {})
@@ -1507,29 +1406,6 @@ class DMXLightingEditor:
                 self.on_scene_applied_callback()
             except Exception:
                 pass
-
-
-    def _push_strobe_speed_to_dmx(self):
-        """Update the active strobe scene speed without affecting non-strobe effects."""
-        if not self.dmx:
-            return
-        effect_name = self._selected_effect_name()
-        if not effect_name or not self._effect_is_strobe(effect_name):
-            return
-        scenes = getattr(self.dmx, "scenes", {})
-        scene = scenes.get(effect_name)
-        if not scene:
-            self._preview_dmx_effect(effect_name)
-            scene = scenes.get(effect_name)
-            if not scene:
-                return
-        scene.setdefault("pattern", {})["type"] = "strobe"
-        scene["pattern"]["speed"] = self._strobe_speed
-        data = getattr(self.dmx, "_active_scene_data", None)
-        if data:
-            data["pattern"] = "strobe"
-            data["speed"] = self._strobe_speed
-        self._preview_dmx_effect(effect_name)
 
     def _animate_preview(self):
         if not self.window or not self.canvas:

@@ -135,11 +135,12 @@
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
-          "effect": "Solar Flare",
+          "effect": "Color Roulette",
           "apply_to": "LR PAIR",
-          "fade_enabled": true,
+          "fade_enabled": false,
           "fade_in_ms": 250,
-          "fade_out_ms": 0
+          "fade_out_ms": 500,
+          "strobe_speed": 210
         },
         "Bonus": {
           "effect": "Gold Victory",
@@ -454,34 +455,34 @@
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Idle": {
-          "effect": null,
+          "effect": "Rainbow Wave (Copy)",
           "apply_to": "All Fixtures",
           "fade_enabled": true,
           "fade_in_ms": 375,
           "fade_out_ms": 125
         },
         "Check-In Open": {
-          "effect": null,
+          "effect": "Static Green",
           "apply_to": "All Fixtures"
         },
         "Game Running": {
-          "effect": null,
+          "effect": "Deep Purple Fade",
           "apply_to": "All Fixtures"
         },
         "Results / Scoreboard": {
-          "effect": null,
+          "effect": "Color Roulette",
           "apply_to": "All Fixtures"
         },
         "Countdown": {
-          "effect": null,
+          "effect": "Static Blue",
           "apply_to": "All Fixtures"
         },
         "Game Over": {
-          "effect": null,
+          "effect": "Static Red",
           "apply_to": "All Fixtures"
         },
         "Attract Mode": {
-          "effect": null,
+          "effect": "Aurora Ribbon",
           "apply_to": "All Fixtures"
         }
       }

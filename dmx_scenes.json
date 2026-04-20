@@ -1,4 +1,892 @@
 [
+{
+  "name": "Bounce Hero Orange",
+  "category": "attract",
+  "game": "global",
+  "mode_filter": "any",
+  "enabled": true,
+  "locked": false,
+  "priority": "normal",
+  "fixture_target": {
+    "bank": 1,
+    "range": "1-4",
+    "groups": ["L1", "L2", "L3", "L4", "L8"],
+    "link_mode": "linked"
+  },
+  "colors": {
+    "palette": ["#ff8800"],
+    "mode": "palette_cycle",
+    "brightness": 100,
+    "saturation": 90,
+    "blending": 20
+  },
+  "pattern": {
+    "type": "bounce",
+    "speed": 65,
+    "fade_time": 0.35,
+    "direction": 90,
+    "loop": true
+  },
+  "transitions": {
+    "fade_in": 0.5,
+    "fade_out": 1.0,
+    "crossfade": true,
+    "auto_expire": 0.0,
+    "return_to_default": true,
+    "return_to_default_time": 2.5
+  },
+  "triggers": ["auto_attract"],
+  "trigger_behavior": "loop",
+  "trigger_behavior_map": {},
+  "dmx_settings": {
+    "channels": "master_rgb",
+    "universe": 5,
+    "size": 4,
+    "blackout_time": 0.35,
+    "auto_expire": 2.0
+  },
+  "safety": {
+    "max_brightness": 100,
+    "strobe_cap": 80,
+    "safe_startup": true,
+    "idle_timeout": 300,
+    "test_brightness_limit": 80,
+    "global_master": 100,
+    "fallback_scene": ""
+  },
+  "fixture_roles": {},
+  "button_assignment": null,
+  "button_behavior": "press = activate",
+  "button_action": "quick scene recall",
+  "user_slot_names": ["", "", "", "", "", ""],
+  "end_trigger_color": "BLACK",
+  "end_trigger_fade": false
+},
+{
+  "name": "Bounce Yellow Spark",
+  "category": "attract",
+  "game": "global",
+  "mode_filter": "any",
+  "enabled": true,
+  "locked": false,
+  "priority": "normal",
+  "fixture_target": {
+    "bank": 1,
+    "range": "1-4",
+    "groups": ["L1", "L2", "L3", "L4", "L8"],
+    "link_mode": "linked"
+  },
+  "colors": {
+    "palette": ["#ffcc00"],
+    "mode": "palette_cycle",
+    "brightness": 100,
+    "saturation": 90,
+    "blending": 20
+  },
+  "pattern": {
+    "type": "bounce",
+    "speed": 65,
+    "fade_time": 0.35,
+    "direction": 90,
+    "loop": true
+  },
+  "transitions": {
+    "fade_in": 0.5,
+    "fade_out": 1.0,
+    "crossfade": true,
+    "auto_expire": 0.0,
+    "return_to_default": true,
+    "return_to_default_time": 2.5
+  },
+  "triggers": ["auto_attract"],
+  "trigger_behavior": "loop",
+  "trigger_behavior_map": {},
+  "dmx_settings": {
+    "channels": "master_rgb",
+    "universe": 5,
+    "size": 4,
+    "blackout_time": 0.35,
+    "auto_expire": 2.0
+  },
+  "safety": {
+    "max_brightness": 100,
+    "strobe_cap": 80,
+    "safe_startup": true,
+    "idle_timeout": 300,
+    "test_brightness_limit": 80,
+    "global_master": 100,
+    "fallback_scene": ""
+  },
+  "fixture_roles": {},
+  "button_assignment": null,
+  "button_behavior": "press = activate",
+  "button_action": "quick scene recall",
+  "user_slot_names": ["", "", "", "", "", ""],
+  "end_trigger_color": "BLACK",
+  "end_trigger_fade": false
+},
+{
+  "name": "Bounce Green Fresh",
+  "category": "attract",
+  "game": "global",
+  "mode_filter": "any",
+  "enabled": true,
+  "locked": false,
+  "priority": "normal",
+  "fixture_target": {
+    "bank": 1,
+    "range": "1-4",
+    "groups": ["L1", "L2", "L3", "L4", "L8"],
+    "link_mode": "linked"
+  },
+  "colors": {
+    "palette": ["#00ff44"],
+    "mode": "palette_cycle",
+    "brightness": 100,
+    "saturation": 90,
+    "blending": 20
+  },
+  "pattern": {
+    "type": "bounce",
+    "speed": 65,
+    "fade_time": 0.35,
+    "direction": 90,
+    "loop": true
+  },
+  "transitions": {
+    "fade_in": 0.5,
+    "fade_out": 1.0,
+    "crossfade": true,
+    "auto_expire": 0.0,
+    "return_to_default": true,
+    "return_to_default_time": 2.5
+  },
+  "triggers": ["auto_attract"],
+  "trigger_behavior": "loop",
+  "trigger_behavior_map": {},
+  "dmx_settings": {
+    "channels": "master_rgb",
+    "universe": 5,
+    "size": 4,
+    "blackout_time": 0.35,
+    "auto_expire": 2.0
+  },
+  "safety": {
+    "max_brightness": 100,
+    "strobe_cap": 80,
+    "safe_startup": true,
+    "idle_timeout": 300,
+    "test_brightness_limit": 80,
+    "global_master": 100,
+    "fallback_scene": ""
+  },
+  "fixture_roles": {},
+  "button_assignment": null,
+  "button_behavior": "press = activate",
+  "button_action": "quick scene recall",
+  "user_slot_names": ["", "", "", "", "", ""],
+  "end_trigger_color": "BLACK",
+  "end_trigger_fade": false
+},
+{
+  "name": "Bounce Light Blue",
+  "category": "attract",
+  "game": "global",
+  "mode_filter": "any",
+  "enabled": true,
+  "locked": false,
+  "priority": "normal",
+  "fixture_target": {
+    "bank": 1,
+    "range": "1-4",
+    "groups": ["L1", "L2", "L3", "L4", "L8"],
+    "link_mode": "linked"
+  },
+  "colors": {
+    "palette": ["#4499ff"],
+    "mode": "palette_cycle",
+    "brightness": 100,
+    "saturation": 90,
+    "blending": 20
+  },
+  "pattern": {
+    "type": "bounce",
+    "speed": 65,
+    "fade_time": 0.35,
+    "direction": 90,
+    "loop": true
+  },
+  "transitions": {
+    "fade_in": 0.5,
+    "fade_out": 1.0,
+    "crossfade": true,
+    "auto_expire": 0.0,
+    "return_to_default": true,
+    "return_to_default_time": 2.5
+  },
+  "triggers": ["auto_attract"],
+  "trigger_behavior": "loop",
+  "trigger_behavior_map": {},
+  "dmx_settings": {
+    "channels": "master_rgb",
+    "universe": 5,
+    "size": 4,
+    "blackout_time": 0.35,
+    "auto_expire": 2.0
+  },
+  "safety": {
+    "max_brightness": 100,
+    "strobe_cap": 80,
+    "safe_startup": true,
+    "idle_timeout": 300,
+    "test_brightness_limit": 80,
+    "global_master": 100,
+    "fallback_scene": ""
+  },
+  "fixture_roles": {},
+  "button_assignment": null,
+  "button_behavior": "press = activate",
+  "button_action": "quick scene recall",
+  "user_slot_names": ["", "", "", "", "", ""],
+  "end_trigger_color": "BLACK",
+  "end_trigger_fade": false
+},
+{
+  "name": "Bounce Red Burst",
+  "category": "attract",
+  "game": "global",
+  "mode_filter": "any",
+  "enabled": true,
+  "locked": false,
+  "priority": "normal",
+  "fixture_target": {
+    "bank": 1,
+    "range": "1-4",
+    "groups": ["L1", "L2", "L3", "L4", "L8"],
+    "link_mode": "linked"
+  },
+  "colors": {
+    "palette": ["#ff4400"],
+    "mode": "palette_cycle",
+    "brightness": 100,
+    "saturation": 90,
+    "blending": 20
+  },
+  "pattern": {
+    "type": "bounce",
+    "speed": 65,
+    "fade_time": 0.35,
+    "direction": 90,
+    "loop": true
+  },
+  "transitions": {
+    "fade_in": 0.5,
+    "fade_out": 1.0,
+    "crossfade": true,
+    "auto_expire": 0.0,
+    "return_to_default": true,
+    "return_to_default_time": 2.5
+  },
+  "triggers": ["auto_attract"],
+  "trigger_behavior": "loop",
+  "trigger_behavior_map": {},
+  "dmx_settings": {
+    "channels": "master_rgb",
+    "universe": 5,
+    "size": 4,
+    "blackout_time": 0.35,
+    "auto_expire": 2.0
+  },
+  "safety": {
+    "max_brightness": 100,
+    "strobe_cap": 80,
+    "safe_startup": true,
+    "idle_timeout": 300,
+    "test_brightness_limit": 80,
+    "global_master": 100,
+    "fallback_scene": ""
+  },
+  "fixture_roles": {},
+  "button_assignment": null,
+  "button_behavior": "press = activate",
+  "button_action": "quick scene recall",
+  "user_slot_names": ["", "", "", "", "", ""],
+  "end_trigger_color": "BLACK",
+  "end_trigger_fade": false
+},
+{
+  "name": "Bounce Amber",
+  "category": "attract",
+  "game": "global",
+  "mode_filter": "any",
+  "enabled": true,
+  "locked": false,
+  "priority": "normal",
+  "fixture_target": {
+    "bank": 1,
+    "range": "1-4",
+    "groups": ["L1", "L2", "L3", "L4", "L8"],
+    "link_mode": "linked"
+  },
+  "colors": {
+    "palette": ["#ffaa00"],
+    "mode": "palette_cycle",
+    "brightness": 100,
+    "saturation": 90,
+    "blending": 20
+  },
+  "pattern": {
+    "type": "bounce",
+    "speed": 65,
+    "fade_time": 0.35,
+    "direction": 90,
+    "loop": true
+  },
+  "transitions": {
+    "fade_in": 0.5,
+    "fade_out": 1.0,
+    "crossfade": true,
+    "auto_expire": 0.0,
+    "return_to_default": true,
+    "return_to_default_time": 2.5
+  },
+  "triggers": ["auto_attract"],
+  "trigger_behavior": "loop",
+  "trigger_behavior_map": {},
+  "dmx_settings": {
+    "channels": "master_rgb",
+    "universe": 5,
+    "size": 4,
+    "blackout_time": 0.35,
+    "auto_expire": 2.0
+  },
+  "safety": {
+    "max_brightness": 100,
+    "strobe_cap": 80,
+    "safe_startup": true,
+    "idle_timeout": 300,
+    "test_brightness_limit": 80,
+    "global_master": 100,
+    "fallback_scene": ""
+  },
+  "fixture_roles": {},
+  "button_assignment": null,
+  "button_behavior": "press = activate",
+  "button_action": "quick scene recall",
+  "user_slot_names": ["", "", "", "", "", ""],
+  "end_trigger_color": "BLACK",
+  "end_trigger_fade": false
+},
+{
+  "name": "Bounce White Blaze",
+  "category": "attract",
+  "game": "global",
+  "mode_filter": "any",
+  "enabled": true,
+  "locked": false,
+  "priority": "normal",
+  "fixture_target": {
+    "bank": 1,
+    "range": "1-4",
+    "groups": ["L1", "L2", "L3", "L4", "L8"],
+    "link_mode": "linked"
+  },
+  "colors": {
+    "palette": ["#ffffff"],
+    "mode": "palette_cycle",
+    "brightness": 100,
+    "saturation": 0,
+    "blending": 0
+  },
+  "pattern": {
+    "type": "bounce",
+    "speed": 65,
+    "fade_time": 0.35,
+    "direction": 90,
+    "loop": true
+  },
+  "transitions": {
+    "fade_in": 0.5,
+    "fade_out": 1.0,
+    "crossfade": true,
+    "auto_expire": 0.0,
+    "return_to_default": true,
+    "return_to_default_time": 2.5
+  },
+  "triggers": ["auto_attract"],
+  "trigger_behavior": "loop",
+  "trigger_behavior_map": {},
+  "dmx_settings": {
+    "channels": "master_rgb",
+    "universe": 5,
+    "size": 4,
+    "blackout_time": 0.35,
+    "auto_expire": 2.0
+  },
+  "safety": {
+    "max_brightness": 100,
+    "strobe_cap": 80,
+    "safe_startup": true,
+    "idle_timeout": 300,
+    "test_brightness_limit": 80,
+    "global_master": 100,
+    "fallback_scene": ""
+  },
+  "fixture_roles": {},
+  "button_assignment": null,
+  "button_behavior": "press = activate",
+  "button_action": "quick scene recall",
+  "user_slot_names": ["", "", "", "", "", ""],
+  "end_trigger_color": "BLACK",
+  "end_trigger_fade": false
+},
+{
+  "name": "Bounce Rainbow Rush",
+  "category": "attract",
+  "game": "global",
+  "mode_filter": "any",
+  "enabled": true,
+  "locked": false,
+  "priority": "normal",
+  "fixture_target": {
+    "bank": 1,
+    "range": "1-4",
+    "groups": ["L1", "L2", "L3", "L4", "L8"],
+    "link_mode": "linked"
+  },
+  "colors": {
+    "palette": [
+      "#ff4400",
+      "#ff8800",
+      "#ffaa00",
+      "#ffcc00",
+      "#00ff44",
+      "#4499ff",
+      "#0033aa",
+      "#aa00ff",
+      "#ffee00",
+      "#ffffff"
+    ],
+    "mode": "palette_cycle",
+    "brightness": 100,
+    "saturation": 90,
+    "blending": 20
+  },
+  "pattern": {
+    "type": "bounce",
+    "speed": 65,
+    "fade_time": 0.35,
+    "direction": 90,
+    "loop": true
+  },
+  "transitions": {
+    "fade_in": 0.5,
+    "fade_out": 1.0,
+    "crossfade": true,
+    "auto_expire": 0.0,
+    "return_to_default": true,
+    "return_to_default_time": 2.5
+  },
+  "triggers": ["auto_attract"],
+  "trigger_behavior": "loop",
+  "trigger_behavior_map": {},
+  "dmx_settings": {
+    "channels": "master_rgb",
+    "universe": 5,
+    "size": 4,
+    "blackout_time": 0.35,
+    "auto_expire": 2.0
+  },
+  "safety": {
+    "max_brightness": 100,
+    "strobe_cap": 80,
+    "safe_startup": true,
+    "idle_timeout": 300,
+    "test_brightness_limit": 80,
+    "global_master": 100,
+    "fallback_scene": ""
+  },
+  "fixture_roles": {},
+  "button_assignment": null,
+  "button_behavior": "press = activate",
+  "button_action": "quick scene recall",
+  "user_slot_names": ["", "", "", "", "", ""],
+  "end_trigger_color": "BLACK",
+  "end_trigger_fade": false
+},
+  {
+    "name": "Static Blue",
+    "category": "test",
+    "game": "global",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": ["L1", "L2", "L3", "L4", "L8"],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": ["#0000ff"],
+      "mode": "static",
+      "brightness": 100,
+      "saturation": 100,
+      "blending": 0
+    },
+    "pattern": {
+      "type": "static",
+      "speed": 0,
+      "fade_time": 0,
+      "direction": 0,
+      "loop": false
+    },
+    "transitions": {
+      "fade_in": 0.2,
+      "fade_out": 0.2,
+      "crossfade": false,
+      "auto_expire": 0.0,
+      "return_to_default": false
+    },
+    "triggers": ["manual_test"],
+    "trigger_behavior": "single",
+    "trigger_behavior_map": {},
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0,
+      "auto_expire": 0
+    },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100,
+      "fallback_scene": ""
+    },
+    "fixture_roles": {},
+    "button_assignment": null,
+    "button_behavior": "press = activate",
+    "button_action": "quick scene recall",
+    "user_slot_names": ["", "", "", "", "", ""],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
+  },
+  {
+    "name": "Static Red",
+    "category": "test",
+    "game": "global",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": ["L1", "L2", "L3", "L4", "L8"],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": ["#ff0000"],
+      "mode": "static",
+      "brightness": 100,
+      "saturation": 100,
+      "blending": 0
+    },
+    "pattern": {
+      "type": "static",
+      "speed": 0,
+      "fade_time": 0,
+      "direction": 0,
+      "loop": false
+    },
+    "transitions": {
+      "fade_in": 0.2,
+      "fade_out": 0.2,
+      "crossfade": false,
+      "auto_expire": 0.0,
+      "return_to_default": false
+    },
+    "triggers": ["manual_test"],
+    "trigger_behavior": "single",
+    "trigger_behavior_map": {},
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0,
+      "auto_expire": 0
+    },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100,
+      "fallback_scene": ""
+    },
+    "fixture_roles": {},
+    "button_assignment": null,
+    "button_behavior": "press = activate",
+    "button_action": "quick scene recall",
+    "user_slot_names": ["", "", "", "", "", ""],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
+  },
+  {
+    "name": "Static Green",
+    "category": "test",
+    "game": "global",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": ["L1", "L2", "L3", "L4", "L8"],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": ["#00ff00"],
+      "mode": "static",
+      "brightness": 100,
+      "saturation": 100,
+      "blending": 0
+    },
+    "pattern": {
+      "type": "static",
+      "speed": 0,
+      "fade_time": 0,
+      "direction": 0,
+      "loop": false
+    },
+    "transitions": {
+      "fade_in": 0.2,
+      "fade_out": 0.2,
+      "crossfade": false,
+      "auto_expire": 0.0,
+      "return_to_default": false
+    },
+    "triggers": ["manual_test"],
+    "trigger_behavior": "single",
+    "trigger_behavior_map": {},
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0,
+      "auto_expire": 0
+    },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100,
+      "fallback_scene": ""
+    },
+    "fixture_roles": {},
+    "button_assignment": null,
+    "button_behavior": "press = activate",
+    "button_action": "quick scene recall",
+    "user_slot_names": ["", "", "", "", "", ""],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
+  },
+  {
+    "name": "Static Dark Blue",
+    "category": "test",
+    "game": "global",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": ["L1", "L2", "L3", "L4", "L8"],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": ["#000066"],
+      "mode": "static",
+      "brightness": 100,
+      "saturation": 100,
+      "blending": 0
+    },
+    "pattern": {
+      "type": "static",
+      "speed": 0,
+      "fade_time": 0,
+      "direction": 0,
+      "loop": false
+    },
+    "transitions": {
+      "fade_in": 0.2,
+      "fade_out": 0.2,
+      "crossfade": false,
+      "auto_expire": 0.0,
+      "return_to_default": false
+    },
+    "triggers": ["manual_test"],
+    "trigger_behavior": "single",
+    "trigger_behavior_map": {},
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0,
+      "auto_expire": 0
+    },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100,
+      "fallback_scene": ""
+    },
+    "fixture_roles": {},
+    "button_assignment": null,
+    "button_behavior": "press = activate",
+    "button_action": "quick scene recall",
+    "user_slot_names": ["", "", "", "", "", ""],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
+  },
+  {
+    "name": "Static Magenta",
+    "category": "test",
+    "game": "global",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": ["L1", "L2", "L3", "L4", "L8"],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": ["#ff00ff"],
+      "mode": "static",
+      "brightness": 100,
+      "saturation": 100,
+      "blending": 0
+    },
+    "pattern": {
+      "type": "static",
+      "speed": 0,
+      "fade_time": 0,
+      "direction": 0,
+      "loop": false
+    },
+    "transitions": {
+      "fade_in": 0.2,
+      "fade_out": 0.2,
+      "crossfade": false,
+      "auto_expire": 0.0,
+      "return_to_default": false
+    },
+    "triggers": ["manual_test"],
+    "trigger_behavior": "single",
+    "trigger_behavior_map": {},
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0,
+      "auto_expire": 0
+    },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100,
+      "fallback_scene": ""
+    },
+    "fixture_roles": {},
+    "button_assignment": null,
+    "button_behavior": "press = activate",
+    "button_action": "quick scene recall",
+    "user_slot_names": ["", "", "", "", "", ""],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
+  },
+  {
+    "name": "Static White",
+    "category": "test",
+    "game": "global",
+    "mode_filter": "any",
+    "enabled": true,
+    "locked": false,
+    "priority": "normal",
+    "fixture_target": {
+      "bank": 1,
+      "range": "1-4",
+      "groups": ["L1", "L2", "L3", "L4", "L8"],
+      "link_mode": "linked"
+    },
+    "colors": {
+      "palette": ["#ffffff"],
+      "mode": "static",
+      "brightness": 100,
+      "saturation": 0,
+      "blending": 0
+    },
+    "pattern": {
+      "type": "static",
+      "speed": 0,
+      "fade_time": 0,
+      "direction": 0,
+      "loop": false
+    },
+    "transitions": {
+      "fade_in": 0.2,
+      "fade_out": 0.2,
+      "crossfade": false,
+      "auto_expire": 0.0,
+      "return_to_default": false
+    },
+    "triggers": ["manual_test"],
+    "trigger_behavior": "single",
+    "trigger_behavior_map": {},
+    "dmx_settings": {
+      "channels": "master_rgb",
+      "universe": 5,
+      "size": 4,
+      "blackout_time": 0,
+      "auto_expire": 0
+    },
+    "safety": {
+      "max_brightness": 100,
+      "strobe_cap": 80,
+      "safe_startup": true,
+      "idle_timeout": 300,
+      "test_brightness_limit": 80,
+      "global_master": 100,
+      "fallback_scene": ""
+    },
+    "fixture_roles": {},
+    "button_assignment": null,
+    "button_behavior": "press = activate",
+    "button_action": "quick scene recall",
+    "user_slot_names": ["", "", "", "", "", ""],
+    "end_trigger_color": "BLACK",
+    "end_trigger_fade": false
+  },
+
   {
     "name": "Fire Burst",
     "category": "gameplay",
