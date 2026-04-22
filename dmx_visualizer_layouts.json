@@ -5,34 +5,6 @@
       "name": "Default Small Rig",
       "fixtures": [
         {
-          "id": "F1",
-          "type": "wash",
-          "x": 80,
-          "y": 726,
-          "direction": "right"
-        },
-        {
-          "id": "F2",
-          "type": "wash",
-          "x": 71,
-          "y": 487,
-          "direction": "right"
-        },
-        {
-          "id": "F3",
-          "type": "top",
-          "x": 761,
-          "y": 741,
-          "direction": "left"
-        },
-        {
-          "id": "F4",
-          "type": "top",
-          "x": 753,
-          "y": 476,
-          "direction": "left"
-        },
-        {
           "id": "F5",
           "type": "top",
           "x": 490,
@@ -59,58 +31,60 @@
           "x": 323,
           "y": 90,
           "direction": "down"
+        },
+        {
+          "id": "F1",
+          "type": "custom",
+          "x": 99,
+          "y": 694,
+          "direction": "right",
+          "universe": 9,
+          "start_address": 1
+        },
+        {
+          "id": "F2",
+          "type": "custom",
+          "x": 63,
+          "y": 456,
+          "direction": "right",
+          "universe": 9,
+          "start_address": 9
+        },
+        {
+          "id": "F3",
+          "type": "custom",
+          "x": 841,
+          "y": 641,
+          "direction": "left",
+          "universe": 9,
+          "start_address": 17
+        },
+        {
+          "id": "F4",
+          "type": "custom",
+          "x": 812,
+          "y": 458,
+          "direction": "left",
+          "universe": 9,
+          "start_address": 25
         }
       ],
       "targets": {
         "All Fixtures": [
-          "F1",
-          "F2",
-          "F3",
-          "F4",
           "F5",
           "F6",
           "F7",
-          "F8"
-        ],
-        "Top Fixtures": [
-          "F3",
-          "F4",
-          "F5",
-          "F6"
-        ],
-        "Top Left Pair": [
-          "F3",
-          "F4"
-        ],
-        "Top Right Pair": [
-          "F5",
-          "F6"
-        ],
-        "LR PAIR": [
-          [
-            "F1",
-            "F3"
-          ],
-          [
-            "F2",
-            "F4"
-          ]
-        ],
-        "1-3": [
+          "F8",
           "F1",
           "F2",
-          "F3"
-        ],
-        "turn": [
+          "F3",
           "F4"
         ],
-        "F1 F2": [
+        "F1 F4": [
           "F1",
-          "F2"
-        ],
-        "F7 F8": [
-          "F7",
-          "F8"
+          "F2",
+          "F3",
+          "F4"
         ]
       }
     }

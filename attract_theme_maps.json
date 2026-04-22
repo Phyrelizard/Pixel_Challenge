@@ -17,8 +17,8 @@
   "selected_themes": [
     "Fire Burst",
     "Bounce Chase",
-    "Galaxy Wave",
-    "Team Colors"
+    "Team Colors",
+    "Galaxy Wave"
   ],
   "sash_left_attract_bottom": 576,
   "sash_center_ctrl": 401,
@@ -26,13 +26,13 @@
   "sash_bottom_log": 516,
   "sash_center_mixer": 644,
   "sash_mixer_height": null,
-  "falcon_brightness": 20,
-  "gameplay_brightness": 70,
+  "falcon_brightness": 30,
+  "gameplay_brightness": 40,
   "music_volume": 0,
   "sfx_volume": 35,
   "voice_volume": 12,
   "master_volume": 14,
-  "falcon_ip": "192.168.2.28",
+  "falcon_ip": "192.168.2.25",
   "wifi_dhcp": true,
   "wifi_ssid": "skynet",
   "wifi_psk": "",
