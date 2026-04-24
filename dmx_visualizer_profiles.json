@@ -137,8 +137,41 @@
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
-          "layers": [],
-          "active_target": "f1-4"
+          "layers": [
+            {
+              "effect": "Dimmer Off",
+              "apply_to": "f1-4"
+            },
+            {
+              "effect": "Dimmer Off",
+              "apply_to": "switch 1"
+            },
+            {
+              "effect": "Dimmer 50%",
+              "apply_to": "f10"
+            },
+            {
+              "effect": "Green Chase Up (Copy)",
+              "apply_to": "f33"
+            },
+            {
+              "effect": "Rainbow Wave (Copy)",
+              "apply_to": "f34"
+            },
+            {
+              "effect": "Rainbow Wave (Copy)",
+              "apply_to": "F35"
+            },
+            {
+              "effect": "Bounce Green Fresh",
+              "apply_to": "F36"
+            },
+            {
+              "effect": "Dimmer 100%",
+              "apply_to": "F9"
+            }
+          ],
+          "active_target": "F3"
         },
         "Bonus": {
           "effect": null,
@@ -169,8 +202,25 @@
           "apply_to": "All Fixtures"
         },
         "Overlay 4": {
-          "effect": null,
-          "apply_to": "All Fixtures"
+          "layers": [
+            {
+              "effect": null,
+              "apply_to": "All Fixtures"
+            },
+            {
+              "effect": "Switch Off",
+              "apply_to": "F1"
+            },
+            {
+              "effect": "Switch On",
+              "apply_to": "F2"
+            },
+            {
+              "effect": "Dimmer 100%",
+              "apply_to": "F3"
+            }
+          ],
+          "active_target": "F3"
         }
       }
     },
@@ -186,11 +236,15 @@
               "apply_to": "All Fixtures"
             },
             {
-              "effect": "New test Scene",
+              "effect": "Cool Blue Static (Copy)",
               "apply_to": "f1-4"
+            },
+            {
+              "effect": "Rainbow Wave (Copy)",
+              "apply_to": "F1 F4"
             }
           ],
-          "active_target": "f1-4"
+          "active_target": "F1 F4"
         },
         "Bonus": {
           "layers": [
@@ -199,11 +253,16 @@
               "apply_to": "All Fixtures"
             }
           ],
-          "active_target": "All Fixtures"
+          "active_target": "No Fixtures"
         },
         "Danger": {
-          "effect": null,
-          "apply_to": "All Fixtures"
+          "layers": [
+            {
+              "effect": "Red Alert",
+              "apply_to": "All Fixtures"
+            }
+          ],
+          "active_target": "F1 F4"
         },
         "Special": {
           "layers": [
@@ -212,7 +271,7 @@
               "apply_to": "All Fixtures"
             }
           ],
-          "active_target": "All Fixtures"
+          "active_target": "No Fixtures"
         },
         "Randomizer": {
           "layers": [
@@ -221,7 +280,7 @@
               "apply_to": "All Fixtures"
             }
           ],
-          "active_target": "All Fixtures"
+          "active_target": "No Fixtures"
         },
         "Overlay 1": {
           "layers": [
@@ -235,11 +294,15 @@
         "Overlay 2": {
           "layers": [
             {
-              "effect": null,
+              "effect": "Violet Cascade",
               "apply_to": "All Fixtures"
+            },
+            {
+              "effect": "Sapphire Wave",
+              "apply_to": "No Fixtures"
             }
           ],
-          "active_target": "All Fixtures"
+          "active_target": "No Fixtures"
         },
         "Overlay 3": {
           "layers": [
@@ -486,38 +549,79 @@
             {
               "effect": null,
               "apply_to": "No Fixtures"
+            },
+            {
+              "effect": "Rainbow Wave",
+              "apply_to": "F1 F4"
             }
           ],
           "active_target": "F1 F4"
         },
         "Check-In Open": {
-          "effect": null,
-          "apply_to": "No Fixtures"
+          "layers": [
+            {
+              "effect": "Static Green",
+              "apply_to": "No Fixtures"
+            }
+          ],
+          "active_target": "F1 F4"
         },
         "Game Running": {
-          "effect": null,
-          "apply_to": "No Fixtures"
+          "layers": [
+            {
+              "effect": "Bounce Rainbow Rush",
+              "apply_to": "No Fixtures"
+            },
+            {
+              "effect": "Ocean Pulse",
+              "apply_to": "F1 F4"
+            }
+          ],
+          "active_target": "F1 F4"
         },
         "Results / Scoreboard": {
-          "effect": null,
-          "apply_to": "No Fixtures"
+          "layers": [
+            {
+              "effect": "Color Roulette",
+              "apply_to": "No Fixtures"
+            },
+            {
+              "effect": "Color Roulette",
+              "apply_to": "F1 F4"
+            }
+          ],
+          "active_target": "F1 F4"
         },
         "Countdown": {
-          "effect": null,
-          "apply_to": "No Fixtures"
+          "layers": [
+            {
+              "effect": "Static Blue",
+              "apply_to": "No Fixtures"
+            }
+          ],
+          "active_target": "F1 F4"
         },
         "Game Over": {
-          "effect": null,
-          "apply_to": "No Fixtures"
+          "layers": [
+            {
+              "effect": "Yellow Flash test",
+              "apply_to": "No Fixtures"
+            }
+          ],
+          "active_target": "F1 F4"
         },
         "Attract Mode": {
           "layers": [
             {
               "effect": null,
               "apply_to": "No Fixtures"
+            },
+            {
+              "effect": "Rainbow Wave (Copy)",
+              "apply_to": "F1 F4"
             }
           ],
-          "active_target": "No Fixtures"
+          "active_target": "F1 F4"
         }
       }
     },

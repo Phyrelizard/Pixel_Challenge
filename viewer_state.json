@@ -1,19 +1,19 @@
 {
   "game_key": "dot_dash",
-  "phase": "running",
+  "phase": "round_complete",
   "title": "Dot Dash",
-  "instruction": "GO!",
+  "instruction": "ROUND COMPLETE!",
   "players": [
     {
       "id": 1,
-      "score": 90,
+      "score": 2030,
       "colors": [
-        "RED",
-        "GREEN"
+        "GREEN",
+        "BLUE"
       ],
-      "finished": false,
+      "finished": true,
       "timed_out": false,
-      "first_finisher": false
+      "first_finisher": true
     }
   ]
 }

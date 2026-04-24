@@ -16,9 +16,10 @@
   },
   "selected_themes": [
     "Fire Burst",
-    "Bounce Chase",
     "Team Colors",
-    "Galaxy Wave"
+    "Bounce Chase",
+    "Lane Chase RL",
+    "Lane Chase LR"
   ],
   "sash_left_attract_bottom": 576,
   "sash_center_ctrl": 401,
@@ -31,7 +32,7 @@
   "music_volume": 0,
   "sfx_volume": 35,
   "voice_volume": 12,
-  "master_volume": 14,
+  "master_volume": 10,
   "falcon_ip": "192.168.2.25",
   "wifi_dhcp": true,
   "wifi_ssid": "skynet",
@@ -53,7 +54,7 @@
   "window_geometry": "1920x992+1920+52",
   "dmx_universe": 9,
   "dmx_num_fixtures": 4,
-  "dmx_channels_per_fixture": 8,
-  "dmx_start_address": 1,
-  "dmx_profile_id": "venue_thintri38"
+  "dmx_channels_per_fixture": 1,
+  "dmx_start_address": 33,
+  "dmx_profile_id": "dps_switch"
 }

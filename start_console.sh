@@ -3,7 +3,7 @@ sleep 3
 
 LOCK_FILE="/tmp/pixel_challenge_console.lock"
 APP_DIR="/home/ledgame/easter_game"
-APP_SCRIPT="/home/ledgame/easter_game/pixel_challenge_console_v28.6.1.py"
+APP_SCRIPT="/home/ledgame/easter_game/pixel_challenge_console_v28.6.10.py"
 
 source /home/ledgame/easter_game/.venv/bin/activate
 export DISPLAY=:0

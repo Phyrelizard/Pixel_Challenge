@@ -1,5 +1,37 @@
 # Changelog
 
+## v28.6.10 - DMX switch fixture support, editor targeting fixes, and profile management improvements
+
+### Added
+- Added support for a dedicated **Switch** fixture/channel type for DMX-controlled switched outputs.
+- Added **Switch On** and **Switch Off** effects for switch-style fixtures.
+- Added **Edit Profile** and **Copy Profile** buttons to **System Setup > Manage Fixture Profiles**.
+- Added profile copy workflow with rename prompt and cancel support.
+- Added support for one-fixture targets to be recreated automatically when fixtures are deleted and rebuilt.
+
+### Changed
+- Updated DMX switch behavior so switch outputs are treated as **absolute on/off** instead of behaving like dimmers.
+- Updated switch handling so switch outputs can work independently of the normal lighting master brightness workflow.
+- Improved editor targeting so selected fixtures are applied correctly instead of falling back to all fixtures.
+- Improved editor/service refresh behavior after DMX setup changes so the editor is more likely to follow the current DMX/Falcon services.
+- Improved fixture/target recovery so recreated fixtures can once again highlight properly and respond to effects.
+
+### Fixed
+- Fixed editor preview fallback issue that caused targeted effects to apply to **all fixtures** instead of only the selected target.
+- Fixed stale DMX/Falcon reference issue after saving DMX setup changes.
+- Fixed DMX output behavior for 1-channel relay/switch fixtures so only explicitly mapped channels are written.
+- Fixed bug where **Dimmer Off** could be interpreted as full-on because zero values were being replaced incorrectly.
+- Fixed missing built-in live-scene support for **Switch On / Switch Off** in the targeted DMX path.
+- Fixed fixture delete/recreate issue where a recreated fixture could exist visually in layout preview but not act like a valid target.
+- Fixed target highlight issue where recreated fixtures like `F1` would not show the yellow selected border and would not respond.
+
+### Notes
+- Switch-style fixtures now work correctly as individually targetable outputs in the DMX editor.
+- For now, after changing **fixtures** or **targets** in the editor, it is still safest to **close and reopen the editor** before testing.
+- Standard dimmer-based lighting fixtures should continue to use the normal master brightness workflow.
+- Switch outputs should be configured as **Switch**, not **Dimmer**, when absolute on/off behavior is desired.
+
+
 ## [v22.7.0] - 2026-03-31
 
 ### Added - Audio System for Three Games

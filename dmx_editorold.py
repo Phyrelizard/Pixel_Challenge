@@ -8,8 +8,9 @@ import math
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 
-VISUALIZER_VERSION = "v1.4.3"
+VISUALIZER_VERSION = "v1.7.2"
 ALL_FIXTURES_TARGET = "All Fixtures"
+NO_FIXTURES_TARGET = "No Fixtures"
 NO_EFFECT_LABEL = "— No Effect —"
 FIXTURE_HIT_WIDTH = 14
 FIXTURE_HIT_HEIGHT = 12
@@ -26,7 +27,7 @@ STROBE_SPEED_DEFAULT = 90
 _CATEGORY_ORDER = [
     "static", "fade", "pulse", "chase", "sweep",
     "wave", "bounce", "alternating", "strobe", "random_flash",
-    "palette_cycle", "other",
+    "palette_cycle", "dimmer", "other",
 ]
 _CATEGORY_LABELS = {
     "static": "── STATIC ──",
@@ -40,6 +41,7 @@ _CATEGORY_LABELS = {
     "strobe": "── STROBES ──",
     "random_flash": "── RANDOM ──",
     "palette_cycle": "── PALETTE CYCLE ──",
+    "dimmer": "── DIMMERS ──",
     "other": "── OTHER ──",
 }
 
@@ -180,6 +182,17 @@ def _target_all_fixture_ids(value) -> list[str]:
     return list(value)
 
 
+def _generated_dimmer_effects() -> list[dict]:
+    return [
+        {"name": "Dimmer Off", "palette": ["#0a0a0a"], "pattern_type": "static", "category": "dimmer", "speed": 0, "fade_time": 0.0, "brightness": 0.0, "dimmer_level": 0},
+        {"name": "Dimmer 25%", "palette": ["#404040"], "pattern_type": "static", "category": "dimmer", "speed": 0, "fade_time": 0.0, "brightness": 0.25, "dimmer_level": 64},
+        {"name": "Dimmer 50%", "palette": ["#808080"], "pattern_type": "static", "category": "dimmer", "speed": 0, "fade_time": 0.0, "brightness": 0.5, "dimmer_level": 128},
+        {"name": "Dimmer 75%", "palette": ["#bfbfbf"], "pattern_type": "static", "category": "dimmer", "speed": 0, "fade_time": 0.0, "brightness": 0.75, "dimmer_level": 191},
+        {"name": "Dimmer 100%", "palette": ["#ffffff"], "pattern_type": "static", "category": "dimmer", "speed": 0, "fade_time": 0.0, "brightness": 1.0, "dimmer_level": 255},
+        {"name": "Dimmer Up/Down", "palette": ["#ffffff"], "pattern_type": "breathing", "category": "dimmer", "speed": 60, "fade_time": 0.0, "brightness": 1.0, "dimmer_level": 255},
+    ]
+
+
 class DMXLightingEditor:
     def __init__(
         self,
@@ -192,6 +205,7 @@ class DMXLightingEditor:
         on_close_callback=None,
         on_reconfigure_callback=None,
         on_scene_applied_callback=None,
+        on_preview_layers_callback=None,
         game_list=None,
         current_game=None,
         current_scene_name=None,
@@ -205,6 +219,7 @@ class DMXLightingEditor:
         self.on_close_callback = on_close_callback
         self.on_reconfigure_callback = on_reconfigure_callback
         self.on_scene_applied_callback = on_scene_applied_callback
+        self.on_preview_layers_callback = on_preview_layers_callback
         self.game_list = list(game_list or [])
         self.current_game = current_game or (self.game_list[0] if self.game_list else "Splash")
         self.current_scene_name = current_scene_name
@@ -303,12 +318,35 @@ class DMXLightingEditor:
             style.theme_use("clam")
         except Exception:
             pass
-        style.configure("Viz.TCombobox", fieldbackground="#2b3440", background="#2b3440", foreground="white")
+        style.configure(
+            "Viz.TCombobox",
+            fieldbackground="#2b3440",
+            background="#2b3440",
+            foreground="white",
+            arrowcolor="white",
+            bordercolor="#425066",
+            lightcolor="#425066",
+            darkcolor="#425066",
+            selectbackground="#2b3440",
+            selectforeground="white",
+        )
+        style.map(
+            "Viz.TCombobox",
+            fieldbackground=[("readonly", "#2b3440"), ("disabled", "#27303a")],
+            background=[("readonly", "#2b3440"), ("disabled", "#27303a")],
+            foreground=[("readonly", "white"), ("disabled", "#9fb2c9")],
+            selectbackground=[("readonly", "#2b3440")],
+            selectforeground=[("readonly", "white")],
+            arrowcolor=[("readonly", "white"), ("disabled", "#9fb2c9")],
+            bordercolor=[("readonly", "#425066")],
+            lightcolor=[("readonly", "#425066")],
+            darkcolor=[("readonly", "#425066")],
+        )
 
         var_master = self.parent if self._embedded else self.window
         self.game_var = tk.StringVar(master=var_master, value=self.current_game)
         self.profile_name_var = tk.StringVar(master=var_master, value=self.active_profile.get("profile_name", "Default Small Rig"))
-        self.apply_target_var = tk.StringVar(master=var_master, value=self._current_assignment().get("apply_to", ALL_FIXTURES_TARGET))
+        self.apply_target_var = tk.StringVar(master=var_master, value=self._preferred_target_name())
 
         self._build_ui()
         self._refresh_profile_combo()
@@ -455,6 +493,7 @@ class DMXLightingEditor:
             }
             for name, palette, pattern, speed in generated
         ]
+        generated_effects.extend(_generated_dimmer_effects())
 
         by_name = {}
         for effect in scene_effects + generated_effects:
@@ -463,7 +502,7 @@ class DMXLightingEditor:
         # Sort into categories
         categorized: dict[str, list] = {cat: [] for cat in _CATEGORY_ORDER}
         for effect in by_name.values():
-            cat = effect.get("pattern_type", "static")
+            cat = effect.get("category") or effect.get("pattern_type", "static")
             if cat not in categorized:
                 cat = "other"
             categorized[cat].append(effect)
@@ -489,9 +528,23 @@ class DMXLightingEditor:
             ordered.extend(effects_in_cat)
         return ordered
 
+    def _blank_assignment_layer(self, target_name: str | None = None) -> dict:
+        return {"effect": None, "apply_to": str(target_name or NO_FIXTURES_TARGET)}
+
+    def _sanitize_assignment_layer(self, layer: dict | None, target_name: str | None = None) -> dict:
+        src = layer if isinstance(layer, dict) else {}
+        clean = {
+            "effect": src.get("effect"),
+            "apply_to": str(src.get("apply_to") or target_name or NO_FIXTURES_TARGET),
+        }
+        for key in ("fade_enabled", "fade_in_ms", "fade_out_ms", "strobe_speed"):
+            if key in src:
+                clean[key] = src.get(key)
+        return clean
+
     def _default_assignments(self, elements=None):
         names = list(elements or self.game_elements)
-        return {name: {"effect": None, "apply_to": ALL_FIXTURES_TARGET} for name in names}
+        return {name: self._blank_assignment_layer() for name in names}
 
     def _elements_for_game(self, game_key: str):
         if game_key == "console":
@@ -502,8 +555,10 @@ class DMXLightingEditor:
         self.elements = self._elements_for_game(game_key)
 
     def _seed_profiles(self):
+        games = ("dot_dash", "pixel_pop", "surround", "ascend", "global", "console")
         profiles = []
-        for game in ("dot_dash", "pixel_pop", "surround", "ascend", "global", "console"):
+        active_profiles = {}
+        for game in games:
             profiles.append(
                 {
                     "game": game,
@@ -512,8 +567,9 @@ class DMXLightingEditor:
                     "assignments": self._default_assignments(self._elements_for_game(game)),
                 }
             )
-        return {"profiles": profiles}
-    
+            active_profiles[game] = "Default Small Rig"
+        return {"profiles": profiles, "active_profiles": active_profiles}
+
     def _load_profiles(self):
         seeded = self._seed_profiles()
         try:
@@ -521,6 +577,7 @@ class DMXLightingEditor:
                 with open(self.visualizer_profiles_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 if isinstance(data, dict) and isinstance(data.get("profiles"), list):
+                    data.setdefault("active_profiles", dict(seeded.get("active_profiles", {})))
                     return data
             os.makedirs(os.path.dirname(self.visualizer_profiles_file), exist_ok=True)
             with open(self.visualizer_profiles_file, "w", encoding="utf-8") as f:
@@ -537,24 +594,33 @@ class DMXLightingEditor:
         except Exception as e:
             messagebox.showerror("DMX Visualizer", f"Could not save profiles: {e}")
 
+    def _active_profile_name_for_game(self, game_key: str) -> str:
+        active = self.profiles_data.setdefault("active_profiles", {})
+        return str(active.get(game_key) or "Default Small Rig")
+
+    def _set_active_profile_name_for_game(self, game_key: str, profile_name: str):
+        self.profiles_data.setdefault("active_profiles", {})[game_key] = profile_name or "Default Small Rig"
+
     def _resolve_profile(self, game_key: str, profile_name: str | None = None):
+        if profile_name is None:
+            profile_name = self._active_profile_name_for_game(game_key)
         for item in self.profiles_data.get("profiles", []):
-            if item.get("game") == game_key and (profile_name is None or item.get("profile_name") == profile_name):
+            if item.get("game") == game_key and item.get("profile_name") == profile_name:
                 return item
-        if profile_name is not None:
-            for item in self.profiles_data.get("profiles", []):
-                if item.get("game") == game_key:
-                    return item
+        for item in self.profiles_data.get("profiles", []):
+            if item.get("game") == game_key:
+                return item
         for item in self.profiles_data.get("profiles", []):
             if item.get("game") == "global":
                 return item
         profile = {
             "game": game_key,
-            "profile_name": "Default Small Rig",
+            "profile_name": profile_name or "Default Small Rig",
             "layout_id": "small_rig_8_fixture",
             "assignments": self._default_assignments(self._elements_for_game(game_key)),
         }
         self.profiles_data.setdefault("profiles", []).append(profile)
+        self._set_active_profile_name_for_game(game_key, profile.get("profile_name", "Default Small Rig"))
         return profile
 
     def _selected_element_name(self) -> str:
@@ -564,11 +630,123 @@ class DMXLightingEditor:
             return self.elements[self.element_listbox.curselection()[0]]
         return self.elements[0]
 
-    def _current_assignment(self):
+    def _assignment_record(self, create: bool = False) -> dict:
         assignments = self.active_profile.setdefault("assignments", {})
         element = self._selected_element_name()
-        assignments.setdefault(element, {"effect": None, "apply_to": ALL_FIXTURES_TARGET})
-        return assignments[element]
+        raw = assignments.get(element)
+
+        record = None
+        if isinstance(raw, dict) and isinstance(raw.get("layers"), list):
+            layers = [
+                self._sanitize_assignment_layer(layer)
+                for layer in raw.get("layers", [])
+                if isinstance(layer, dict)
+            ]
+            if not layers and raw.get("effect") is not None:
+                layers = [self._sanitize_assignment_layer(raw)]
+            active_target = str(raw.get("active_target") or (layers[-1].get("apply_to") if layers else NO_FIXTURES_TARGET))
+            record = {"layers": layers, "active_target": active_target}
+        elif isinstance(raw, dict):
+            layers = []
+            if raw.get("effect") is not None or raw.get("apply_to"):
+                layers.append(self._sanitize_assignment_layer(raw))
+            record = {
+                "layers": layers,
+                "active_target": str(raw.get("apply_to") or NO_FIXTURES_TARGET),
+            }
+        else:
+            record = {"layers": [], "active_target": NO_FIXTURES_TARGET}
+
+        if create or raw is None or raw != record:
+            assignments[element] = record
+        return record
+
+    def _current_target_name(self) -> str:
+        if hasattr(self, "apply_target_var") and self.apply_target_var is not None:
+            value = str(self.apply_target_var.get() or "").strip()
+            if value:
+                return value
+        record = self._assignment_record(create=False)
+        target_name = str(record.get("active_target") or "").strip()
+        if target_name:
+            return target_name
+        layers = record.get("layers", [])
+        if layers:
+            return str(layers[-1].get("apply_to") or NO_FIXTURES_TARGET)
+        return NO_FIXTURES_TARGET
+
+    def _preferred_target_name(self) -> str:
+        return self._current_target_name()
+
+    def _find_layer_for_target(self, record: dict, target_name: str):
+        target_name = str(target_name or NO_FIXTURES_TARGET)
+        for layer in record.get("layers", []):
+            if str(layer.get("apply_to") or NO_FIXTURES_TARGET) == target_name:
+                return layer
+        return None
+
+    def _current_assignment_layers(self) -> list[dict]:
+        record = self._assignment_record(create=False)
+        return [self._sanitize_assignment_layer(layer) for layer in record.get("layers", []) if isinstance(layer, dict)]
+
+    def _current_assignment(self, create: bool = False):
+        target_name = self._current_target_name()
+        record = self._assignment_record(create=create)
+        layer = self._find_layer_for_target(record, target_name)
+        if layer:
+            return layer
+        if create:
+            layer = self._blank_assignment_layer(target_name)
+            record.setdefault("layers", []).append(layer)
+            record["active_target"] = target_name
+            return layer
+        return self._blank_assignment_layer(target_name)
+
+    def _remove_assignment_layer(self, target_name: str):
+        record = self._assignment_record(create=True)
+        target_name = str(target_name or NO_FIXTURES_TARGET)
+        record["layers"] = [
+            layer for layer in record.get("layers", [])
+            if str(layer.get("apply_to") or ALL_FIXTURES_TARGET) != target_name
+        ]
+        record["active_target"] = target_name
+
+    def _upsert_assignment_layer(self, layer_data: dict):
+        record = self._assignment_record(create=True)
+        target_name = str(layer_data.get("apply_to") or ALL_FIXTURES_TARGET)
+        layer = self._find_layer_for_target(record, target_name)
+        clean = self._sanitize_assignment_layer(layer_data, target_name)
+        if layer is None:
+            record.setdefault("layers", []).append(clean)
+        else:
+            layer.clear()
+            layer.update(clean)
+        record["active_target"] = target_name
+        return self._find_layer_for_target(record, target_name)
+
+    def _target_fixture_ids_for_name(self, target_name: str) -> set[str]:
+        if target_name == NO_FIXTURES_TARGET:
+            return set()
+        if target_name == ALL_FIXTURES_TARGET:
+            return {fixture.get("id", "") for fixture in self.fixtures if fixture.get("id")}
+        value = self.targets.get(target_name, [])
+        return {fid for fid in _target_all_fixture_ids(value) if fid}
+
+    def _assignment_conflicts(self, target_name: str, ignore_target: str | None = None) -> list[tuple[str, list[str]]]:
+        target_ids = self._target_fixture_ids_for_name(target_name)
+        if not target_ids:
+            return []
+        conflicts = []
+        for layer in self._current_assignment_layers():
+            other_target = str(layer.get("apply_to") or ALL_FIXTURES_TARGET)
+            if ignore_target and other_target == ignore_target:
+                continue
+            if not layer.get("effect"):
+                continue
+            overlap = sorted(target_ids & self._target_fixture_ids_for_name(other_target))
+            if overlap:
+                conflicts.append((other_target, overlap))
+        return conflicts
 
     def _get_profile_names_for_game(self, game_key):
         return [p["profile_name"] for p in self.profiles_data.get("profiles", []) if p.get("game") == game_key]
@@ -577,12 +755,18 @@ class DMXLightingEditor:
         game_key = self._game_key(self.game_var.get())
         names = self._get_profile_names_for_game(game_key)
         self.profile_combo["values"] = names
-        current = self.profile_name_var.get().strip()
+        current = self.profile_name_var.get().strip() or self._active_profile_name_for_game(game_key)
         if current in names:
+            self.profile_name_var.set(current)
             self.profile_combo.set(current)
         elif names:
-            self.profile_name_var.set(names[0])
-            self.profile_combo.set(names[0])
+            preferred = self._active_profile_name_for_game(game_key)
+            if preferred in names:
+                self.profile_name_var.set(preferred)
+                self.profile_combo.set(preferred)
+            else:
+                self.profile_name_var.set(names[0])
+                self.profile_combo.set(names[0])
 
     # ------------------------------------------------------------------
     # UI
@@ -755,9 +939,11 @@ class DMXLightingEditor:
             self.element_listbox.insert("end", item)
         self._refresh_profile_combo()
         names = list(self.profile_combo["values"]) if self.profile_combo else []
-        selected_name = names[0] if names else "Default Small Rig"
+        preferred = self._active_profile_name_for_game(game_key)
+        selected_name = preferred if preferred in names else (names[0] if names else "Default Small Rig")
         self.active_profile = self._resolve_profile(game_key, selected_name)
         self.profile_name_var.set(self.active_profile.get("profile_name", "Default Small Rig"))
+        self._set_active_profile_name_for_game(game_key, self.profile_name_var.get().strip())
         self._refresh_profile_combo()
         self._sync_element_selection(0)
 
@@ -766,6 +952,8 @@ class DMXLightingEditor:
         profile_name = self.profile_name_var.get().strip()
         self.active_profile = self._resolve_profile(game_key, profile_name)
         self.profile_name_var.set(self.active_profile.get("profile_name", "Default Small Rig"))
+        self._set_active_profile_name_for_game(game_key, self.profile_name_var.get().strip())
+        self._save_profiles()
         idx = self.element_listbox.curselection()[0] if self.element_listbox and self.element_listbox.curselection() else 0
         self._sync_element_selection(idx)
 
@@ -779,8 +967,10 @@ class DMXLightingEditor:
         self._syncing = True
         self.element_listbox.selection_clear(0, "end")
         self.element_listbox.selection_set(idx)
-        assignment = self._current_assignment()
-        self.apply_target_var.set(assignment.get("apply_to", ALL_FIXTURES_TARGET))
+        record = self._assignment_record(create=True)
+        target_name = str(record.get("active_target") or self._preferred_target_name())
+        self.apply_target_var.set(target_name)
+        assignment = self._current_assignment(create=False)
         effect_name = assignment.get("effect")
         self.effect_listbox.selection_clear(0, "end")
         if effect_name:
@@ -848,21 +1038,45 @@ class DMXLightingEditor:
             self.effect_listbox.selection_clear(idx)
             return
 
-        assignment = self._current_assignment()
-        assignment["apply_to"] = self.apply_target_var.get() or ALL_FIXTURES_TARGET
+        target_name = self._current_target_name()
+        record = self._assignment_record(create=True)
+        record["active_target"] = target_name
 
         if eff_idx == -1:
-            assignment["effect"] = None
+            self._remove_assignment_layer(target_name)
             self.hover_effect_name = None
             self._sync_strobe_ui()
+            self._preview_current_layers()
             self._draw_layout()
             return
 
+        conflicts = self._assignment_conflicts(target_name, ignore_target=target_name)
+        if conflicts:
+            lines = []
+            for other_target, overlap in conflicts:
+                joined = ", ".join(overlap)
+                lines.append(f"• {other_target}: {joined}")
+            messagebox.showerror(
+                "DMX Visualizer",
+                "That target overlaps fixtures already assigned to another effect in this element.\n\n"
+                + "Please use non-overlapping targets for layered effects.\n\n"
+                + "Conflicts:\n"
+                + "\n".join(lines),
+                parent=self.window,
+            )
+            self._sync_element_selection(self.element_listbox.curselection()[0] if self.element_listbox and self.element_listbox.curselection() else 0)
+            return
+
         effect = self.effects[eff_idx]
-        assignment["effect"] = effect["name"]
+        existing = self._current_assignment(create=False)
+        layer = self._sanitize_assignment_layer(existing, target_name)
+        layer["effect"] = effect["name"]
+        self._upsert_assignment_layer(layer)
         self.hover_effect_name = effect["name"]
         self._sync_strobe_ui(effect["name"])
-        self._preview_dmx_effect(effect["name"])
+        if not self._preview_current_layers():
+            self._preview_dmx_effect(effect["name"])
+        self._draw_layout()
 
 
     def _selected_effect_name(self) -> str | None:
@@ -935,10 +1149,11 @@ class DMXLightingEditor:
 
     def _open_target_dropup(self):
         menu = tk.Menu(self.window, tearoff=0, bg="#1f2732", fg="white", activebackground="#8ec5ff", activeforeground="#0a1a2b")
-        for target_name in self.targets.keys():
+        target_names = [NO_FIXTURES_TARGET, ALL_FIXTURES_TARGET] + [name for name in self.targets.keys() if name not in (NO_FIXTURES_TARGET, ALL_FIXTURES_TARGET)]
+        for target_name in target_names:
             menu.add_command(label=target_name, command=lambda t=target_name: self._set_target(t))
         x = self.target_button.winfo_rootx()
-        y = self.target_button.winfo_rooty() - (26 * max(len(self.targets), 1))
+        y = self.target_button.winfo_rooty() - (26 * max(len(target_names), 1))
         try:
             menu.tk_popup(x, max(0, y))
         finally:
@@ -946,13 +1161,17 @@ class DMXLightingEditor:
 
     def _set_target(self, target_name: str):
         self.apply_target_var.set(target_name)
-        self._current_assignment()["apply_to"] = target_name
+        record = self._assignment_record(create=True)
+        record["active_target"] = target_name
+        idx = self.element_listbox.curselection()[0] if self.element_listbox and self.element_listbox.curselection() else 0
+        self._sync_element_selection(idx)
 
     def _save_profile(self):
         game_key = self._game_key(self.game_var.get())
         self.active_profile["game"] = game_key
         self.active_profile["profile_name"] = self.profile_name_var.get().strip() or "Default Small Rig"
         self.active_profile["layout_id"] = "small_rig_8_fixture"
+        self._set_active_profile_name_for_game(game_key, self.active_profile["profile_name"])
         self._save_profiles()
         self._refresh_profile_combo()
         messagebox.showinfo("DMX Visualizer", "Profile saved.")
@@ -970,6 +1189,7 @@ class DMXLightingEditor:
         self.profiles_data.setdefault("profiles", []).append(cloned)
         self.active_profile = cloned
         self.profile_name_var.set(cloned["profile_name"])
+        self._set_active_profile_name_for_game(cloned["game"], cloned["profile_name"])
         self._save_profiles()
         self._refresh_profile_combo()
         messagebox.showinfo("DMX Visualizer", "Profile saved as new profile.")
@@ -1001,7 +1221,7 @@ class DMXLightingEditor:
         self._save_profiles()
         self._refresh_profile_combo()
         self._sync_element_selection(0)
-        messagebox.showinfo("DMX Visualizer", f"{game_label} was reset to No Effect for all elements.", parent=self.window)
+        messagebox.showinfo("DMX Visualizer", f"{game_label} was reset to No Effect and No Fixtures for all elements.", parent=self.window)
 
     def _delete_profile(self):
         if not messagebox.askyesno("Delete Profile", "Delete current profile?", parent=self.window):
@@ -1014,6 +1234,7 @@ class DMXLightingEditor:
         ]
         self.active_profile = self._resolve_profile(game_key)
         self.profile_name_var.set(self.active_profile.get("profile_name", "Default Small Rig"))
+        self._set_active_profile_name_for_game(game_key, self.profile_name_var.get().strip())
         self._save_profiles()
         self._refresh_profile_combo()
         self._sync_element_selection(0)
@@ -1031,7 +1252,11 @@ class DMXLightingEditor:
 
         def refresh():
             lst.delete(0, "end")
+            lst.insert("end", f"{NO_FIXTURES_TARGET}: ")
+            lst.insert("end", f"{ALL_FIXTURES_TARGET}: " + ", ".join(fixture.get("id", "") for fixture in self.fixtures if fixture.get("id")))
             for k, v in self.targets.items():
+                if k in (NO_FIXTURES_TARGET, ALL_FIXTURES_TARGET):
+                    continue
                 lst.insert("end", f"{k}: {_format_target_value(v)}")
 
         refresh()
@@ -1118,6 +1343,219 @@ class DMXLightingEditor:
         except Exception:
             pass
 
+    def _sync_all_fixtures_target(self):
+        self.targets[ALL_FIXTURES_TARGET] = [fixture.get("id") for fixture in self.fixtures if fixture.get("id")]
+
+    def _rename_fixture_in_targets(self, old_id: str, new_id: str):
+        if not old_id or old_id == new_id:
+            return
+        for key, value in list(self.targets.items()):
+            if isinstance(value, list) and value and isinstance(value[0], list):
+                updated = []
+                for group in value:
+                    updated.append([new_id if fid == old_id else fid for fid in group if fid])
+                self.targets[key] = [group for group in updated if group]
+            elif isinstance(value, list):
+                self.targets[key] = [new_id if fid == old_id else fid for fid in value if fid]
+
+    def _remove_fixture_from_targets(self, fixture_id: str):
+        if not fixture_id:
+            return
+        remove_keys = []
+        for key, value in list(self.targets.items()):
+            if key == ALL_FIXTURES_TARGET:
+                continue
+            if isinstance(value, list) and value and isinstance(value[0], list):
+                updated = []
+                for group in value:
+                    kept = [fid for fid in group if fid != fixture_id]
+                    if kept:
+                        updated.append(kept)
+                if updated:
+                    self.targets[key] = updated
+                else:
+                    remove_keys.append(key)
+            elif isinstance(value, list):
+                kept = [fid for fid in value if fid != fixture_id]
+                if kept:
+                    self.targets[key] = kept
+                else:
+                    remove_keys.append(key)
+        for key in remove_keys:
+            self.targets.pop(key, None)
+
+    def _commit_layout_changes(self):
+        self._sync_all_fixtures_target()
+        self.layout["fixtures"] = self.fixtures
+        self.layout["targets"] = self.targets
+        self._save_layouts()
+        self._draw_layout()
+
+    def _default_fixture_universe(self) -> int:
+        try:
+            return max(1, int(getattr(self.dmx, "universe", 9) or 9))
+        except Exception:
+            return 9
+
+    def _fixture_meta_text(self, fixture: dict) -> str:
+        universe = fixture.get("universe")
+        address = fixture.get("start_address")
+        parts = []
+        if universe not in (None, ""):
+            parts.append(f"U{universe}")
+        if address not in (None, ""):
+            parts.append(f"A{address}")
+        return " ".join(parts)
+
+    def _show_fixture_dialog(self, title: str, initial: dict | None = None, x_root: int | None = None, y_root: int | None = None):
+        initial = dict(initial or {})
+        result = {}
+        dialog = tk.Toplevel(self.window)
+        dialog.title(title)
+        dialog.configure(bg="#202833")
+        dialog.transient(self.window)
+        dialog.resizable(False, False)
+
+        if x_root is None or y_root is None:
+            x_root = self.window.winfo_rootx() + 120
+            y_root = self.window.winfo_rooty() + 120
+        dialog.geometry(f"300x178+{int(x_root)}+{int(y_root)}")
+
+        tk.Label(dialog, text=title, bg="#202833", fg="white", font=("Arial", 13, "bold")).pack(anchor="w", padx=14, pady=(12, 10))
+
+        form = tk.Frame(dialog, bg="#202833")
+        form.pack(fill="x", padx=14)
+
+        def _row(label_text, var):
+            row = tk.Frame(form, bg="#202833")
+            row.pack(fill="x", pady=4)
+            tk.Label(row, text=label_text, width=12, anchor="w", bg="#202833", fg="#cfd8e3", font=("Arial", 11, "bold")).pack(side="left")
+            entry = tk.Entry(row, textvariable=var, bg="#111820", fg="white", insertbackground="white", relief="flat", font=("Arial", 11))
+            entry.pack(side="left", fill="x", expand=True, ipady=4)
+            return entry
+
+        id_var = tk.StringVar(master=dialog, value=str(initial.get("id") or ""))
+        universe_var = tk.StringVar(master=dialog, value=str(initial.get("universe") or self._default_fixture_universe()))
+        address_var = tk.StringVar(master=dialog, value=str(initial.get("start_address") or ""))
+
+        id_entry = _row("Name", id_var)
+        universe_entry = _row("Universe", universe_var)
+        address_entry = _row("Address", address_var)
+
+        error_var = tk.StringVar(master=dialog, value="")
+        tk.Label(dialog, textvariable=error_var, bg="#202833", fg="#ff9f9f", font=("Arial", 10, "bold")).pack(anchor="w", padx=14, pady=(6, 0))
+
+        btns = tk.Frame(dialog, bg="#202833")
+        btns.pack(fill="x", padx=14, pady=(10, 12))
+
+        def close_dialog(event=None):
+            if dialog.winfo_exists():
+                dialog.destroy()
+
+        def save_dialog(event=None):
+            fixture_id = id_var.get().strip().upper()
+            if not fixture_id:
+                error_var.set("A fixture name is required.")
+                return
+            other_ids = {str(f.get("id") or "") for f in self.fixtures if f is not initial.get("_fixture_ref")}
+            if fixture_id in other_ids:
+                error_var.set("That fixture name already exists.")
+                return
+            try:
+                universe = int(str(universe_var.get()).strip() or self._default_fixture_universe())
+                address = int(str(address_var.get()).strip() or "0")
+            except Exception:
+                error_var.set("Universe and address must be whole numbers.")
+                return
+            if universe < 1 or address < 1:
+                error_var.set("Universe and address must be 1 or higher.")
+                return
+            result.update({
+                "id": fixture_id,
+                "universe": universe,
+                "start_address": address,
+            })
+            close_dialog()
+
+        tk.Button(btns, text="SAVE", bg="#2f9b4e", fg="white", activebackground="#44ba66", relief="flat", font=("Arial", 11, "bold"), command=save_dialog).pack(side="left", fill="x", expand=True, padx=(0, 6), ipady=5)
+        tk.Button(btns, text="CANCEL", bg="#5b3540", fg="white", activebackground="#7a4655", relief="flat", font=("Arial", 11, "bold"), command=close_dialog).pack(side="left", fill="x", expand=True, padx=(6, 0), ipady=5)
+
+        dialog.bind("<Escape>", close_dialog)
+        dialog.bind("<Return>", save_dialog)
+
+        def _cancel_if_focus_left():
+            try:
+                focus = dialog.focus_displayof()
+                if focus is None:
+                    close_dialog()
+                    return
+                top = focus.winfo_toplevel()
+                if top is not dialog:
+                    close_dialog()
+            except Exception:
+                pass
+
+        dialog.bind("<FocusOut>", lambda _e: dialog.after(80, _cancel_if_focus_left))
+        dialog.protocol("WM_DELETE_WINDOW", close_dialog)
+        dialog.after(10, id_entry.focus_set)
+        dialog.wait_window()
+        return result or None
+
+    def _add_fixture_at(self, x: int, y: int, x_root: int | None = None, y_root: int | None = None):
+        defaults = {
+            "id": "",
+            "universe": self._default_fixture_universe(),
+            "start_address": "",
+        }
+        data = self._show_fixture_dialog("Add Fixture", defaults, x_root, y_root)
+        if not data:
+            return
+        max_x = max(self.canvas.winfo_width() - 20, 20)
+        max_y = max(self.canvas.winfo_height() - 60, 20)
+        fixture = {
+            "id": data["id"],
+            "type": "custom",
+            "x": max(20, min(int(x), max_x)),
+            "y": max(20, min(int(y), max_y)),
+            "direction": "down",
+            "universe": data["universe"],
+            "start_address": data["start_address"],
+        }
+        self.fixtures.append(fixture)
+        self.default_fixture_positions[fixture["id"]] = {"x": fixture["x"], "y": fixture["y"], "direction": fixture["direction"]}
+        self._commit_layout_changes()
+
+    def _edit_fixture(self, fixture: dict, x_root: int | None = None, y_root: int | None = None):
+        if not fixture:
+            return
+        seed = dict(fixture)
+        seed["_fixture_ref"] = fixture
+        data = self._show_fixture_dialog("Edit Fixture", seed, x_root, y_root)
+        if not data:
+            return
+        old_id = str(fixture.get("id") or "")
+        new_id = data["id"]
+        fixture["id"] = new_id
+        fixture["universe"] = data["universe"]
+        fixture["start_address"] = data["start_address"]
+        if old_id != new_id:
+            self._rename_fixture_in_targets(old_id, new_id)
+            default = self.default_fixture_positions.pop(old_id, None)
+            if default is not None:
+                self.default_fixture_positions[new_id] = default
+        self._commit_layout_changes()
+
+    def _delete_fixture(self, fixture: dict):
+        if not fixture:
+            return
+        fid = str(fixture.get("id") or "")
+        if not messagebox.askyesno("Delete Fixture", f"Delete fixture {fid}?", parent=self.window):
+            return
+        self.fixtures = [item for item in self.fixtures if item is not fixture]
+        self.default_fixture_positions.pop(fid, None)
+        self._remove_fixture_from_targets(fid)
+        self._commit_layout_changes()
+
     # ------------------------------------------------------------------
     # Preview canvas + DMX hover-preview
     # ------------------------------------------------------------------
@@ -1143,6 +1581,16 @@ class DMXLightingEditor:
         plen = len(palette)
         pattern = effect.get("pattern_type", "static")
         phase = self.preview_phase
+
+        if effect.get("category") == "dimmer":
+            if effect_name == "Dimmer Off":
+                return "#101010"
+            if effect_name == "Dimmer Up/Down":
+                wave = 0.25 + 0.75 * (0.5 + 0.5 * math.sin(phase * 0.18))
+                level = clamp = max(0, min(255, int(255 * wave)))
+                return f"#{level:02x}{level:02x}{level:02x}"
+            level = max(0, min(255, int(effect.get("dimmer_level", 255))))
+            return f"#{level:02x}{level:02x}{level:02x}"
 
         if pattern == "static":
             # Static: show first palette color (or per-fixture if enough colors)
@@ -1212,31 +1660,53 @@ class DMXLightingEditor:
         w = max(self.canvas.winfo_width(), 200)
         h = max(self.canvas.winfo_height(), 200)
 
-        assignment = self._current_assignment()
-        effect_name = self.hover_effect_name or assignment.get("effect", "")
-        target_name = assignment.get("apply_to", ALL_FIXTURES_TARGET)
-        target_value = self.targets.get(target_name, [fid["id"] for fid in self.fixtures])
+        record = self._assignment_record(create=False)
+        target_name = self._current_target_name()
+        preview_layers = []
+        seen_targets = set()
+        for layer in record.get("layers", []):
+            if not isinstance(layer, dict):
+                continue
+            apply_to = str(layer.get("apply_to") or ALL_FIXTURES_TARGET)
+            effect_name = str(layer.get("effect") or "").strip()
+            if not effect_name:
+                continue
+            preview_layers.append({"apply_to": apply_to, "effect": effect_name})
+            seen_targets.add(apply_to)
+        if self.hover_effect_name:
+            preview_layers = [layer for layer in preview_layers if layer.get("apply_to") != target_name]
+            preview_layers.append({"apply_to": target_name, "effect": self.hover_effect_name})
+            seen_targets.add(target_name)
 
-        # Flatten to get all active fixture IDs
-        active_ids = set(_target_all_fixture_ids(target_value))
-
-        # Build group mapping: fixture_id → slot index for pattern computation
-        # For grouped targets [[F1,F3],[F2,F4]], F1&F3 share slot 0, F2&F4 share slot 1
-        is_grouped = isinstance(target_value, list) and target_value and isinstance(target_value[0], list)
-        fid_to_slot = {}
-        if is_grouped:
-            for slot_idx, group in enumerate(target_value):
-                for fid in group:
+        fixture_preview = {}
+        for layer in preview_layers:
+            effect_name = layer.get("effect", "")
+            target_name = str(layer.get("apply_to", NO_FIXTURES_TARGET) or NO_FIXTURES_TARGET)
+            if target_name == NO_FIXTURES_TARGET:
+                target_value = []
+            elif target_name == ALL_FIXTURES_TARGET:
+                target_value = [fixture.get("id") for fixture in self.fixtures if fixture.get("id")]
+            else:
+                target_value = self.targets.get(target_name, [])
+            active_ids = set(_target_all_fixture_ids(target_value))
+            is_grouped = isinstance(target_value, list) and target_value and isinstance(target_value[0], list)
+            fid_to_slot = {}
+            if is_grouped:
+                for slot_idx, group in enumerate(target_value):
+                    for fid in group:
+                        fid_to_slot[fid] = slot_idx
+                total_active = len(target_value) or 1
+            else:
+                flat_ids = list(target_value) if target_value else []
+                for slot_idx, fid in enumerate(flat_ids):
                     fid_to_slot[fid] = slot_idx
-            total_active = len(target_value)
-        else:
-            # Flat list: each fixture is its own slot
-            flat_ids = list(target_value) if target_value else []
-            for slot_idx, fid in enumerate(flat_ids):
-                fid_to_slot[fid] = slot_idx
-            total_active = len(flat_ids) or 1
+                total_active = len(flat_ids) or 1
+            for fid in active_ids:
+                fixture_preview[fid] = self._fixture_color(effect_name, fid_to_slot.get(fid, 0), total_active)
 
-        # Draw beams then fixtures — wide dispersal fan shape
+        highlighted_ids = set(fixture_preview.keys())
+        selected_target_ids = self._target_fixture_ids_for_name(self._current_target_name())
+
         for i, fixture in enumerate(self.fixtures):
             x = fixture.get("x", 0)
             y = fixture.get("y", 0)
@@ -1248,27 +1718,29 @@ class DMXLightingEditor:
             right_angle = angle + half_spread
             p_left = (x + math.cos(left_angle) * beam_length, y + math.sin(left_angle) * beam_length)
             p_right = (x + math.cos(right_angle) * beam_length, y + math.sin(right_angle) * beam_length)
-
-            if fid in active_ids:
-                # Position within active set for pattern computation (grouped or flat)
-                pos_in_active = fid_to_slot.get(fid, 0)
-                color = self._fixture_color(effect_name, pos_in_active, total_active)
-            else:
-                color = "#181e28"  # dim off for non-targeted fixtures
+            color = fixture_preview.get(fid, "#181e28")
             self.canvas.create_polygon(x, y, p_left[0], p_left[1], p_right[0], p_right[1], fill=color, stipple="gray50", outline="")
 
         for fixture in self.fixtures:
             x = fixture.get("x", 0)
             y = fixture.get("y", 0)
             fid = fixture.get("id", "F?")
-            outline_color = "#8ec5ff" if fid in active_ids else "#202833"
+            if fid in selected_target_ids:
+                outline_color = "#ffd74f"
+            elif fid in highlighted_ids:
+                outline_color = "#8ec5ff"
+            else:
+                outline_color = "#202833"
             self.canvas.create_rectangle(x - 12, y - 7, x + 12, y + 7, fill="#c3ccd9", outline=outline_color, width=2)
             self.canvas.create_text(x, y + 22, text=fid, fill="white", font=("Arial", 10, "bold"))
+            meta = self._fixture_meta_text(fixture)
+            if meta:
+                self.canvas.create_text(x, y + 35, text=meta, fill="#9fb2c9", font=("Arial", 8, "bold"))
 
         self.canvas.create_text(
             w // 2,
             h - 36,
-            text="Left click fixture to rotate, hold left click to drag, right click for options.",
+            text="Left click fixture to rotate, drag to move, right click fixture to edit or blank space to add.",
             fill="#c7d2df",
             font=("Arial", 11),
         )
@@ -1307,43 +1779,56 @@ class DMXLightingEditor:
             cur = self.drag_fixture.get("direction", "down")
             idx = self.directions.index(cur) if cur in self.directions else 0
             self.drag_fixture["direction"] = self.directions[(idx + 1) % len(self.directions)]
-        self.layout["fixtures"] = self.fixtures
-        self._save_layouts()
-        self._draw_layout()
+        self._commit_layout_changes()
 
     def _on_canvas_right_click(self, event):
         fixture = self._hit_fixture(event.x, event.y)
-        if not fixture:
-            return
         menu = tk.Menu(self.window, tearoff=0)
-        menu.add_command(label="Rotate", command=lambda: self._rotate_fixture(fixture))
-        menu.add_command(label="Reset Position", command=lambda: self._reset_fixture_position(fixture))
-        menu.add_command(label="Reset Direction", command=lambda: self._reset_fixture_direction(fixture))
-        menu.tk_popup(event.x_root, event.y_root)
+        if fixture:
+            menu.add_command(label="Edit Fixture", command=lambda f=fixture: self._edit_fixture(f, event.x_root + 6, event.y_root + 6))
+            menu.add_command(label="Delete Fixture", command=lambda f=fixture: self._delete_fixture(f))
+            menu.add_separator()
+            menu.add_command(label="Rotate", command=lambda f=fixture: self._rotate_fixture(f))
+            menu.add_command(label="Reset Position", command=lambda f=fixture: self._reset_fixture_position(f))
+            menu.add_command(label="Reset Direction", command=lambda f=fixture: self._reset_fixture_direction(f))
+        else:
+            menu.add_command(label="Add Fixture", command=lambda: self._add_fixture_at(event.x, event.y, event.x_root + 6, event.y_root + 6))
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
 
     def _rotate_fixture(self, fixture):
         cur = fixture.get("direction", "down")
         idx = self.directions.index(cur) if cur in self.directions else 0
         fixture["direction"] = self.directions[(idx + 1) % len(self.directions)]
-        self.layout["fixtures"] = self.fixtures
-        self._save_layouts()
-        self._draw_layout()
+        self._commit_layout_changes()
 
     def _reset_fixture_position(self, fixture):
         saved = self.default_fixture_positions.get(fixture.get("id"), {})
         fixture["x"] = saved.get("x", fixture.get("x"))
         fixture["y"] = saved.get("y", fixture.get("y"))
-        self.layout["fixtures"] = self.fixtures
-        self._save_layouts()
-        self._draw_layout()
+        self._commit_layout_changes()
 
     def _reset_fixture_direction(self, fixture):
         saved = self.default_fixture_positions.get(fixture.get("id"), {})
         fixture["direction"] = saved.get("direction", "down")
-        self.layout["fixtures"] = self.fixtures
-        self._save_layouts()
-        self._draw_layout()
+        self._commit_layout_changes()
 
+
+
+    def _preview_current_layers(self):
+        callback = getattr(self, "on_preview_layers_callback", None)
+        if not callable(callback):
+            return False
+        try:
+            game_key = self._game_key(self.game_var.get())
+            element_name = self._selected_element_name()
+            layers = self._current_assignment_layers()
+            callback(game_key, element_name, layers)
+            return True
+        except Exception:
+            return False
     def _preview_dmx_effect(self, effect_name):
         """Send the selected effect to DMX fixtures.
 
@@ -1367,10 +1852,12 @@ class DMXLightingEditor:
             num = getattr(self.dmx, "num_fixtures", 8)
             fixtures = []
             shared_hex = palette[0] if pat_type == "strobe" else None
+            default_dimmer = max(0, min(255, int(effect.get("dimmer_level", 255))))
+            is_dimmer = effect.get("category") == "dimmer"
             for i in range(num):
                 hex_c = shared_hex if shared_hex is not None else palette[i % len(palette)]
                 r, g, b = _hex_to_rgb(hex_c)
-                fixtures.append({"r": r, "g": g, "b": b, "strobe": 0, "dimmer": 255})
+                fixtures.append({"r": r, "g": g, "b": b, "strobe": 0, "dimmer": default_dimmer if is_dimmer else 255})
             scene_entry = {"fixtures": fixtures}
             if pat_type != "static":
                 scene_entry["pattern"] = {"type": pat_type, "speed": speed}
@@ -1472,6 +1959,8 @@ class DMXLightingEditor:
         self._fade_in_lbl.configure(text=str(self._fade_in_ms))
         self._fade_out_lbl.configure(text=str(self._fade_out_ms))
 
+
+
     def _push_fade_to_dmx(self):
         """Update DMX scene data with current fade settings and refresh preview.
 
@@ -1479,29 +1968,27 @@ class DMXLightingEditor:
         animate_scene_step() call reads fade_in_ms / fade_out_ms from the
         active scene data dict.
         """
-        if not self.dmx:
-            return
         effect_name = self._selected_effect_name() or self.hover_effect_name
         if not effect_name:
             return
-        scenes = getattr(self.dmx, "scenes", {})
-        scene = scenes.get(effect_name)
-        if not scene:
-            return
-        if self._fade_enabled:
-            scene["fade"] = {"in_ms": self._fade_in_ms, "out_ms": self._fade_out_ms}
-        else:
-            scene.pop("fade", None)
-        # Push into active scene data so the running animation picks it up
-        data = getattr(self.dmx, "_active_scene_data", None)
-        if data:
-            if self._fade_enabled:
-                data["fade_in_ms"] = self._fade_in_ms
-                data["fade_out_ms"] = self._fade_out_ms
-            else:
-                data.pop("fade_in_ms", None)
-                data.pop("fade_out_ms", None)
-        # Notify the console to restart animation with updated fade settings
+        if self.dmx:
+            scenes = getattr(self.dmx, "scenes", {})
+            scene = scenes.get(effect_name)
+            if scene:
+                if self._fade_enabled:
+                    scene["fade"] = {"in_ms": self._fade_in_ms, "out_ms": self._fade_out_ms}
+                else:
+                    scene.pop("fade", None)
+                data = getattr(self.dmx, "_active_scene_data", None)
+                if data:
+                    if self._fade_enabled:
+                        data["fade_in_ms"] = self._fade_in_ms
+                        data["fade_out_ms"] = self._fade_out_ms
+                    else:
+                        data.pop("fade_in_ms", None)
+                        data.pop("fade_out_ms", None)
+        if not self._preview_current_layers() and self.dmx:
+            self._preview_dmx_effect(effect_name)
         if callable(self.on_scene_applied_callback):
             try:
                 self.on_scene_applied_callback()
@@ -1511,26 +1998,24 @@ class DMXLightingEditor:
 
     def _push_strobe_speed_to_dmx(self):
         """Update the active strobe scene speed without affecting non-strobe effects."""
-        if not self.dmx:
-            return
         effect_name = self._selected_effect_name()
         if not effect_name or not self._effect_is_strobe(effect_name):
             return
-        scenes = getattr(self.dmx, "scenes", {})
-        scene = scenes.get(effect_name)
-        if not scene:
-            self._preview_dmx_effect(effect_name)
+        if self.dmx:
+            scenes = getattr(self.dmx, "scenes", {})
             scene = scenes.get(effect_name)
             if not scene:
-                return
-        scene.setdefault("pattern", {})["type"] = "strobe"
-        scene["pattern"]["speed"] = self._strobe_speed
-        data = getattr(self.dmx, "_active_scene_data", None)
-        if data:
-            data["pattern"] = "strobe"
-            data["speed"] = self._strobe_speed
-        self._preview_dmx_effect(effect_name)
-
+                self._preview_dmx_effect(effect_name)
+                scene = scenes.get(effect_name)
+            if scene:
+                scene.setdefault("pattern", {})["type"] = "strobe"
+                scene["pattern"]["speed"] = self._strobe_speed
+                data = getattr(self.dmx, "_active_scene_data", None)
+                if data:
+                    data["pattern"] = "strobe"
+                    data["speed"] = self._strobe_speed
+        if not self._preview_current_layers() and self.dmx:
+            self._preview_dmx_effect(effect_name)
     def _animate_preview(self):
         if not self.window or not self.canvas:
             self.preview_timer = None

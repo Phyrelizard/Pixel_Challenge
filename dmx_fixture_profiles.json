@@ -31,6 +31,31 @@
         "dmx_channels_per_fixture": 8,
         "dmx_start_address": 1
       }
+    },
+    {
+      "manufacturer": "dps",
+      "model": "switch",
+      "channels": 1,
+      "channel_map": {
+        "switch": 1
+      },
+      "runtime_config": {
+        "dmx_universe": 9,
+        "dmx_num_fixtures": 4,
+        "dmx_channels_per_fixture": 1,
+        "dmx_start_address": 33
+      },
+      "strobe_range": {
+        "off_max": 15,
+        "min": 16,
+        "max": 255
+      },
+      "dimmer_range": {
+        "off": 0,
+        "full": 255
+      },
+      "notes": "",
+      "id": "dps_switch"
     }
   ]
 }

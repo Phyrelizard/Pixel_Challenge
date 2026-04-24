@@ -8,7 +8,7 @@ import math
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 
-VISUALIZER_VERSION = "v1.7.2"
+VISUALIZER_VERSION = "v1.7.5"
 ALL_FIXTURES_TARGET = "All Fixtures"
 NO_FIXTURES_TARGET = "No Fixtures"
 NO_EFFECT_LABEL = "— No Effect —"
@@ -27,7 +27,7 @@ STROBE_SPEED_DEFAULT = 90
 _CATEGORY_ORDER = [
     "static", "fade", "pulse", "chase", "sweep",
     "wave", "bounce", "alternating", "strobe", "random_flash",
-    "palette_cycle", "dimmer", "other",
+    "palette_cycle", "switch", "dimmer", "other",
 ]
 _CATEGORY_LABELS = {
     "static": "── STATIC ──",
@@ -41,6 +41,7 @@ _CATEGORY_LABELS = {
     "strobe": "── STROBES ──",
     "random_flash": "── RANDOM ──",
     "palette_cycle": "── PALETTE CYCLE ──",
+    "switch": "── SWITCHES ──",
     "dimmer": "── DIMMERS ──",
     "other": "── OTHER ──",
 }
@@ -180,6 +181,13 @@ def _target_all_fixture_ids(value) -> list[str]:
             out.extend(g)
         return out
     return list(value)
+
+
+def _generated_switch_effects() -> list[dict]:
+    return [
+        {"name": "Switch Off", "palette": ["#0a0a0a"], "pattern_type": "static", "category": "switch", "speed": 0, "fade_time": 0.0, "brightness": 0.0, "dimmer_level": 0},
+        {"name": "Switch On", "palette": ["#ffffff"], "pattern_type": "static", "category": "switch", "speed": 0, "fade_time": 0.0, "brightness": 1.0, "dimmer_level": 255},
+    ]
 
 
 def _generated_dimmer_effects() -> list[dict]:
@@ -493,6 +501,7 @@ class DMXLightingEditor:
             }
             for name, palette, pattern, speed in generated
         ]
+        generated_effects.extend(_generated_switch_effects())
         generated_effects.extend(_generated_dimmer_effects())
 
         by_name = {}
@@ -730,7 +739,15 @@ class DMXLightingEditor:
         if target_name == ALL_FIXTURES_TARGET:
             return {fixture.get("id", "") for fixture in self.fixtures if fixture.get("id")}
         value = self.targets.get(target_name, [])
-        return {fid for fid in _target_all_fixture_ids(value) if fid}
+        ids = {fid for fid in _target_all_fixture_ids(value) if fid}
+        if ids:
+            return ids
+        # Fallback: if a fixture exists with the same ID as the target name,
+        # treat it as an implicit single-fixture target.
+        fixture_ids = {fixture.get("id", "") for fixture in self.fixtures if fixture.get("id")}
+        if target_name in fixture_ids:
+            return {target_name}
+        return set()
 
     def _assignment_conflicts(self, target_name: str, ignore_target: str | None = None) -> list[tuple[str, list[str]]]:
         target_ids = self._target_fixture_ids_for_name(target_name)
@@ -905,10 +922,11 @@ class DMXLightingEditor:
 
         button_row = tk.Frame(left, bg="#242b35")
         button_row.pack(fill="x", padx=20, pady=(0, 18))
-        tk.Button(button_row, text="SAVE PROFILE", bg="#2f9b4e", fg="white", relief="flat", font=("Arial", 11, "bold"), command=self._save_profile).pack(side="left", expand=True, fill="x", padx=(0, 6), ipady=6)
-        tk.Button(button_row, text="SAVE AS", bg="#cf8f2b", fg="white", relief="flat", font=("Arial", 11, "bold"), command=self._save_as_profile).pack(side="left", expand=True, fill="x", padx=6, ipady=6)
-        tk.Button(button_row, text="RESET GAME", bg="#8c3f22", fg="white", relief="flat", font=("Arial", 11, "bold"), command=self._reset_selected_game_effects).pack(side="left", expand=True, fill="x", padx=6, ipady=6)
-        tk.Button(button_row, text="DELETE PROFILE", bg="#30445e", fg="white", relief="flat", font=("Arial", 11, "bold"), command=self._delete_profile).pack(side="left", expand=True, fill="x", padx=(6, 0), ipady=6)
+        tk.Button(button_row, text="SAVE PROFILE", bg="#2f9b4e", fg="white", relief="flat", font=("Arial", 11, "bold"), command=self._save_profile).pack(side="left", expand=True, fill="x", padx=(0, 4), ipady=6)
+        tk.Button(button_row, text="EDIT PROFILE", bg="#2f6b9e", fg="white", relief="flat", font=("Arial", 11, "bold"), command=self._edit_profile).pack(side="left", expand=True, fill="x", padx=4, ipady=6)
+        tk.Button(button_row, text="COPY", bg="#cf8f2b", fg="white", relief="flat", font=("Arial", 11, "bold"), command=self._copy_profile).pack(side="left", expand=True, fill="x", padx=4, ipady=6)
+        tk.Button(button_row, text="RESET GAME", bg="#8c3f22", fg="white", relief="flat", font=("Arial", 11, "bold"), command=self._reset_selected_game_effects).pack(side="left", expand=True, fill="x", padx=4, ipady=6)
+        tk.Button(button_row, text="DELETE PROFILE", bg="#30445e", fg="white", relief="flat", font=("Arial", 11, "bold"), command=self._delete_profile).pack(side="left", expand=True, fill="x", padx=(4, 0), ipady=6)
 
         canvas_wrap = tk.Frame(right, bg="#202833")
         canvas_wrap.pack(fill="both", expand=True, padx=18, pady=(0, 18))
@@ -1176,23 +1194,60 @@ class DMXLightingEditor:
         self._refresh_profile_combo()
         messagebox.showinfo("DMX Visualizer", "Profile saved.")
 
-    def _save_as_profile(self):
-        new_name = simpledialog.askstring("Save As", "Profile name:", initialvalue=self.profile_name_var.get(), parent=self.window)
-        if not new_name:
+    def _prompt_profile_name(self, title: str, prompt: str, initial_name: str) -> str | None:
+        while True:
+            new_name = simpledialog.askstring(title, prompt, initialvalue=initial_name, parent=self.window)
+            if new_name is None:
+                return None
+            cleaned = str(new_name).strip()
+            if cleaned:
+                return cleaned
+            messagebox.showwarning("DMX Visualizer", "Profile name cannot be blank.", parent=self.window)
+
+    def _edit_profile(self):
+        game_key = self._game_key(self.game_var.get())
+        current_name = self.profile_name_var.get().strip() or self.active_profile.get("profile_name", "Default Small Rig")
+        new_name = self._prompt_profile_name("Edit Profile", "Profile name:", current_name)
+        if new_name is None:
+            return
+        if new_name == current_name:
+            return
+        existing = self._resolve_profile(game_key, new_name)
+        if existing is not self.active_profile and existing.get("profile_name") == new_name and existing.get("game") == game_key:
+            messagebox.showwarning("DMX Visualizer", f'A profile named "{new_name}" already exists for this game.', parent=self.window)
+            return
+        self.active_profile["game"] = game_key
+        self.active_profile["profile_name"] = new_name
+        self.profile_name_var.set(new_name)
+        self._set_active_profile_name_for_game(game_key, new_name)
+        self._save_profiles()
+        self._refresh_profile_combo()
+        messagebox.showinfo("DMX Visualizer", "Profile name updated.", parent=self.window)
+
+    def _copy_profile(self):
+        game_key = self._game_key(self.game_var.get())
+        current_name = self.profile_name_var.get().strip() or self.active_profile.get("profile_name", "Default Small Rig")
+        suggested_name = f"{current_name} Copy"
+        new_name = self._prompt_profile_name("Copy Profile", "New profile name:", suggested_name)
+        if new_name is None:
+            return
+        profiles = self.profiles_data.setdefault("profiles", [])
+        if any(p.get("game") == game_key and p.get("profile_name") == new_name for p in profiles):
+            messagebox.showwarning("DMX Visualizer", f'A profile named "{new_name}" already exists for this game.', parent=self.window)
             return
         cloned = {
-            "game": self._game_key(self.game_var.get()),
-            "profile_name": new_name.strip(),
-            "layout_id": "small_rig_8_fixture",
+            "game": game_key,
+            "profile_name": new_name,
+            "layout_id": self.active_profile.get("layout_id", "small_rig_8_fixture"),
             "assignments": json.loads(json.dumps(self.active_profile.get("assignments", {}))),
         }
-        self.profiles_data.setdefault("profiles", []).append(cloned)
+        profiles.append(cloned)
         self.active_profile = cloned
         self.profile_name_var.set(cloned["profile_name"])
         self._set_active_profile_name_for_game(cloned["game"], cloned["profile_name"])
         self._save_profiles()
         self._refresh_profile_combo()
-        messagebox.showinfo("DMX Visualizer", "Profile saved as new profile.")
+        messagebox.showinfo("DMX Visualizer", "Profile copied.", parent=self.window)
 
     def _reset_selected_game_effects(self):
         game_label = self.game_var.get().strip() or "Current Game"
@@ -1344,7 +1399,12 @@ class DMXLightingEditor:
             pass
 
     def _sync_all_fixtures_target(self):
-        self.targets[ALL_FIXTURES_TARGET] = [fixture.get("id") for fixture in self.fixtures if fixture.get("id")]
+        fixture_ids = [fixture.get("id") for fixture in self.fixtures if fixture.get("id")]
+        self.targets[ALL_FIXTURES_TARGET] = fixture_ids
+        # Keep one-fixture targets in sync so deleting and recreating a fixture
+        # with the same ID still leaves F1/F2/... usable as apply-to targets.
+        for fid in fixture_ids:
+            self.targets[fid] = [fid]
 
     def _rename_fixture_in_targets(self, old_id: str, new_id: str):
         if not old_id or old_id == new_id:
@@ -1582,6 +1642,10 @@ class DMXLightingEditor:
         pattern = effect.get("pattern_type", "static")
         phase = self.preview_phase
 
+        if effect.get("category") == "switch":
+            level = max(0, min(255, int(effect.get("dimmer_level", 0))))
+            return "#58ff8a" if level >= 128 else "#101010"
+
         if effect.get("category") == "dimmer":
             if effect_name == "Dimmer Off":
                 return "#101010"
@@ -1688,6 +1752,8 @@ class DMXLightingEditor:
                 target_value = [fixture.get("id") for fixture in self.fixtures if fixture.get("id")]
             else:
                 target_value = self.targets.get(target_name, [])
+                if not target_value and any(str(f.get("id") or "") == target_name for f in self.fixtures):
+                    target_value = [target_name]
             active_ids = set(_target_all_fixture_ids(target_value))
             is_grouped = isinstance(target_value, list) and target_value and isinstance(target_value[0], list)
             fid_to_slot = {}
@@ -1853,7 +1919,7 @@ class DMXLightingEditor:
             fixtures = []
             shared_hex = palette[0] if pat_type == "strobe" else None
             default_dimmer = max(0, min(255, int(effect.get("dimmer_level", 255))))
-            is_dimmer = effect.get("category") == "dimmer"
+            is_dimmer = effect.get("category") in {"dimmer", "switch"}
             for i in range(num):
                 hex_c = shared_hex if shared_hex is not None else palette[i % len(palette)]
                 r, g, b = _hex_to_rgb(hex_c)
