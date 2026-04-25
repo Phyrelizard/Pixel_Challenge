@@ -1,5 +1,36 @@
 # Changelog
 
+## v28.7.1 - Switch cycle timing fix
+
+### Fixed
+- Fixed switch effect cycle timing so the **Cycle** control now changes the actual live animation rate.
+- Fixed switch animation scheduling so grouped switch effects no longer ignore the per-effect cycle timing.
+
+### Notes
+- **Switch Cycle**, **Switch Sequence LR**, **Switch Sequence RL**, **Switch Ping Pong**, and **Switch Random** now respond correctly to the **Cycle** control.
+
+## v28.7.0 - Switch effect expansion
+
+### Added
+- Added new switch effects:
+  - **Switch Off**
+  - **Switch On**
+  - **Switch Cycle**
+  - **Switch Sequence LR**
+  - **Switch Sequence RL**
+  - **Switch Ping Pong**
+  - **Switch Random**
+- Added a **Cycle** control to the editor for switch-style effect timing.
+- Added grouped switch animation support for multi-fixture targets.
+
+### Changed
+- Expanded the lower editor control area to make room for the new switch timing control.
+- Updated switch effect handling so grouped targets can run sequence and random behaviors.
+
+### Notes
+- Switch effects are intended for fixtures configured as **Switch**.
+- Grouped targets such as `F1,F2,F3,F4` or grouped pairs can now be used for switch sequencing behaviors.
+
 ## v28.6.10 - DMX switch fixture support, editor targeting fixes, and profile management improvements
 
 ### Added

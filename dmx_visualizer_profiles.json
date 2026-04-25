@@ -169,9 +169,13 @@
             {
               "effect": "Dimmer 100%",
               "apply_to": "F9"
+            },
+            {
+              "effect": "Switch Cycle",
+              "apply_to": "F1 F4"
             }
           ],
-          "active_target": "F3"
+          "active_target": "F1 F4"
         },
         "Bonus": {
           "effect": null,
@@ -240,7 +244,7 @@
               "apply_to": "f1-4"
             },
             {
-              "effect": "Rainbow Wave (Copy)",
+              "effect": "Switch Ping Pong",
               "apply_to": "F1 F4"
             }
           ],

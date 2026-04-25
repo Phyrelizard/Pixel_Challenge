@@ -8,7 +8,7 @@ import math
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 
-VISUALIZER_VERSION = "v1.8.0"
+VISUALIZER_VERSION = "v1.7.5"
 ALL_FIXTURES_TARGET = "All Fixtures"
 NO_FIXTURES_TARGET = "No Fixtures"
 NO_EFFECT_LABEL = "— No Effect —"
@@ -22,10 +22,6 @@ STROBE_SPEED_STEP = 5
 STROBE_SPEED_MIN = 16
 STROBE_SPEED_MAX = 255
 STROBE_SPEED_DEFAULT = 90
-CYCLE_STEP_MS = 100
-CYCLE_MIN_MS = 100
-CYCLE_MAX_MS = 3000
-CYCLE_DEFAULT_MS = 500
 
 # Category ordering for the effect list
 _CATEGORY_ORDER = [
@@ -187,16 +183,10 @@ def _target_all_fixture_ids(value) -> list[str]:
     return list(value)
 
 
-
 def _generated_switch_effects() -> list[dict]:
     return [
         {"name": "Switch Off", "palette": ["#0a0a0a"], "pattern_type": "static", "category": "switch", "speed": 0, "fade_time": 0.0, "brightness": 0.0, "dimmer_level": 0},
         {"name": "Switch On", "palette": ["#ffffff"], "pattern_type": "static", "category": "switch", "speed": 0, "fade_time": 0.0, "brightness": 1.0, "dimmer_level": 255},
-        {"name": "Switch Cycle", "palette": ["#ffffff"], "pattern_type": "switch_cycle", "category": "switch", "speed": CYCLE_DEFAULT_MS, "fade_time": 0.0, "brightness": 1.0, "dimmer_level": 255},
-        {"name": "Switch Sequence LR", "palette": ["#ffffff"], "pattern_type": "switch_chase_lr", "category": "switch", "speed": CYCLE_DEFAULT_MS, "fade_time": 0.0, "brightness": 1.0, "dimmer_level": 255},
-        {"name": "Switch Sequence RL", "palette": ["#ffffff"], "pattern_type": "switch_chase_rl", "category": "switch", "speed": CYCLE_DEFAULT_MS, "fade_time": 0.0, "brightness": 1.0, "dimmer_level": 255},
-        {"name": "Switch Ping Pong", "palette": ["#ffffff"], "pattern_type": "switch_ping_pong", "category": "switch", "speed": CYCLE_DEFAULT_MS, "fade_time": 0.0, "brightness": 1.0, "dimmer_level": 255},
-        {"name": "Switch Random", "palette": ["#ffffff"], "pattern_type": "switch_random", "category": "switch", "speed": CYCLE_DEFAULT_MS, "fade_time": 0.0, "brightness": 1.0, "dimmer_level": 255},
     ]
 
 
@@ -287,10 +277,6 @@ class DMXLightingEditor:
         # Strobe controls state (per-element, only enabled for strobe effects)
         self._strobe_speed = STROBE_SPEED_DEFAULT
         self._strobe_enabled = False
-
-        # Cycle controls state (per-element, used by animated switch effects)
-        self._cycle_speed = CYCLE_DEFAULT_MS
-        self._cycle_enabled = False
 
         self.drag_fixture = None
         self.drag_start = None
@@ -560,7 +546,7 @@ class DMXLightingEditor:
             "effect": src.get("effect"),
             "apply_to": str(src.get("apply_to") or target_name or NO_FIXTURES_TARGET),
         }
-        for key in ("fade_enabled", "fade_in_ms", "fade_out_ms", "strobe_speed", "cycle_speed"):
+        for key in ("fade_enabled", "fade_in_ms", "fade_out_ms", "strobe_speed"):
             if key in src:
                 clean[key] = src.get(key)
         return clean
@@ -873,7 +859,7 @@ class DMXLightingEditor:
         self.effect_listbox.bind("<Motion>", self._on_effect_hover)
         self.effect_listbox.bind("<<ListboxSelect>>", self._on_effect_selected)
 
-        # ── Fade / Strobe / Cycle Controls Panel ──
+        # ── Fade Controls Panel ──
         fade_frame = tk.Frame(effect_wrap, bg="#2c3441", relief="flat", bd=0)
         fade_frame.pack(fill="x", pady=(6, 0))
 
@@ -892,7 +878,7 @@ class DMXLightingEditor:
 
         # Row 2: In / Out controls
         fade_ctrl = tk.Frame(fade_frame, bg="#2c3441")
-        fade_ctrl.pack(fill="x", padx=6, pady=(2, 2))
+        fade_ctrl.pack(fill="x", padx=6, pady=(2, 6))
         btn_style = {"bg": "#3b4552", "fg": "white", "activebackground": "#506074", "relief": "flat", "font": ("Arial", 11, "bold"), "width": 2}
         lbl_style = {"bg": "#2c3441", "fg": "#cfd8e3", "font": ("Arial", 11, "bold")}
         val_style = {"bg": "#111820", "fg": "#8ec5ff", "font": ("Arial", 12, "bold"), "width": 5, "anchor": "center"}
@@ -912,29 +898,15 @@ class DMXLightingEditor:
         tk.Button(fade_ctrl, text="▲", command=self._fade_out_up, **btn_style).pack(side="left")
         tk.Label(fade_ctrl, text="ms", bg="#2c3441", fg="#8899aa", font=("Arial", 9)).pack(side="left", padx=(0, 12))
 
-        # Row 3: Strobe / Cycle controls
-        fx_ctrl = tk.Frame(fade_frame, bg="#2c3441")
-        fx_ctrl.pack(fill="x", padx=6, pady=(2, 6))
-
-        tk.Label(fx_ctrl, text="Strobe", **lbl_style).pack(side="left")
-        self._strobe_down_btn = tk.Button(fx_ctrl, text="▼", command=self._strobe_speed_down, **btn_style)
+        tk.Label(fade_ctrl, text="Strobe", **lbl_style).pack(side="left")
+        self._strobe_down_btn = tk.Button(fade_ctrl, text="▼", command=self._strobe_speed_down, **btn_style)
         self._strobe_down_btn.pack(side="left", padx=(4, 0))
-        self._strobe_speed_lbl = tk.Label(fx_ctrl, text="—", **val_style)
+        self._strobe_speed_lbl = tk.Label(fade_ctrl, text="—", **val_style)
         self._strobe_speed_lbl.pack(side="left", padx=2)
-        self._strobe_up_btn = tk.Button(fx_ctrl, text="▲", command=self._strobe_speed_up, **btn_style)
+        self._strobe_up_btn = tk.Button(fade_ctrl, text="▲", command=self._strobe_speed_up, **btn_style)
         self._strobe_up_btn.pack(side="left")
-        self._strobe_unit_lbl = tk.Label(fx_ctrl, text="spd", bg="#2c3441", fg="#8899aa", font=("Arial", 9))
-        self._strobe_unit_lbl.pack(side="left", padx=(0, 14))
-
-        tk.Label(fx_ctrl, text="Cycle", **lbl_style).pack(side="left")
-        self._cycle_down_btn = tk.Button(fx_ctrl, text="▼", command=self._cycle_speed_down, **btn_style)
-        self._cycle_down_btn.pack(side="left", padx=(4, 0))
-        self._cycle_speed_lbl = tk.Label(fx_ctrl, text="—", **val_style)
-        self._cycle_speed_lbl.pack(side="left", padx=2)
-        self._cycle_up_btn = tk.Button(fx_ctrl, text="▲", command=self._cycle_speed_up, **btn_style)
-        self._cycle_up_btn.pack(side="left")
-        self._cycle_unit_lbl = tk.Label(fx_ctrl, text="ms", bg="#2c3441", fg="#8899aa", font=("Arial", 9))
-        self._cycle_unit_lbl.pack(side="left")
+        self._strobe_unit_lbl = tk.Label(fade_ctrl, text="spd", bg="#2c3441", fg="#8899aa", font=("Arial", 9))
+        self._strobe_unit_lbl.pack(side="left")
 
         target_wrap = tk.Frame(left, bg="#242b35")
         target_wrap.pack(fill="x", padx=20, pady=(12, 10))
@@ -1036,7 +1008,6 @@ class DMXLightingEditor:
             self.hover_effect_name = None
         self._sync_fade_ui()
         self._sync_strobe_ui()
-        self._sync_cycle_ui()
         self._draw_layout()
         if self.window and self.window.winfo_exists():
             self.window.after_idle(self._end_sync)
@@ -1093,7 +1064,6 @@ class DMXLightingEditor:
             self._remove_assignment_layer(target_name)
             self.hover_effect_name = None
             self._sync_strobe_ui()
-            self._sync_cycle_ui()
             self._preview_current_layers()
             self._draw_layout()
             return
@@ -1122,7 +1092,6 @@ class DMXLightingEditor:
         self._upsert_assignment_layer(layer)
         self.hover_effect_name = effect["name"]
         self._sync_strobe_ui(effect["name"])
-        self._sync_cycle_ui(effect["name"])
         if not self._preview_current_layers():
             self._preview_dmx_effect(effect["name"])
         self._draw_layout()
@@ -1195,66 +1164,6 @@ class DMXLightingEditor:
         assignment = self._current_assignment()
         assignment["strobe_speed"] = self._strobe_speed
         self._push_strobe_speed_to_dmx()
-
-    def _effect_uses_cycle_controls(self, effect_name: str | None = None) -> bool:
-        if not effect_name:
-            effect_name = self._selected_effect_name()
-        effect = self.effects_by_name.get(effect_name) if effect_name else None
-        if not effect:
-            return False
-        return bool(effect.get("category") == "switch" and effect.get("pattern_type") not in {"static"})
-
-    def _default_cycle_speed(self, effect_name: str | None = None) -> int:
-        if not effect_name:
-            effect_name = self._selected_effect_name()
-        effect = self.effects_by_name.get(effect_name) if effect_name else None
-        speed = effect.get("speed", CYCLE_DEFAULT_MS) if effect else CYCLE_DEFAULT_MS
-        return max(CYCLE_MIN_MS, min(CYCLE_MAX_MS, int(speed)))
-
-    def _set_cycle_controls_enabled(self, enabled: bool):
-        self._cycle_enabled = enabled
-        btn_state = "normal" if enabled else "disabled"
-        val_fg = "#8ec5ff" if enabled else "#607081"
-        unit_fg = "#8899aa" if enabled else "#4d5b69"
-        btn_bg = "#3b4552" if enabled else "#27303a"
-        btn_active = "#506074" if enabled else "#27303a"
-        for button in (self._cycle_down_btn, self._cycle_up_btn):
-            button.configure(state=btn_state, bg=btn_bg, activebackground=btn_active, disabledforeground="#7b8a98")
-        self._cycle_speed_lbl.configure(fg=val_fg)
-        self._cycle_unit_lbl.configure(fg=unit_fg)
-
-    def _sync_cycle_ui(self, effect_name: str | None = None):
-        if not effect_name:
-            effect_name = self._selected_effect_name()
-        assignment = self._current_assignment()
-        if self._effect_uses_cycle_controls(effect_name):
-            speed = assignment.get("cycle_speed", self._default_cycle_speed(effect_name))
-            speed = max(CYCLE_MIN_MS, min(CYCLE_MAX_MS, int(speed)))
-            self._cycle_speed = speed
-            self._cycle_speed_lbl.configure(text=str(speed))
-            self._set_cycle_controls_enabled(True)
-        else:
-            self._cycle_speed = assignment.get("cycle_speed", self._default_cycle_speed(effect_name))
-            self._cycle_speed_lbl.configure(text="—")
-            self._set_cycle_controls_enabled(False)
-
-    def _cycle_speed_down(self):
-        if not self._effect_uses_cycle_controls():
-            return
-        self._cycle_speed = max(CYCLE_MIN_MS, self._cycle_speed - CYCLE_STEP_MS)
-        self._cycle_speed_lbl.configure(text=str(self._cycle_speed))
-        assignment = self._current_assignment()
-        assignment["cycle_speed"] = self._cycle_speed
-        self._push_cycle_speed_to_dmx()
-
-    def _cycle_speed_up(self):
-        if not self._effect_uses_cycle_controls():
-            return
-        self._cycle_speed = min(CYCLE_MAX_MS, self._cycle_speed + CYCLE_STEP_MS)
-        self._cycle_speed_lbl.configure(text=str(self._cycle_speed))
-        assignment = self._current_assignment()
-        assignment["cycle_speed"] = self._cycle_speed
-        self._push_cycle_speed_to_dmx()
 
     def _open_target_dropup(self):
         menu = tk.Menu(self.window, tearoff=0, bg="#1f2732", fg="white", activebackground="#8ec5ff", activeforeground="#0a1a2b")
@@ -1734,27 +1643,8 @@ class DMXLightingEditor:
         phase = self.preview_phase
 
         if effect.get("category") == "switch":
-            if pattern == "static":
-                level = max(0, min(255, int(effect.get("dimmer_level", 0))))
-                return "#58ff8a" if level >= 128 else "#101010"
-            if pattern == "switch_cycle":
-                return "#58ff8a" if int(phase) % 2 == 0 else "#101010"
-            if pattern == "switch_chase_lr":
-                active = int(phase) % max(total_fixtures, 1)
-                return "#58ff8a" if fixture_index == active else "#101010"
-            if pattern == "switch_chase_rl":
-                active = (total_fixtures - 1 - (int(phase) % max(total_fixtures, 1))) if total_fixtures > 0 else 0
-                return "#58ff8a" if fixture_index == active else "#101010"
-            if pattern == "switch_ping_pong":
-                cycle = total_fixtures * 2 - 2 if total_fixtures > 1 else 1
-                pos = int(phase) % max(cycle, 1)
-                if total_fixtures > 1 and pos >= total_fixtures:
-                    pos = cycle - pos
-                return "#58ff8a" if fixture_index == pos else "#101010"
-            if pattern == "switch_random":
-                seed = ((int(phase) + 1) * 7919 + fixture_index * 104729) % 100
-                return "#58ff8a" if seed >= 50 else "#101010"
-            return "#101010"
+            level = max(0, min(255, int(effect.get("dimmer_level", 0))))
+            return "#58ff8a" if level >= 128 else "#101010"
 
         if effect.get("category") == "dimmer":
             if effect_name == "Dimmer Off":
@@ -2049,11 +1939,6 @@ class DMXLightingEditor:
             assignment["strobe_speed"] = strobe_speed
             scene.setdefault("pattern", {})["type"] = "strobe"
             scene["pattern"]["speed"] = strobe_speed
-        if self._effect_uses_cycle_controls(effect_name):
-            cycle_speed = assignment.get("cycle_speed", self._default_cycle_speed(effect_name))
-            cycle_speed = max(CYCLE_MIN_MS, min(CYCLE_MAX_MS, int(cycle_speed)))
-            assignment["cycle_speed"] = cycle_speed
-            scene.setdefault("pattern", {})["speed"] = cycle_speed
         if self._fade_enabled:
             scene["fade"] = {"in_ms": self._fade_in_ms, "out_ms": self._fade_out_ms}
         else:
@@ -2070,8 +1955,6 @@ class DMXLightingEditor:
             data.pop("fade_out_ms", None)
         if data and self._effect_is_strobe(effect_name):
             data["speed"] = self._current_assignment().get("strobe_speed", self._default_effect_speed(effect_name))
-        if data and self._effect_uses_cycle_controls(effect_name):
-            data["speed"] = self._current_assignment().get("cycle_speed", self._default_cycle_speed(effect_name))
         if callable(self.on_scene_applied_callback):
             try:
                 self.on_scene_applied_callback()
@@ -2197,25 +2080,6 @@ class DMXLightingEditor:
                 if data:
                     data["pattern"] = "strobe"
                     data["speed"] = self._strobe_speed
-        if not self._preview_current_layers() and self.dmx:
-            self._preview_dmx_effect(effect_name)
-
-    def _push_cycle_speed_to_dmx(self):
-        """Update the active animated switch scene speed without affecting other effects."""
-        effect_name = self._selected_effect_name()
-        if not effect_name or not self._effect_uses_cycle_controls(effect_name):
-            return
-        if self.dmx:
-            scenes = getattr(self.dmx, "scenes", {})
-            scene = scenes.get(effect_name)
-            if not scene:
-                self._preview_dmx_effect(effect_name)
-                scene = scenes.get(effect_name)
-            if scene:
-                scene.setdefault("pattern", {})["speed"] = self._cycle_speed
-                data = getattr(self.dmx, "_active_scene_data", None)
-                if data:
-                    data["speed"] = self._cycle_speed
         if not self._preview_current_layers() and self.dmx:
             self._preview_dmx_effect(effect_name)
     def _animate_preview(self):
