@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v28.7.0
+Pixel Challenge Host Console v28.10.0
 
 """
 
@@ -16,6 +16,12 @@ from enum import Enum, auto
 import subprocess
 import webbrowser
 import traceback
+import re
+import socket
+import ipaddress
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.request import Request, urlopen
 
 import pygame
 import sacn
@@ -27,11 +33,12 @@ from games.base import PlayerConfig
 from sla import SLAStore, SLACalibration
 from dmx_editor import DMXLightingEditor
 
-VERSION_LABEL = "v28.7.0"
+VERSION_LABEL = "v28.10.0"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 DEFAULT_FALCON_IP = "192.168.2.113"
-PIXELS_PER_LANE = 100
+DEFAULT_PIXELS_PER_LANE = 100
+PIXELS_PER_LANE = DEFAULT_PIXELS_PER_LANE  # legacy alias; use saved setup value at runtime
 ASSIGNMENTS_FILE = "/home/ledgame/easter_game/controller_assignments.json"
 SCORE_HISTORY_FILE = "/home/ledgame/easter_game/score_history.json"
 SCOREBOARD_DATA_FILE = "/home/ledgame/easter_game/scoreboard_data.json"
@@ -349,21 +356,24 @@ class FalconService:
 
 
 class DMXService:
-    """Controls DMX fixtures via sACN universe shared with FalconService."""
+    """Controls mixed DMX fixtures via one sACN universe shared with FalconService."""
 
     def __init__(self, falcon_service, dmx_universe: int, profile: dict,
-                 num_fixtures: int, start_address: int, channels_per_fixture: int):
+                 num_fixtures: int, start_address: int, channels_per_fixture: int,
+                 fixture_defs: list | None = None, profiles_by_id: dict | None = None):
         self.falcon = falcon_service   # shares the sACN sender
         self.universe = dmx_universe
-        self.profile = profile         # channel_map dict e.g. {"red": 1, "green": 2, ...}
-        self.num_fixtures = num_fixtures
+        self.profile = profile         # fallback channel_map dict e.g. {"red": 1, "green": 2, ...}
         self.start_address = start_address
         self.channels_per_fixture = channels_per_fixture
+        self.profiles_by_id = profiles_by_id or {}
+        self.fixture_defs = self._normalize_fixture_defs(fixture_defs or [])
+        self.num_fixtures = len(self.fixture_defs) if self.fixture_defs else num_fixtures
         self.brightness = 76           # master dimmer 0-255 (30% default)
         self.current_scene = None
         self.fixture_states = [
-            {"r": 0, "g": 0, "b": 0, "strobe": 0, "dimmer": 255}
-            for _ in range(num_fixtures)
+            {"r": 0, "g": 0, "b": 0, "strobe": 0, "dimmer": 255, "switch": 0}
+            for _ in range(self.num_fixtures)
         ]
         self.scenes = self._build_default_scenes()
         # Per-fixture crossfade state for smooth color transitions
@@ -371,33 +381,221 @@ class DMXService:
         self._fade_target_rgb = [(0, 0, 0)] * num_fixtures
         self._fade_target_dimmer = [255] * num_fixtures
         self._fade_target_strobe = [0] * num_fixtures
+        # v28.9.5: keep per-output channel values during fade/animation.
+        # Without this, multi-channel dimmer packs collapse back to one
+        # fixture-level dimmer value during dimmer chase effects.
+        self._fade_target_dimmer_channels = [None] * num_fixtures
+        self._fade_target_switch_channels = [None] * num_fixtures
         self._fade_elapsed_ms = 0       # ms elapsed within current crossfade
         self._fade_duration_ms = 0      # total ms for current crossfade (0 = disabled)
         self._fade_timer = None         # tk after handle for sub-tick
         self._fade_root = None          # tk root reference for after() calls
 
     # ------------------------------------------------------------------
+    def _normalize_fixture_defs(self, fixture_defs: list) -> list[dict]:
+        """Normalize visualizer fixture records into runtime DMX fixture records.
+
+        v28.8.0 supports mixed fixtures on the same universe: for example
+        ThinTri 38 heads at 1/9/17/25 and one-channel switch outputs at 33-36.
+
+        v28.9.6 adds a guard for a common Elation DP-DMX4B setup mistake:
+        if a 4-channel dimmer-pack profile is assigned to four separate
+        consecutive layout fixtures, treat each fixture as one output port.
+        Otherwise F9 at address 37 writes 37-40, F10 at 38 writes 38-41, and
+        chase effects appear to turn all four ports on together.
+        """
+        raw_items = [raw for raw in (fixture_defs or []) if isinstance(raw, dict)]
+
+        def _raw_universe(raw: dict) -> int:
+            try:
+                return int(raw.get("universe", self.universe) or self.universe)
+            except Exception:
+                return self.universe
+
+        def _raw_start(raw: dict) -> int:
+            try:
+                return int(raw.get("start_address", 0) or 0)
+            except Exception:
+                return 0
+
+        def _profile_is_direct_pack(profile_obj: dict) -> bool:
+            if not isinstance(profile_obj, dict):
+                return False
+            try:
+                channels = int(profile_obj.get("channels") or 1)
+            except Exception:
+                channels = 1
+            cmap = profile_obj.get("channel_map") or {}
+            has_output = isinstance(cmap, dict) and ("dimmer" in cmap or "switch" in cmap)
+            has_rgb = isinstance(cmap, dict) and any(k in cmap for k in ("red", "green", "blue", "white", "amber", "uv"))
+            return channels > 1 and has_output and not has_rgb
+
+        # Detect profiles used as four independent ports instead of one pack.
+        # A run like 37,38,39,40 with the same multi-channel direct profile means
+        # each layout fixture should own only its start address.
+        profile_starts: dict[str, list[int]] = {}
+        for raw in raw_items:
+            if _raw_universe(raw) != self.universe:
+                continue
+            profile_id = str(raw.get("profile_id") or "").strip()
+            if not profile_id:
+                continue
+            profile_obj = self.profiles_by_id.get(profile_id) or {}
+            if _profile_is_direct_pack(profile_obj):
+                start = _raw_start(raw)
+                if start > 0:
+                    profile_starts.setdefault(profile_id, []).append(start)
+        per_port_profile_ids = set()
+        for profile_id, starts in profile_starts.items():
+            ordered = sorted(set(starts))
+            run_len = 1
+            for a, b in zip(ordered, ordered[1:]):
+                run_len = run_len + 1 if b == a + 1 else 1
+                if run_len >= 2:
+                    per_port_profile_ids.add(profile_id)
+                    break
+
+        normalized = []
+        for idx, raw in enumerate(raw_items):
+            universe = _raw_universe(raw)
+            if universe != self.universe:
+                continue
+            start_address = _raw_start(raw)
+            if start_address < 1:
+                continue
+
+            profile_id = str(raw.get("profile_id") or "").strip()
+            fixture_type = str(raw.get("type") or "").lower().strip()
+            if not profile_id:
+                if fixture_type in {"switch", "relay", "dimmer", "dps_switch"}:
+                    profile_id = "dps_switch"
+                elif fixture_type in {"wash", "top", "thintri", "thintri38", "venue_thintri38"}:
+                    profile_id = "venue_thintri38"
+            profile_obj = self.profiles_by_id.get(profile_id) or {}
+            channel_map = dict(profile_obj.get("channel_map") or raw.get("channel_map") or self.profile or {})
+            channels = int(profile_obj.get("channels") or raw.get("channels") or raw.get("channels_per_fixture") or self.channels_per_fixture or 1)
+
+            if profile_id in per_port_profile_ids and _profile_is_direct_pack(profile_obj):
+                # Per-port layout: F9=37, F10=38, F11=39, F12=40.  Force each
+                # fixture to be a one-channel direct output so a chase steps the
+                # fixtures, not all four channels inside each fixture.
+                channels = 1
+                channel_map = {"dimmer": 1, "switch": 1}
+
+            if channels < 1:
+                channels = 1
+            normalized.append({
+                "id": str(raw.get("id") or f"F{idx + 1}"),
+                "type": fixture_type or profile_id or "fixture",
+                "profile_id": profile_id,
+                "universe": universe,
+                "start_address": start_address,
+                "channels": channels,
+                "channel_map": channel_map,
+            })
+        return normalized
+
     def _fixture_base_address(self, fixture_index: int) -> int:
         """Return 0-indexed byte offset for fixture (0-indexed fixture_index)."""
+        if self.fixture_defs and 0 <= fixture_index < len(self.fixture_defs):
+            return int(self.fixture_defs[fixture_index].get("start_address", 1)) - 1
         return self.start_address + (fixture_index * self.channels_per_fixture) - 1
+
+    def _fixture_profile(self, fixture_index: int) -> dict:
+        if self.fixture_defs and 0 <= fixture_index < len(self.fixture_defs):
+            return dict(self.fixture_defs[fixture_index].get("channel_map") or {})
+        return dict(self.profile or {})
+
+    def _fixture_uses_switch_channel(self, fixture_index: int) -> bool:
+        return "switch" in self._fixture_profile(fixture_index)
+
+    def _fixture_uses_dimmer_channel(self, fixture_index: int) -> bool:
+        return "dimmer" in self._fixture_profile(fixture_index)
+
+    def _fixture_uses_rgb_channels(self, fixture_index: int) -> bool:
+        p = self._fixture_profile(fixture_index)
+        return any(key in p for key in ("red", "green", "blue", "white", "amber", "uv"))
+
+    def _fixture_channel_count(self, fixture_index: int) -> int:
+        """Return the channel count for one runtime fixture.
+
+        In mixed rigs this comes from the visualizer fixture definition, not the
+        selected global profile.  It lets a 4-channel dimmer pack still be
+        treated as four independently addressable outputs even if an older
+        profile only mapped one dimmer/switch channel.
+        """
+        try:
+            if self.fixture_defs and 0 <= fixture_index < len(self.fixture_defs):
+                return max(1, int(self.fixture_defs[fixture_index].get("channels", 1) or 1))
+            return max(1, int(self.channels_per_fixture or 1))
+        except Exception:
+            return 1
+
+    def _fixture_type_hint(self, fixture_index: int) -> str:
+        if self.fixture_defs and 0 <= fixture_index < len(self.fixture_defs):
+            f = self.fixture_defs[fixture_index]
+            return " ".join([
+                str(f.get("type", "")),
+                str(f.get("profile_id", "")),
+                str(f.get("id", "")),
+            ]).lower()
+        return ""
+
+    def _fixture_is_direct_output_hint(self, fixture_index: int) -> bool:
+        """Detect dimmer/switch/relay fixtures even when the channel map is sparse."""
+        hint = self._fixture_type_hint(fixture_index)
+        return any(word in hint for word in (
+            "switch", "relay", "dimmer", "dps", "dp-dmx", "dpdmx", "vpdmx", "elation"
+        ))
+
+    def _fixture_is_direct_output(self, fixture_index: int) -> bool:
+        """True for relay/switch/dimmer-pack outputs, false for RGB wash heads.
+
+        ThinTri heads also have a dimmer channel, but because they also have
+        RGB channels their dimmer should still obey the console's global
+        brightness slider.  A dimmer pack profile such as {"dimmer": [1,2,3,4]}
+        has no RGB channels, so its percentage effects should be absolute DMX
+        output levels: 25%=64, 50%=128, 75%=191, 100%=255.
+        """
+        if self._fixture_uses_switch_channel(fixture_index):
+            return True
+        if self._fixture_uses_dimmer_channel(fixture_index) and not self._fixture_uses_rgb_channels(fixture_index):
+            return True
+        # v28.9.3: user-created dimmer/relay profiles sometimes have the
+        # correct channel count and fixture type but an incomplete/sparse channel
+        # map.  Treat those as direct outputs so chase effects do not fall back
+        # to RGB wash behavior.
+        return self._fixture_is_direct_output_hint(fixture_index) and not self._fixture_uses_rgb_channels(fixture_index)
 
     # ------------------------------------------------------------------
     def set_fixture_color(self, fixture_index: int, r: int, g: int, b: int):
         """Set RGB color on a single fixture. Respects channel map."""
         if 0 <= fixture_index < self.num_fixtures:
-            self.fixture_states[fixture_index]["r"] = clamp8(r)
-            self.fixture_states[fixture_index]["g"] = clamp8(g)
-            self.fixture_states[fixture_index]["b"] = clamp8(b)
-            self.fixture_states[fixture_index]["dimmer"] = self.brightness
+            rr, gg, bb = clamp8(r), clamp8(g), clamp8(b)
+            self.fixture_states[fixture_index]["r"] = rr
+            self.fixture_states[fixture_index]["g"] = gg
+            self.fixture_states[fixture_index]["b"] = bb
+            if self._fixture_is_direct_output(fixture_index):
+                level = 0 if (rr, gg, bb) == (0, 0, 0) else 255
+                self.fixture_states[fixture_index]["dimmer"] = level
+                self.fixture_states[fixture_index]["switch"] = level
+            else:
+                self.fixture_states[fixture_index]["dimmer"] = self.brightness
             self._send_dmx_frame()
 
     def set_all_color(self, r: int, g: int, b: int):
         """Set all fixtures to same RGB color."""
+        rr, gg, bb = clamp8(r), clamp8(g), clamp8(b)
         for i in range(self.num_fixtures):
-            self.fixture_states[i]["r"] = clamp8(r)
-            self.fixture_states[i]["g"] = clamp8(g)
-            self.fixture_states[i]["b"] = clamp8(b)
-            self.fixture_states[i]["dimmer"] = self.brightness
+            self.fixture_states[i]["r"] = rr
+            self.fixture_states[i]["g"] = gg
+            self.fixture_states[i]["b"] = bb
+            if self._fixture_is_direct_output(i):
+                level = 0 if (rr, gg, bb) == (0, 0, 0) else 255
+                self.fixture_states[i]["dimmer"] = level
+                self.fixture_states[i]["switch"] = level
+            else:
+                self.fixture_states[i]["dimmer"] = self.brightness
         self._send_dmx_frame()
 
     def set_fixture_strobe(self, fixture_index: int, speed: int):
@@ -435,32 +633,91 @@ class DMXService:
         return _hex_to_rgb(hex_c)
 
     def _profile_uses_switch_channel(self) -> bool:
-        """Return True when the active fixture profile maps a dedicated switch channel."""
+        """Return True only when the entire active runtime bank is switch-only.
+
+        Mixed rigs use _fixture_uses_switch_channel(index) so ThinTri heads and
+        one-channel switch outputs can share the same universe without one
+        fixture type borrowing the other fixture type's rules.
+        """
+        if self.fixture_defs:
+            return bool(self.fixture_defs) and all(self._fixture_uses_switch_channel(i) for i in range(self.num_fixtures))
         return isinstance(self.profile, dict) and "switch" in self.profile
 
     def _is_switch_pattern(self, pattern: str) -> bool:
         return pattern in {"switch_cycle", "switch_chase_lr", "switch_chase_rl", "switch_ping_pong", "switch_random"}
 
-    def _switch_pattern_level(self, pattern: str, step: int, slot_index: int, slot_count: int) -> int:
+    def _is_dimmer_channel_pattern(self, pattern: str) -> bool:
+        return pattern in {"dimmer_cycle", "dimmer_chase_lr", "dimmer_chase_rl", "dimmer_ping_pong", "dimmer_random"}
+
+    def _is_channel_step_pattern(self, pattern: str) -> bool:
+        return self._is_switch_pattern(pattern) or self._is_dimmer_channel_pattern(pattern)
+
+    def _fixture_dimmer_offsets(self, fixture_index: int) -> list[int]:
+        """Return mapped dimmer/switch output offsets for one fixture.
+
+        A 4-channel dimmer pack can be represented as one fixture with
+        {"dimmer": [1,2,3,4]}.  v28.9.3 also handles older/user-created
+        profiles that only mapped one channel or left the map sparse: if the
+        fixture is clearly a direct-output dimmer/switch and has multiple
+        channels, chase effects use every channel in that fixture.
+        """
+        profile = self._fixture_profile(fixture_index)
+        offsets = profile.get("dimmer") or profile.get("switch") or []
+        cleaned = []
+        if isinstance(offsets, (list, tuple, set)):
+            for off in offsets:
+                try:
+                    cleaned.append(int(off))
+                except Exception:
+                    pass
+        else:
+            try:
+                if offsets not in (None, ""):
+                    cleaned.append(int(offsets))
+            except Exception:
+                pass
+
+        channel_count = self._fixture_channel_count(fixture_index)
+        # If this is a multi-channel direct-output fixture, prefer the full
+        # fixture channel range unless the profile already explicitly maps more
+        # than one output.  This is what makes an Elation-style 4-port pack at
+        # address 37 chase 37/38/39/40 instead of treating channel 37 as one
+        # all-ports control.
+        if channel_count > 1 and self._fixture_is_direct_output(fixture_index):
+            if len(cleaned) <= 1:
+                return list(range(1, channel_count + 1))
+        return cleaned
+
+    def _step_pattern_level(self, pattern: str, step: int, slot_index: int, slot_count: int) -> int:
         slot_count = max(1, int(slot_count or 1))
-        if pattern == "switch_cycle":
+        if pattern in {"switch_cycle", "dimmer_cycle"}:
             return 255 if (step % 2) == 0 else 0
-        if pattern == "switch_chase_lr":
+        if pattern in {"switch_chase_lr", "dimmer_chase_lr"}:
             active = step % slot_count
             return 255 if slot_index == active else 0
-        if pattern == "switch_chase_rl":
+        if pattern in {"switch_chase_rl", "dimmer_chase_rl"}:
             active = slot_count - 1 - (step % slot_count)
             return 255 if slot_index == active else 0
-        if pattern == "switch_ping_pong":
+        if pattern in {"switch_ping_pong", "dimmer_ping_pong"}:
             cycle = slot_count * 2 - 2 if slot_count > 1 else 1
             pos = step % max(cycle, 1)
             if slot_count > 1 and pos >= slot_count:
                 pos = cycle - pos
             return 255 if slot_index == pos else 0
-        if pattern == "switch_random":
+        if pattern in {"switch_random", "dimmer_random"}:
             seed = ((step + 1) * 7919 + slot_index * 104729) % 100
             return 255 if seed >= 50 else 0
         return 0
+
+    def _switch_pattern_level(self, pattern: str, step: int, slot_index: int, slot_count: int) -> int:
+        return self._step_pattern_level(pattern, step, slot_index, slot_count)
+
+    def _dimmer_channel_levels(self, pattern: str, step: int, fixture_index: int) -> list[int]:
+        offsets = self._fixture_dimmer_offsets(fixture_index)
+        count = len(offsets)
+        if count <= 0:
+            return []
+        return [self._step_pattern_level(pattern, step, channel_idx, count) for channel_idx in range(count)]
 
     def set_brightness(self, brightness_percent: int):
         """Set master brightness 0-100.
@@ -470,15 +727,15 @@ class DMXService:
         output so they remain hard on/off regardless of the global slider.
         """
         self.brightness = clamp8(int(brightness_percent * 255 / 100))
-        if not self._profile_uses_switch_channel():
-            for i in range(self.num_fixtures):
+        for i in range(self.num_fixtures):
+            if not self._fixture_is_direct_output(i):
                 self.fixture_states[i]["dimmer"] = self.brightness
         self._send_dmx_frame()
 
     def blackout(self):
         """All fixtures off — set dimmer to 0 on all."""
         for i in range(self.num_fixtures):
-            self.fixture_states[i] = {"r": 0, "g": 0, "b": 0, "strobe": 0, "dimmer": 0}
+            self.fixture_states[i] = {"r": 0, "g": 0, "b": 0, "strobe": 0, "dimmer": 0, "switch": 0}
         self._send_dmx_frame()
 
     def apply_scene(self, scene_name: str):
@@ -491,18 +748,24 @@ class DMXService:
         if not scene:
             return
         fixtures = scene.get("fixtures", [])
+        pattern = scene.get("pattern") if isinstance(scene.get("pattern"), dict) else {}
+        pat_type_for_switch = pattern.get("type", "static") if isinstance(pattern, dict) else "static"
+        scene_label = str(scene_name or "").lower()
+        switch_intended = self._is_channel_step_pattern(pat_type_for_switch) or "dimmer" in scene_label or "switch" in scene_label or "relay" in scene_label
         for i in range(self.num_fixtures):
             if i < len(fixtures):
                 state = dict(fixtures[i])
-                # Scale scene dimmer by master brightness for normal fixtures,
+                # Scale scene dimmer by master brightness for RGB fixtures,
                 # but keep dedicated switch outputs absolute on/off.
                 base_dimmer = state.get("dimmer", 255)
-                if self._profile_uses_switch_channel():
-                    state["dimmer"] = clamp8(base_dimmer)
+                if self._fixture_is_direct_output(i):
+                    level = clamp8(base_dimmer) if switch_intended else 0
+                    state["dimmer"] = level
+                    state["switch"] = level
                 else:
                     state["dimmer"] = clamp8(int(base_dimmer * self.brightness / 255))
             else:
-                state = {"r": 0, "g": 0, "b": 0, "strobe": 0, "dimmer": 0}
+                state = {"r": 0, "g": 0, "b": 0, "strobe": 0, "dimmer": 0, "switch": 0}
             self.fixture_states[i] = state
         self.current_scene = scene_name
         # Check for pattern data — store for animation if non-static
@@ -526,13 +789,18 @@ class DMXService:
                 strobe_val = max(16, min(255, pattern.get("speed", 100)))
                 colors_obj = scene.get("colors", [])
                 sr, sg, sb = self._resolve_strobe_rgb(colors_obj, step=0)
-                for state in self.fixture_states:
+                for idx, state in enumerate(self.fixture_states):
                     state["r"] = sr
                     state["g"] = sg
                     state["b"] = sb
-                    if state.get("dimmer", 0) <= 0:
-                        state["dimmer"] = self.brightness
-                    state["strobe"] = strobe_val
+                    if self._fixture_is_direct_output(idx):
+                        state["dimmer"] = 0
+                        state["switch"] = 0
+                        state["strobe"] = 0
+                    else:
+                        if state.get("dimmer", 0) <= 0:
+                            state["dimmer"] = self.brightness
+                        state["strobe"] = strobe_val
         else:
             self._active_scene_data = None
         self._send_dmx_frame()
@@ -586,7 +854,7 @@ class DMXService:
                 dimmer_val = self.brightness if i % 2 == 0 else int(self.brightness * 0.15)
             self.fixture_states[i] = {
                 "r": r, "g": g, "b": b, "strobe": strobe_val,
-                "dimmer": clamp8(dimmer_val),
+                "dimmer": clamp8(dimmer_val), "switch": clamp8(dimmer_val),
             }
         name = getattr(scene_obj, "name", "editor")
         self.current_scene = name
@@ -620,8 +888,22 @@ class DMXService:
                 r, g, b = _hex_to_rgb(hex_c)
             strobe_val = 0
             dimmer_val = self.brightness
-            if self._profile_uses_switch_channel() and self._is_switch_pattern(pat_type):
-                dimmer_val = self._switch_pattern_level(pat_type, step, i, n)
+            dimmer_channels = None
+            switch_channels = None
+            if self._is_dimmer_channel_pattern(pat_type):
+                levels = self._dimmer_channel_levels(pat_type, 0, i)
+                if levels:
+                    dimmer_val = max(levels)
+                    switch_channels = levels
+                    dimmer_channels = levels
+                else:
+                    dimmer_val = self._step_pattern_level(pat_type, 0, i, self.num_fixtures)
+                    switch_channels = None
+                    dimmer_channels = None
+                strobe_val = 0
+                r, g, b = (255, 255, 255)
+            elif self._fixture_uses_switch_channel(i) and self._is_switch_pattern(pat_type):
+                dimmer_val = self._switch_pattern_level(pat_type, 0, i, self.num_fixtures)
                 strobe_val = 0
                 if fc:
                     hex_c = fc[i % len(fc)]
@@ -645,10 +927,14 @@ class DMXService:
                 dimmer_val = int(self.brightness * dist)
             elif pat_type == "alternating":
                 dimmer_val = self.brightness if i % 2 == 0 else int(self.brightness * 0.15)
-            self.fixture_states[i] = {
+            state = {
                 "r": r, "g": g, "b": b, "strobe": strobe_val,
-                "dimmer": clamp8(dimmer_val),
+                "dimmer": clamp8(dimmer_val), "switch": clamp8(dimmer_val),
             }
+            if dimmer_channels is not None:
+                state["dimmer_channels"] = [clamp8(v) for v in dimmer_channels]
+                state["switch_channels"] = [clamp8(v) for v in (switch_channels or dimmer_channels)]
+            self.fixture_states[i] = state
         # Store pattern info for animated playback via animate_scene_step
         self._active_scene_data = {
             "colors": fc, "pattern": pat_type, "speed": speed,
@@ -690,7 +976,14 @@ class DMXService:
             self._active_scene_data = None
             return
         self.current_scene = ", ".join(names) if names else "layered"
-        self._active_scene_data = {"pattern": "composite", "layers": clean_layers}
+        # v28.9.4: composite/layered effects can have different chase speeds.
+        # Store a monotonic start time so each layer derives its own step from
+        # its own speed instead of sharing the global animation tick counter.
+        self._active_scene_data = {
+            "pattern": "composite",
+            "layers": clean_layers,
+            "started_monotonic": time.monotonic(),
+        }
         self.animate_scene_step(0)
 
     def _animate_composite_layers(self, step: int, data: dict):
@@ -698,6 +991,8 @@ class DMXService:
         target_rgb = [(0, 0, 0)] * total
         target_dimmer = [0] * total
         target_strobe = [0] * total
+        target_dimmer_channels = [None] * total
+        target_switch_channels = [None] * total
         max_fade_ms = 0
 
         for layer in data.get("layers", []):
@@ -714,27 +1009,50 @@ class DMXService:
             dimmers = list(layer.get("slot_dimmers") or [])
             strobes = list(layer.get("slot_strobes") or [])
             pattern = str(layer.get("pattern", "static") or "static")
-            speed = int(layer.get("speed", 100) or 100)
+            effect_name = str(layer.get("effect_name", "") or "").lower()
+            switch_intended = self._is_switch_pattern(pattern) or "dimmer" in effect_name or "switch" in effect_name or "relay" in effect_name
+            speed = max(50, min(3000, int(layer.get("speed", 100) or 100)))
+            started = data.get("started_monotonic") or time.monotonic()
+            data["started_monotonic"] = started
+            elapsed_ms = max(0, int((time.monotonic() - started) * 1000))
+            # v28.9.4: this layer advances at its own configured speed.
+            layer_step = elapsed_ms // speed
             n = len(slots)
             slot_rgb = []
             slot_dimmer = []
             slot_strobe = []
+            slot_dimmer_channels = []
+            slot_switch_channels = []
 
             for i in range(n):
+                slot_fixture_indexes = slots[i] if i < len(slots) else []
+                slot_has_switch = any(self._fixture_is_direct_output(idx) for idx in slot_fixture_indexes)
                 hex_c = colors[i % len(colors)] if colors else "#000000"
                 r, g, b = _hex_to_rgb(hex_c)
-                # For dedicated switch fixtures, keep slot levels absolute on/off
-                # even in the visualizer/composite-layer path. Normal lighting
-                # fixtures still scale through the global DMX brightness.
+                # For dedicated switch/dimmer-pack fixtures, keep slot levels
+                # absolute. Normal RGB wash fixtures still scale through the
+                # global DMX brightness slider.
                 raw_dimmer = int(dimmers[i] if i < len(dimmers) else 255)
-                if self._profile_uses_switch_channel():
+                if slot_has_switch:
                     dimmer_val = clamp8(raw_dimmer)
                 else:
                     dimmer_val = clamp8(int(raw_dimmer * self.brightness / 255))
                 strobe_val = strobes[i] if i < len(strobes) else 0
+                channel_levels = None
 
-                if self._profile_uses_switch_channel() and self._is_switch_pattern(pattern):
-                    level = self._switch_pattern_level(pattern, step, i, n)
+                if self._is_dimmer_channel_pattern(pattern):
+                    # One 4-channel dimmer-pack fixture: chase its mapped output
+                    # channels. Four separate 1-channel dimmer fixtures: chase
+                    # the selected fixture slots.
+                    if len(slot_fixture_indexes) == 1 and len(self._fixture_dimmer_offsets(slot_fixture_indexes[0])) > 1:
+                        channel_levels = self._dimmer_channel_levels(pattern, layer_step, slot_fixture_indexes[0])
+                        dimmer_val = max(channel_levels) if channel_levels else 0
+                    else:
+                        dimmer_val = self._step_pattern_level(pattern, layer_step, i, n)
+                    strobe_val = 0
+                    r, g, b = (255, 255, 255)
+                elif slot_has_switch and self._is_switch_pattern(pattern):
+                    level = self._switch_pattern_level(pattern, layer_step, i, n)
                     dimmer_val = level
                     strobe_val = 0
                     if colors:
@@ -743,38 +1061,38 @@ class DMXService:
                         r, g, b = (255, 255, 255)
                 elif pattern == "strobe":
                     if colors:
-                        r, g, b = _hex_to_rgb(colors[step % len(colors)])
+                        r, g, b = _hex_to_rgb(colors[layer_step % len(colors)])
                     strobe_val = max(16, min(255, speed))
                     dimmer_val = self.brightness
                 elif pattern == "pulse":
                     if colors:
-                        color_idx = (step // 4) % len(colors)
+                        color_idx = (layer_step // 4) % len(colors)
                         r, g, b = _hex_to_rgb(colors[color_idx])
-                    phase = (step * 0.15 + i * 0.3) % (2 * math.pi)
+                    phase = (layer_step * 0.15 + i * 0.3) % (2 * math.pi)
                     dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
                     strobe_val = 0
                 elif pattern == "chase":
                     if colors:
-                        shifted_idx = (i + step) % len(colors)
+                        shifted_idx = (i + layer_step) % len(colors)
                         r, g, b = _hex_to_rgb(colors[shifted_idx])
-                    active = step % max(n, 1)
+                    active = layer_step % max(n, 1)
                     dimmer_val = self.brightness if i == active else int(self.brightness * 0.25)
                     strobe_val = 0
                 elif pattern == "sweep":
                     if colors:
-                        shifted_idx = (i + step) % len(colors)
+                        shifted_idx = (i + layer_step) % len(colors)
                         r, g, b = _hex_to_rgb(colors[shifted_idx])
-                    pos = step % max(n, 1)
+                    pos = layer_step % max(n, 1)
                     dist = abs(i - pos)
                     falloff = max(0, 1.0 - dist / max(n * 0.3, 1))
                     dimmer_val = int(self.brightness * max(0.15, falloff))
                     strobe_val = 0
                 elif pattern == "bounce":
                     if colors:
-                        shifted_idx = (i + step) % len(colors)
+                        shifted_idx = (i + layer_step) % len(colors)
                         r, g, b = _hex_to_rgb(colors[shifted_idx])
                     half = max(n, 1)
-                    pos = step % (2 * half)
+                    pos = layer_step % (2 * half)
                     if pos >= half:
                         pos = 2 * half - pos - 1
                     dist = abs(i - pos)
@@ -782,23 +1100,23 @@ class DMXService:
                     dimmer_val = int(self.brightness * falloff)
                     strobe_val = 0
                 elif pattern == "alternating":
-                    flip = step % 2
+                    flip = layer_step % 2
                     if colors:
                         slot = (i + flip) % len(colors)
                         r, g, b = _hex_to_rgb(colors[slot])
                     dimmer_val = self.brightness if (i + flip) % 2 == 0 else int(self.brightness * 0.6)
                     strobe_val = 0
                 elif pattern == "palette_cycle":
-                    shifted_idx = (i + step) % len(colors) if colors else 0
+                    shifted_idx = (i + layer_step) % len(colors) if colors else 0
                     hex_c = colors[shifted_idx] if colors else "#000000"
                     r, g, b = _hex_to_rgb(hex_c)
                     dimmer_val = self.brightness
                     strobe_val = 0
                 elif pattern == "wave":
                     if colors:
-                        shifted_idx = (i + step) % len(colors)
+                        shifted_idx = (i + layer_step) % len(colors)
                         r, g, b = _hex_to_rgb(colors[shifted_idx])
-                    phase = (step * 0.2 - i * 0.4) % (2 * math.pi)
+                    phase = (layer_step * 0.2 - i * 0.4) % (2 * math.pi)
                     dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
                     strobe_val = 0
                 elif pattern == "random_flash":
@@ -811,7 +1129,7 @@ class DMXService:
                 elif pattern == "fade_loop" or pattern == "fade":
                     if colors:
                         cycle_len = len(colors)
-                        pos = (step * 0.08) % cycle_len
+                        pos = (layer_step * 0.08) % cycle_len
                         idx_a = int(pos) % cycle_len
                         idx_b = (idx_a + 1) % cycle_len
                         frac = pos - int(pos)
@@ -821,7 +1139,7 @@ class DMXService:
                         g = int(ga + (gb - ga) * frac)
                         b = int(ba + (bb - ba) * frac)
                     else:
-                        phase = (step * 0.1) % (2 * math.pi)
+                        phase = (layer_step * 0.1) % (2 * math.pi)
                         dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
                     strobe_val = 0
                 elif pattern == "sparkle":
@@ -829,29 +1147,29 @@ class DMXService:
                     dimmer_val = self.brightness if random.random() > 0.8 else int(self.brightness * 0.1)
                     strobe_val = 0
                 elif pattern == "breathing":
-                    phase = (step * 0.08) % (2 * math.pi)
+                    phase = (layer_step * 0.08) % (2 * math.pi)
                     dimmer_val = int(self.brightness * (0.3 + 0.7 * (0.5 + 0.5 * math.sin(phase))))
                     strobe_val = 0
                 elif pattern == "wave_center":
                     center = n / 2
                     dist = abs(i - center)
-                    phase = (step * 0.2 - dist * 0.5) % (2 * math.pi)
+                    phase = (layer_step * 0.2 - dist * 0.5) % (2 * math.pi)
                     dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
                     strobe_val = 0
                 elif pattern == "wave_lr":
-                    phase = (step * 0.2 - i * 0.4) % (2 * math.pi)
+                    phase = (layer_step * 0.2 - i * 0.4) % (2 * math.pi)
                     dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
                     strobe_val = 0
                 elif pattern == "wave_player":
-                    phase = (step * 0.15 + i * 0.6) % (2 * math.pi)
+                    phase = (layer_step * 0.15 + i * 0.6) % (2 * math.pi)
                     dimmer_val = int(self.brightness * (0.5 + 0.5 * math.sin(phase)))
                     strobe_val = 0
                 elif pattern == "build_up":
-                    lit_count = min((step % (n + 4)), n)
+                    lit_count = min((layer_step % (n + 4)), n)
                     dimmer_val = self.brightness if i < lit_count else 0
                     strobe_val = 0
                 elif pattern == "explosion":
-                    cycle = step % 20
+                    cycle = layer_step % 20
                     if cycle < 2:
                         dimmer_val = self.brightness
                     elif cycle < 10:
@@ -860,9 +1178,17 @@ class DMXService:
                         dimmer_val = 0
                     strobe_val = 0
 
+                if slot_has_switch and not switch_intended and not self._is_dimmer_channel_pattern(pattern):
+                    # Safety/default behavior: RGB wash effects should not energize
+                    # relay/switch outputs just because a target says All Fixtures.
+                    dimmer_val = 0
+                    strobe_val = 0
+
                 slot_rgb.append((r, g, b))
                 slot_dimmer.append(clamp8(dimmer_val))
                 slot_strobe.append(int(strobe_val))
+                slot_dimmer_channels.append([clamp8(v) for v in channel_levels] if channel_levels is not None else None)
+                slot_switch_channels.append([clamp8(v) for v in channel_levels] if channel_levels is not None else None)
 
             for slot_idx, group in enumerate(slots):
                 for fixture_idx in group:
@@ -870,6 +1196,8 @@ class DMXService:
                         target_rgb[fixture_idx] = slot_rgb[slot_idx]
                         target_dimmer[fixture_idx] = slot_dimmer[slot_idx]
                         target_strobe[fixture_idx] = slot_strobe[slot_idx]
+                        target_dimmer_channels[fixture_idx] = slot_dimmer_channels[slot_idx]
+                        target_switch_channels[fixture_idx] = slot_switch_channels[slot_idx]
 
             max_fade_ms = max(max_fade_ms, int(layer.get("fade_in_ms", 0) or 0), int(layer.get("fade_out_ms", 0) or 0))
 
@@ -881,16 +1209,23 @@ class DMXService:
             self._fade_target_rgb = target_rgb
             self._fade_target_dimmer = target_dimmer
             self._fade_target_strobe = target_strobe
+            self._fade_target_dimmer_channels = target_dimmer_channels
+            self._fade_target_switch_channels = target_switch_channels
             self._fade_duration_ms = max_fade_ms
             self._fade_elapsed_ms = 0
         else:
             for i in range(total):
                 r, g, b = target_rgb[i]
-                self.fixture_states[i] = {
+                state = {
                     "r": r, "g": g, "b": b,
                     "strobe": target_strobe[i],
                     "dimmer": target_dimmer[i],
+                    "switch": target_dimmer[i],
                 }
+                if target_dimmer_channels[i] is not None:
+                    state["dimmer_channels"] = target_dimmer_channels[i]
+                    state["switch_channels"] = target_switch_channels[i] or target_dimmer_channels[i]
+                self.fixture_states[i] = state
             self._send_dmx_frame()
 
     def animate_scene_step(self, step: int):
@@ -923,6 +1258,8 @@ class DMXService:
         slot_rgb = []
         slot_dimmer = []
         slot_strobe = []
+        slot_dimmer_channels = []
+        slot_switch_channels = []
         shared_strobe_rgb = self._resolve_strobe_rgb(fc, step=step) if pat_type == "strobe" else None
         for i in range(n):
             if pat_type == "strobe" and shared_strobe_rgb is not None:
@@ -935,7 +1272,23 @@ class DMXService:
                 r, g, b = _hex_to_rgb(hex_c)
             strobe_val = 0
             dimmer_val = self.brightness
-            if pat_type == "strobe":
+            channel_levels = None
+            if self._is_dimmer_channel_pattern(pat_type):
+                # If this slot maps to one multi-channel dimmer fixture, chase
+                # the fixture's mapped output channels. Otherwise chase the
+                # slots/fixtures themselves.
+                target_fixture = None
+                if fixture_groups and i < len(fixture_groups) and len(fixture_groups[i]) == 1:
+                    target_fixture = fixture_groups[i][0]
+                elif not fixture_groups and i < self.num_fixtures:
+                    target_fixture = i
+                if target_fixture is not None and len(self._fixture_dimmer_offsets(target_fixture)) > 1:
+                    channel_levels = self._dimmer_channel_levels(pat_type, step, target_fixture)
+                    dimmer_val = max(channel_levels) if channel_levels else 0
+                else:
+                    dimmer_val = self._step_pattern_level(pat_type, step, i, n)
+                r, g, b = (255, 255, 255)
+            elif pat_type == "strobe":
                 # ThinTri 38 handles strobing internally on the fixture's
                 # dedicated strobe channel (CH5) while CH6 remains in its
                 # "no function" range. Do not blank the dimmer in software
@@ -1058,12 +1411,16 @@ class DMXService:
             slot_rgb.append((r, g, b))
             slot_dimmer.append(clamp8(dimmer_val))
             slot_strobe.append(strobe_val)
+            slot_dimmer_channels.append([clamp8(v) for v in channel_levels] if channel_levels is not None else None)
+            slot_switch_channels.append([clamp8(v) for v in channel_levels] if channel_levels is not None else None)
 
         # ── Expand slots to actual fixtures ──
         total = self.num_fixtures
         target_rgb = [(0, 0, 0)] * total
         target_dimmer = [0] * total
         target_strobe = [0] * total
+        target_dimmer_channels = [None] * total
+        target_switch_channels = [None] * total
         if fixture_groups:
             # Map each group's slot values to all fixtures in that group
             included = set()
@@ -1073,6 +1430,8 @@ class DMXService:
                         target_rgb[fix_idx] = slot_rgb[slot_idx]
                         target_dimmer[fix_idx] = slot_dimmer[slot_idx]
                         target_strobe[fix_idx] = slot_strobe[slot_idx]
+                        target_dimmer_channels[fix_idx] = slot_dimmer_channels[slot_idx]
+                        target_switch_channels[fix_idx] = slot_switch_channels[slot_idx]
                         included.add(fix_idx)
             # Fixtures not in any group keep their current state (untouched)
             for i in range(total):
@@ -1081,6 +1440,8 @@ class DMXService:
                     target_rgb[i] = (s.get("r", 0), s.get("g", 0), s.get("b", 0))
                     target_dimmer[i] = s.get("dimmer", 0)
                     target_strobe[i] = s.get("strobe", 0)
+                    target_dimmer_channels[i] = s.get("dimmer_channels")
+                    target_switch_channels[i] = s.get("switch_channels")
         else:
             # No grouping — slot_i maps directly to fixture_i
             for i in range(total):
@@ -1088,6 +1449,8 @@ class DMXService:
                     target_rgb[i] = slot_rgb[i]
                     target_dimmer[i] = slot_dimmer[i]
                     target_strobe[i] = slot_strobe[i]
+                    target_dimmer_channels[i] = slot_dimmer_channels[i]
+                    target_switch_channels[i] = slot_switch_channels[i]
 
         # ── Per-fixture color crossfade ──
         fade_in_ms = data.get("fade_in_ms", 0)
@@ -1102,16 +1465,23 @@ class DMXService:
             self._fade_target_rgb = target_rgb
             self._fade_target_dimmer = target_dimmer
             self._fade_target_strobe = target_strobe
+            self._fade_target_dimmer_channels = target_dimmer_channels
+            self._fade_target_switch_channels = target_switch_channels
             self._fade_duration_ms = fade_ms
             self._fade_elapsed_ms = 0
         else:
             for i in range(total):
                 r, g, b = target_rgb[i]
-                self.fixture_states[i] = {
+                state = {
                     "r": r, "g": g, "b": b,
                     "strobe": target_strobe[i],
                     "dimmer": target_dimmer[i],
+                    "switch": target_dimmer[i],
                 }
+                if target_dimmer_channels[i] is not None:
+                    state["dimmer_channels"] = target_dimmer_channels[i]
+                    state["switch_channels"] = target_switch_channels[i] or target_dimmer_channels[i]
+                self.fixture_states[i] = state
             self._send_dmx_frame()
 
     def fade_subtick(self, interval_ms: int = 20):
@@ -1134,10 +1504,19 @@ class DMXService:
             b = int(pb + (tb - pb) * t)
             td = self._fade_target_dimmer[i] if i < len(self._fade_target_dimmer) else self.brightness
             ts = self._fade_target_strobe[i] if i < len(self._fade_target_strobe) else 0
-            self.fixture_states[i] = {
+            state = {
                 "r": clamp8(r), "g": clamp8(g), "b": clamp8(b),
-                "strobe": ts, "dimmer": td,
+                "strobe": ts, "dimmer": td, "switch": td,
             }
+            # v28.9.5: preserve per-channel values for direct-output
+            # fixtures during fade-enabled dimmer/switch chases.  Do not let
+            # fade_subtick turn [255,0,0,0] into one shared dimmer value.
+            dc = self._fade_target_dimmer_channels[i] if i < len(self._fade_target_dimmer_channels) else None
+            sc = self._fade_target_switch_channels[i] if i < len(self._fade_target_switch_channels) else None
+            if dc is not None:
+                state["dimmer_channels"] = [clamp8(v) for v in dc]
+                state["switch_channels"] = [clamp8(v) for v in (sc or dc)]
+            self.fixture_states[i] = state
         self._send_dmx_frame()
         if t >= 1.0:
             self._fade_duration_ms = 0
@@ -1161,33 +1540,70 @@ class DMXService:
             return
         try:
             buf = bytearray(512)
-            p = self.profile  # channel_map dict
             for i, state in enumerate(self.fixture_states):
+                p = self._fixture_profile(i)  # per-fixture channel_map dict
                 base = self._fixture_base_address(i)
 
                 def _safe_set(offset, value, _buf=buf, _base=base):
-                    idx = _base + (offset - 1)
+                    try:
+                        idx = _base + (int(offset) - 1)
+                    except Exception:
+                        return
                     if 0 <= idx < 512:
                         _buf[idx] = clamp8(value)
 
+                def _safe_set_many(offsets, value):
+                    # v28.9.0: allow one function to drive multiple channels,
+                    # e.g. a 4-port dimmer pack profile can map
+                    # {"switch": [1, 2, 3, 4]}.
+                    if isinstance(offsets, (list, tuple, set)):
+                        for off in offsets:
+                            _safe_set(off, value)
+                    else:
+                        _safe_set(offsets, value)
+
                 if "red" in p:
-                    _safe_set(p["red"], state.get("r", 0))
+                    _safe_set_many(p["red"], state.get("r", 0))
                 if "green" in p:
-                    _safe_set(p["green"], state.get("g", 0))
+                    _safe_set_many(p["green"], state.get("g", 0))
                 if "blue" in p:
-                    _safe_set(p["blue"], state.get("b", 0))
+                    _safe_set_many(p["blue"], state.get("b", 0))
                 if "color_macros" in p:
-                    _safe_set(p["color_macros"], 0)
+                    _safe_set_many(p["color_macros"], 0)
                 if "strobe" in p:
-                    _safe_set(p["strobe"], state.get("strobe", 0))
+                    _safe_set_many(p["strobe"], state.get("strobe", 0))
                 if "mode" in p:
-                    _safe_set(p["mode"], 0)
-                if "dimmer" in p:
-                    _safe_set(p["dimmer"], state.get("dimmer", 255))
-                if "switch" in p:
-                    _safe_set(p["switch"], state.get("switch", state.get("dimmer", 0)))
+                    _safe_set_many(p["mode"], 0)
+                def _safe_set_many_or_list(offsets, value, values_key=None):
+                    values = state.get(values_key) if values_key else None
+                    if values is not None and isinstance(offsets, (list, tuple, set)):
+                        for pos, off in enumerate(offsets):
+                            try:
+                                channel_value = values[pos]
+                            except Exception:
+                                channel_value = value
+                            _safe_set(off, channel_value)
+                    else:
+                        _safe_set_many(offsets, value)
+
+                # v28.9.3: direct-output dimmer/switch packs may be one
+                # runtime fixture with multiple DMX channels.  Always use the
+                # expanded output offsets here so dimmer sequence effects can
+                # write different values to CH1..CH4.
+                if self._fixture_is_direct_output(i) and not self._fixture_uses_rgb_channels(i):
+                    output_offsets = self._fixture_dimmer_offsets(i)
+                    if output_offsets:
+                        if "dimmer" in p or "dimmer_channels" in state:
+                            _safe_set_many_or_list(output_offsets, state.get("dimmer", 0), "dimmer_channels")
+                        if "switch" in p or "switch_channels" in state:
+                            _safe_set_many_or_list(output_offsets, state.get("switch", state.get("dimmer", 0)), "switch_channels")
+                else:
+                    if "dimmer" in p:
+                        _safe_set_many_or_list(p["dimmer"], state.get("dimmer", 255), "dimmer_channels")
+                    if "switch" in p:
+                        _safe_set_many_or_list(p["switch"], state.get("switch", state.get("dimmer", 0)), "switch_channels")
                 if "dimmer_speed" in p:
-                    _safe_set(p["dimmer_speed"], 0)
+                    _safe_set_many(p["dimmer_speed"], 0)
 
             self.falcon.sender[self.universe].dmx_data = bytes(buf)
         except Exception as e:
@@ -1224,7 +1640,7 @@ class DMXService:
                     r, g, b = hsv_rgb(hue, 1.0, 1.0)
                     self.fixture_states[i] = {"r": r, "g": g, "b": b, "strobe": 0, "dimmer": self.brightness}
                 else:
-                    self.fixture_states[i] = {"r": 0, "g": 0, "b": 0, "strobe": 0, "dimmer": 0}
+                    self.fixture_states[i] = {"r": 0, "g": 0, "b": 0, "strobe": 0, "dimmer": 0, "switch": 0}
         else:
             return
         self.current_scene = preset_name
@@ -1270,6 +1686,11 @@ class DMXService:
                 "pattern": {"type": "breathing", "speed": 60},
                 "colors": ["#ffffff"],
             },
+            "Dimmer Cycle":    {"fixtures": [{"r": 255, "g": 255, "b": 255, "strobe": 0,  "dimmer": 255}] * n, "pattern": {"type": "dimmer_cycle", "speed": 500}, "colors": ["#ffffff"]},
+            "Dimmer Sequence LR": {"fixtures": [{"r": 255, "g": 255, "b": 255, "strobe": 0,  "dimmer": 255}] * n, "pattern": {"type": "dimmer_chase_lr", "speed": 500}, "colors": ["#ffffff"]},
+            "Dimmer Sequence RL": {"fixtures": [{"r": 255, "g": 255, "b": 255, "strobe": 0,  "dimmer": 255}] * n, "pattern": {"type": "dimmer_chase_rl", "speed": 500}, "colors": ["#ffffff"]},
+            "Dimmer Ping Pong": {"fixtures": [{"r": 255, "g": 255, "b": 255, "strobe": 0,  "dimmer": 255}] * n, "pattern": {"type": "dimmer_ping_pong", "speed": 500}, "colors": ["#ffffff"]},
+            "Dimmer Random":   {"fixtures": [{"r": 255, "g": 255, "b": 255, "strobe": 0,  "dimmer": 255}] * n, "pattern": {"type": "dimmer_random", "speed": 500}, "colors": ["#ffffff"]},
         }
 
 
@@ -1538,6 +1959,8 @@ class PixelChallengeConsole:
         self.info_lines = ["P1 | U1/U2", "P2 | U3/U4", "P3 | U5/U6", "P4 | U7/U8", "Host boot complete."]
 
         self.falcon_ip = DEFAULT_FALCON_IP
+        self.pixels_per_lane = DEFAULT_PIXELS_PER_LANE
+        self.pixels_per_lane_var = tk.IntVar(value=DEFAULT_PIXELS_PER_LANE)
         self.wifi_dhcp = tk.BooleanVar(value=True)
         self.wifi_ssid = tk.StringVar(value="")
         self.wifi_psk = tk.StringVar(value="")
@@ -1577,18 +2000,20 @@ class PixelChallengeConsole:
         self.write_startup_log()
 
         self.viewer = ViewerService("/home/ledgame/easter_game/viewer_command.txt")
-        self.falcon = FalconService(self.falcon_ip, PIXELS_PER_LANE, dmx_universe=self.dmx_universe_num.get())
+        self.falcon = FalconService(self.falcon_ip, self.get_pixels_per_lane(), dmx_universe=self.dmx_universe_num.get())
         self.attract = AttractService(self.falcon)
         self.games = GameRegistry()
 
         self.host_api = ConsoleHostAPI(self)
         self.game_manager = GameManager(self.host_api)
 
-        # Load fixture profiles and create DMX service (v25.3.0)
+        # Load fixture/layout data before creating DMX service.
+        # v28.8.0 mixed-fixture DMX reads the visualizer layout while the
+        # DMX service is being created, so these must exist first.
         self.dmx_profiles = self.load_dmx_profiles()
-        self.dmx = self._create_dmx_service()
         self.visualizer_profiles = self.load_visualizer_profiles()
         self.visualizer_layouts = self.load_visualizer_layouts()
+        self.dmx = self._create_dmx_service()
         # Swatch canvas references updated by refresh_dmx_fixture_cards()
         self.dmx_fixture_swatches = []
 
@@ -1722,6 +2147,27 @@ class PixelChallengeConsole:
         except Exception as e:
             self.log(f"Failed to save score history: {e}")
 
+    def get_pixels_per_lane(self) -> int:
+        """Return the saved LED pixel count per lane, clamped to one DMX universe."""
+        value = DEFAULT_PIXELS_PER_LANE
+        try:
+            if hasattr(self, "pixels_per_lane_var"):
+                value = int(self.pixels_per_lane_var.get())
+            else:
+                value = int(getattr(self, "pixels_per_lane", DEFAULT_PIXELS_PER_LANE))
+        except Exception:
+            value = DEFAULT_PIXELS_PER_LANE
+        # One E1.31/DMX universe carries 170 RGB pixels.  The game rig uses one
+        # universe per lane, so keep the setup value inside that safe range.
+        value = max(1, min(170, value))
+        self.pixels_per_lane = value
+        try:
+            if hasattr(self, "pixels_per_lane_var") and self.pixels_per_lane_var.get() != value:
+                self.pixels_per_lane_var.set(value)
+        except Exception:
+            pass
+        return value
+
     def load_settings(self):
         if not os.path.exists(SETTINGS_FILE):
             return
@@ -1747,6 +2193,11 @@ class PixelChallengeConsole:
             self.voice_volume.set(int(data.get("voice_volume", 100)))
             self.master_volume.set(int(data.get("master_volume", 100)))
             self.falcon_ip = data.get("falcon_ip", DEFAULT_FALCON_IP)
+            pixels = _safe_int(data.get("pixels_per_lane", DEFAULT_PIXELS_PER_LANE), DEFAULT_PIXELS_PER_LANE)
+            pixels = max(1, min(170, pixels))
+            self.pixels_per_lane = pixels
+            if hasattr(self, "pixels_per_lane_var"):
+                self.pixels_per_lane_var.set(pixels)
             self.wifi_dhcp.set(bool(data.get("wifi_dhcp", True)))
             self.wifi_ssid.set(data.get("wifi_ssid", ""))
             self.wifi_psk.set(data.get("wifi_psk", ""))
@@ -1777,12 +2228,24 @@ class PixelChallengeConsole:
             pass
 
     def save_settings(self):
-        runtime = self._persist_active_profile_runtime_config() or {
-            "dmx_universe": _safe_int(self.dmx_universe_num.get(), 9),
-            "dmx_num_fixtures": _safe_int(self.dmx_num_fixtures.get(), 4),
-            "dmx_channels_per_fixture": _safe_int(self.dmx_channels_per_fixture_var.get(), 8),
-            "dmx_start_address": _safe_int(self.dmx_start_address.get(), 1),
-        }
+        # v28.9.0: Do NOT persist the active fixture profile every time general
+        # settings are saved.  In the mixed-fixture runtime, rebuilding the DMX
+        # service can use summary values from the visualizer layout; saving those
+        # back into a selected profile corrupts that profile's own start address,
+        # fixture count, and channel count.  Profile runtime values are persisted
+        # only from save_setup() / the profile editor.
+        runtime = None
+        try:
+            runtime = self._profile_runtime_config(self.get_active_profile())
+        except Exception:
+            runtime = None
+        if not runtime:
+            runtime = {
+                "dmx_universe": _safe_int(self.dmx_universe_num.get(), 9),
+                "dmx_num_fixtures": _safe_int(self.dmx_num_fixtures.get(), 4),
+                "dmx_channels_per_fixture": _safe_int(self.dmx_channels_per_fixture_var.get(), 8),
+                "dmx_start_address": _safe_int(self.dmx_start_address.get(), 1),
+            }
         data = {
             "auto_enabled": bool(self.auto_enabled.get()),
             "cycle_enabled": bool(self.cycle_enabled.get()),
@@ -1802,6 +2265,7 @@ class PixelChallengeConsole:
             "voice_volume": int(self.voice_volume.get()),
             "master_volume": int(self.master_volume.get()),
             "falcon_ip": self.falcon_ip,
+            "pixels_per_lane": int(self.get_pixels_per_lane()),
             "wifi_dhcp": bool(self.wifi_dhcp.get()),
             "wifi_ssid": self.wifi_ssid.get(),
             "wifi_psk": self.wifi_psk.get(),
@@ -2142,24 +2606,34 @@ class PixelChallengeConsole:
             "layouts": [
                 {
                     "layout_id": "small_rig_8_fixture",
-                    "name": "Default Small Rig",
+                    "name": "Mixed ThinTri + Switch Rig",
                     "fixtures": [
-                        {"id": "F1", "type": "wash", "x": 80, "y": 580, "direction": "left"},
-                        {"id": "F2", "type": "wash", "x": 80, "y": 420, "direction": "left"},
-                        {"id": "F3", "type": "top", "x": 250, "y": 100, "direction": "down"},
-                        {"id": "F4", "type": "top", "x": 370, "y": 100, "direction": "down"},
-                        {"id": "F5", "type": "top", "x": 490, "y": 100, "direction": "down"},
-                        {"id": "F6", "type": "top", "x": 610, "y": 100, "direction": "down"},
-                        {"id": "F7", "type": "wash", "x": 780, "y": 420, "direction": "right"},
-                        {"id": "F8", "type": "wash", "x": 780, "y": 580, "direction": "right"},
+                        {"id": "F1", "type": "wash", "profile_id": "venue_thintri38", "x": 80, "y": 620, "direction": "right", "universe": 9, "start_address": 1},
+                        {"id": "F2", "type": "wash", "profile_id": "venue_thintri38", "x": 80, "y": 430, "direction": "right", "universe": 9, "start_address": 9},
+                        {"id": "F3", "type": "wash", "profile_id": "venue_thintri38", "x": 815, "y": 430, "direction": "left", "universe": 9, "start_address": 17},
+                        {"id": "F4", "type": "wash", "profile_id": "venue_thintri38", "x": 815, "y": 620, "direction": "left", "universe": 9, "start_address": 25},
+                        {"id": "F5", "type": "switch", "profile_id": "dps_switch", "x": 250, "y": 120, "direction": "down", "universe": 9, "start_address": 33},
+                        {"id": "F6", "type": "switch", "profile_id": "dps_switch", "x": 370, "y": 120, "direction": "down", "universe": 9, "start_address": 34},
+                        {"id": "F7", "type": "switch", "profile_id": "dps_switch", "x": 490, "y": 120, "direction": "down", "universe": 9, "start_address": 35},
+                        {"id": "F8", "type": "switch", "profile_id": "dps_switch", "x": 610, "y": 120, "direction": "down", "universe": 9, "start_address": 36},
                     ],
                     "targets": {
                         "All Fixtures": ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"],
+                        "ThinTri Heads": ["F1", "F2", "F3", "F4"],
+                        "DMX Switches": ["F5", "F6", "F7", "F8"],
+                        "f1-4": ["F1", "F2", "F3", "F4"],
+                        "F1 F4": ["F1", "F2", "F3", "F4"],
+                        "f5-8": ["F5", "F6", "F7", "F8"],
+                        "switch 1": ["F5"], "switch 2": ["F6"], "switch 3": ["F7"], "switch 4": ["F8"],
+                        "f33": ["F5"], "f34": ["F6"], "f35": ["F7"], "f36": ["F8"],
+                        "F33": ["F5"], "F34": ["F6"], "F35": ["F7"], "F36": ["F8"],
+                        "odd": ["F1", "F3", "F5", "F7"],
+                        "even": ["F2", "F4", "F6", "F8"],
                         "Left Wash Group": ["F1", "F2"],
-                        "Right Wash Group": ["F7", "F8"],
-                        "Top Fixtures": ["F3", "F4", "F5", "F6"],
-                        "Top Left Pair": ["F3", "F4"],
-                        "Top Right Pair": ["F5", "F6"],
+                        "Right Wash Group": ["F3", "F4"],
+                        "Top Fixtures": ["F5", "F6", "F7", "F8"],
+                        "Top Left Pair": ["F5", "F6"],
+                        "Top Right Pair": ["F7", "F8"],
                     },
                 }
             ]
@@ -2298,10 +2772,19 @@ class PixelChallengeConsole:
         slot_colors, slot_dimmers, slot_strobes = self._scene_slot_data_for_indexes(scene, slot_indexes or fixture_indexes)
         pattern = scene.get("pattern", {}) if isinstance(scene.get("pattern"), dict) else {}
         pat_type = pattern.get("type", "static")
+        # v28.9.5: channel-step dimmer/switch effects must be allowed to
+        # chase individual direct-output fixtures.  If a target was entered
+        # as one bracketed group, flatten it; otherwise all ports march as one.
+        if groups and self.dmx._is_channel_step_pattern(pat_type):
+            if len(groups) == 1 and len(groups[0]) > 1 and all(self.dmx._fixture_is_direct_output(idx) for idx in groups[0]):
+                indexes = list(groups[0])
+                groups = None
+                slot_indexes = list(indexes)
+                fixture_indexes = list(indexes)
         speed = int(pattern.get("speed", 100) or 100)
         if pat_type == "strobe":
             speed = int(layer.get("strobe_speed", speed) or speed)
-        elif self.dmx._profile_uses_switch_channel() and self.dmx._is_switch_pattern(pat_type):
+        elif self.dmx._is_channel_step_pattern(pat_type):
             speed = int(layer.get("cycle_speed", speed) or speed)
         return {
             "effect_name": effect_name,
@@ -2350,7 +2833,11 @@ class PixelChallengeConsole:
         return None
 
     def _target_fixture_indexes(self, target_name: str) -> list[int]:
-        layouts = self.visualizer_layouts.get("layouts", []) if isinstance(self.visualizer_layouts, dict) else []
+        visualizer_layouts = getattr(self, "visualizer_layouts", None)
+        if not isinstance(visualizer_layouts, dict):
+            visualizer_layouts = self.load_visualizer_layouts()
+            self.visualizer_layouts = visualizer_layouts
+        layouts = visualizer_layouts.get("layouts", []) if isinstance(visualizer_layouts, dict) else []
         layout0 = layouts[0] if layouts and isinstance(layouts[0], dict) else {}
         targets = layout0.get("targets", {}) if isinstance(layout0, dict) else {}
         fixture_ids = targets.get(target_name, [])
@@ -2368,16 +2855,37 @@ class PixelChallengeConsole:
                 flat.extend(g)
         else:
             flat = list(fixture_ids)
+        runtime_id_to_index = {}
+        if self.dmx and getattr(self.dmx, "fixture_defs", None):
+            runtime_id_to_index = {
+                str(f.get("id") or "").strip().upper(): idx
+                for idx, f in enumerate(self.dmx.fixture_defs)
+                if isinstance(f, dict)
+            }
         indexes = []
         for fid in flat:
-            if isinstance(fid, str) and fid.upper().startswith("F"):
+            fid_key = str(fid or "").strip().upper()
+            if fid_key in runtime_id_to_index:
+                indexes.append(runtime_id_to_index[fid_key])
+            elif fid_key.startswith("F"):
                 try:
-                    idx = int(fid[1:]) - 1
+                    # Compatibility fallback for older runtime maps sorted by F-number.
+                    idx = int(fid_key[1:]) - 1
                     if idx >= 0:
                         indexes.append(idx)
                 except Exception:
                     pass
         return indexes
+
+    def _target_uses_switch_channel(self, indexes: list[int], groups: "list[list[int]] | None" = None) -> bool:
+        if not self.dmx:
+            return False
+        check_indexes = []
+        if groups:
+            for group in groups:
+                check_indexes.extend(group)
+        check_indexes.extend(indexes or [])
+        return any(self.dmx._fixture_uses_switch_channel(idx) for idx in set(check_indexes))
 
     def _target_fixture_groups(self, target_name: str) -> "list[list[int]] | None":
         """Return grouped fixture indexes for a target, or None if flat/ungrouped.
@@ -2385,26 +2893,44 @@ class PixelChallengeConsole:
         For ``[["F1","F3"],["F2","F4"]]`` returns ``[[0,2],[1,3]]``.
         For flat ``["F1","F2"]`` returns None (caller uses per-fixture logic).
         """
-        layouts = self.visualizer_layouts.get("layouts", []) if isinstance(self.visualizer_layouts, dict) else []
+        visualizer_layouts = getattr(self, "visualizer_layouts", None)
+        if not isinstance(visualizer_layouts, dict):
+            visualizer_layouts = self.load_visualizer_layouts()
+            self.visualizer_layouts = visualizer_layouts
+        layouts = visualizer_layouts.get("layouts", []) if isinstance(visualizer_layouts, dict) else []
         layout0 = layouts[0] if layouts and isinstance(layouts[0], dict) else {}
         targets = layout0.get("targets", {}) if isinstance(layout0, dict) else {}
         fixture_ids = targets.get(target_name, [])
         if not (isinstance(fixture_ids, list) and fixture_ids and isinstance(fixture_ids[0], list)):
             return None
+        runtime_id_to_index = {}
+        if self.dmx and getattr(self.dmx, "fixture_defs", None):
+            runtime_id_to_index = {
+                str(f.get("id") or "").strip().upper(): idx
+                for idx, f in enumerate(self.dmx.fixture_defs)
+                if isinstance(f, dict)
+            }
         groups = []
         for g in fixture_ids:
             idxs = []
             for fid in g:
-                if isinstance(fid, str) and fid.upper().startswith("F"):
+                fid_key = str(fid or "").strip().upper()
+                if fid_key in runtime_id_to_index:
+                    idxs.append(runtime_id_to_index[fid_key])
+                elif fid_key.startswith("F"):
                     try:
-                        idx = int(fid[1:]) - 1
+                        idx = int(fid_key[1:]) - 1
                         if idx >= 0:
                             idxs.append(idx)
                     except Exception:
                         pass
             if idxs:
                 groups.append(idxs)
-        return groups if groups else None
+        # v28.9.5: a single bracketed group such as [F9,F10,F11,F12]
+        # should behave the same as a flat target F9,F10,F11,F12.  Grouped
+        # behavior only has meaning when there are two or more sub-groups,
+        # for example [F1,F3],[F2,F4].
+        return groups if len(groups) > 1 else None
 
     def _apply_scene_to_target(self, scene_name: str, target_name: str):
         """Apply a scene and mask fixtures outside the selected visualizer target.
@@ -2466,24 +2992,120 @@ class PixelChallengeConsole:
             return fallback
         return None
 
+    def _infer_layout_fixture_profile_id(self, fixture: dict, profiles_by_id: dict) -> str:
+        """Infer the fixture profile for older layout records that did not store one."""
+        profile_id = str(fixture.get("profile_id") or fixture.get("dmx_profile_id") or "").strip()
+        if profile_id in profiles_by_id:
+            return profile_id
+        fixture_type = str(fixture.get("type") or "").lower().strip()
+        try:
+            address = int(fixture.get("start_address") or 0)
+        except Exception:
+            address = 0
+        if fixture_type in {"switch", "relay", "dimmer", "dps_switch"}:
+            return "dps_switch"
+        if fixture_type in {"wash", "top", "thintri", "thintri38", "venue_thintri38"}:
+            return "venue_thintri38"
+        # Backward compatibility for the current switch-only layout.  Addresses
+        # 33-36 are the four switch outputs; 1/9/17/25 are the ThinTri heads.
+        if 33 <= address <= 36 and "dps_switch" in profiles_by_id:
+            return "dps_switch"
+        if address in {1, 9, 17, 25} and "venue_thintri38" in profiles_by_id:
+            return "venue_thintri38"
+        return self.dmx_profile_id.get() or "venue_thintri38"
+
+    def _dmx_fixture_defs_from_layout(self, profiles_by_id: dict) -> list[dict]:
+        """Build ordered runtime fixture definitions from the visualizer layout.
+
+        The visualizer target resolver maps F1 -> index 0, F2 -> index 1, etc.
+        Therefore the runtime list must be sorted into that same F-number order.
+        """
+        visualizer_layouts = getattr(self, "visualizer_layouts", None)
+        if not isinstance(visualizer_layouts, dict):
+            visualizer_layouts = self.load_visualizer_layouts()
+            self.visualizer_layouts = visualizer_layouts
+        layouts = visualizer_layouts.get("layouts", []) if isinstance(visualizer_layouts, dict) else []
+        layout0 = layouts[0] if layouts and isinstance(layouts[0], dict) else {}
+        fixtures = layout0.get("fixtures", []) if isinstance(layout0, dict) else []
+        if not fixtures:
+            return []
+        slots = {}
+        append_slot = 0
+        for raw in fixtures:
+            if not isinstance(raw, dict):
+                continue
+            fid = str(raw.get("id") or "").strip().upper()
+            try:
+                universe = int(raw.get("universe", self.dmx_universe_num.get()) or self.dmx_universe_num.get())
+                start_address = int(raw.get("start_address") or 0)
+            except Exception:
+                continue
+            if start_address < 1:
+                continue
+            profile_id = self._infer_layout_fixture_profile_id(raw, profiles_by_id)
+            profile = profiles_by_id.get(profile_id) or self.get_active_profile() or {}
+            channels = max(1, _safe_int(raw.get("channels", profile.get("channels", 1)), 1))
+            record = dict(raw)
+            record.update({
+                "id": fid or str(raw.get("id") or f"F{append_slot + 1}"),
+                "universe": universe,
+                "start_address": start_address,
+                "profile_id": profile_id,
+                "channels": channels,
+                "channel_map": dict(profile.get("channel_map") or {}),
+            })
+            match = re.match(r"^F(\d+)$", fid)
+            if match:
+                slot = max(0, int(match.group(1)) - 1)
+            else:
+                while append_slot in slots:
+                    append_slot += 1
+                slot = append_slot
+            slots[slot] = record
+        if not slots:
+            return []
+        return [slots[idx] for idx in sorted(slots)]
+
     def _create_dmx_service(self) -> "DMXService | None":
-        """Create DMXService with the selected profile's saved hardware config."""
+        """Create DMXService with mixed fixture support from the visualizer layout."""
         profile = self.get_active_profile()
         if not profile:
             self.log("DMX: No fixture profile found — DMX disabled.")
             return None
-        runtime = self._profile_runtime_config(profile)
-        self.dmx_universe_num.set(runtime["dmx_universe"])
-        self.dmx_num_fixtures.set(runtime["dmx_num_fixtures"])
-        self.dmx_channels_per_fixture_var.set(runtime["dmx_channels_per_fixture"])
-        self.dmx_start_address.set(runtime["dmx_start_address"])
+        profiles_by_id = {
+            str(p.get("id") or ""): p
+            for p in self.dmx_profiles.get("profiles", [])
+            if isinstance(p, dict) and p.get("id")
+        }
+
+        # v28.9.0: Keep the selected profile's hardware fields separate from
+        # the mixed runtime summary.  The DMX service may drive 8+ visualizer
+        # fixtures, but the Setup fields should continue to show/save the
+        # selected profile's own start address, fixture count, and channel count.
+        profile_runtime = self._profile_runtime_config(profile)
+        service_runtime = dict(profile_runtime)
+        fixture_defs = self._dmx_fixture_defs_from_layout(profiles_by_id)
+        if fixture_defs:
+            service_runtime["dmx_universe"] = _safe_int(fixture_defs[0].get("universe", profile_runtime["dmx_universe"]), profile_runtime["dmx_universe"])
+            service_runtime["dmx_num_fixtures"] = len(fixture_defs)
+            service_runtime["dmx_start_address"] = min(_safe_int(f.get("start_address", profile_runtime["dmx_start_address"]), profile_runtime["dmx_start_address"]) for f in fixture_defs)
+            service_runtime["dmx_channels_per_fixture"] = max(_safe_int(f.get("channels", profile_runtime["dmx_channels_per_fixture"]), profile_runtime["dmx_channels_per_fixture"]) for f in fixture_defs)
+            self.log(f"DMX: Mixed fixture map loaded ({len(fixture_defs)} fixtures).")
+        else:
+            self.dmx_universe_num.set(profile_runtime["dmx_universe"])
+            self.dmx_num_fixtures.set(profile_runtime["dmx_num_fixtures"])
+            self.dmx_channels_per_fixture_var.set(profile_runtime["dmx_channels_per_fixture"])
+            self.dmx_start_address.set(profile_runtime["dmx_start_address"])
+
         return DMXService(
             falcon_service=self.falcon,
-            dmx_universe=runtime["dmx_universe"],
-            profile=profile["channel_map"],
-            num_fixtures=runtime["dmx_num_fixtures"],
-            start_address=runtime["dmx_start_address"],
-            channels_per_fixture=runtime["dmx_channels_per_fixture"],
+            dmx_universe=service_runtime["dmx_universe"],
+            profile=profile.get("channel_map", {}),
+            num_fixtures=service_runtime["dmx_num_fixtures"],
+            start_address=service_runtime["dmx_start_address"],
+            channels_per_fixture=service_runtime["dmx_channels_per_fixture"],
+            fixture_defs=fixture_defs,
+            profiles_by_id=profiles_by_id,
         )
 
     def on_dmx_brightness_changed(self, value):
@@ -2771,11 +3393,11 @@ class PixelChallengeConsole:
         pat = data.get("pattern", "static")
         if pat == "composite":
             layers = data.get("layers", [])
-            speeds = [int(layer.get("speed", default_interval) or default_interval) for layer in layers if self.dmx._is_switch_pattern(str(layer.get("pattern", "")))]
+            speeds = [int(layer.get("speed", default_interval) or default_interval) for layer in layers if self.dmx._is_channel_step_pattern(str(layer.get("pattern", "")))]
             if speeds:
                 return max(50, min(3000, min(speeds)))
             return default_interval
-        if self.dmx._is_switch_pattern(str(pat)):
+        if self.dmx._is_channel_step_pattern(str(pat)):
             return max(50, min(3000, int(data.get("speed", default_interval) or default_interval)))
         return default_interval
 
@@ -2787,9 +3409,9 @@ class PixelChallengeConsole:
         self.dmx.animate_scene_step(self._scene_anim_step)
         self._scene_anim_step += 1
         self.refresh_dmx_fixture_cards()
-        # Speed slider (0-100) maps to interval: 100=fast(50ms) 0=slow(500ms)
-        speed = self.dmx_speed.get()
-        interval = max(50, 500 - speed * 4)
+        # Use the active scene timing so switch cycle controls can override
+        # the generic DMX speed slider for switch-pattern animations.
+        interval = self._scene_animation_interval_ms()
         # If crossfade is active, run sub-ticks until fade completes, then schedule next step
         if self.dmx._fade_duration_ms > 0:
             self._run_fade_subtick(interval)
@@ -4261,7 +4883,12 @@ class PixelChallengeConsole:
         
         # Start game in SETUP phase (game handles color selection)
         # Pass the selected mode to the game
-        game_settings = {"mode": self.game_mode.get()}
+        game_settings = {
+            "mode": self.game_mode.get(),
+            "lane_pixel_count": self.get_pixels_per_lane(),
+            "lane_length": self.get_pixels_per_lane(),
+            "field_length_px": self.get_pixels_per_lane(),
+        }
 
         # Load game config.json and pass as config_override so game module uses edited values
         config_path = self.config_path_for_current_game()
@@ -4270,6 +4897,13 @@ class PixelChallengeConsole:
                 with open(config_path, "r", encoding="utf-8") as f:
                     config_data = json.load(f)
                 game_settings["config_override"] = config_data
+                # v28.10.0: the setup screen's Pixels Per Lane value should
+                # override per-game defaults such as Dot Dash lane_pixel_count.
+                # Keep the config file useful for game tuning, but let hardware
+                # length live in one place.
+                game_settings["config_override"]["lane_pixel_count"] = self.get_pixels_per_lane()
+                game_settings["config_override"]["lane_length"] = self.get_pixels_per_lane()
+                game_settings["config_override"]["field_length_px"] = self.get_pixels_per_lane()
                 self.log(f"Loaded game config: {config_path}")
             except Exception as e:
                 self.log(f"Failed to load game config: {e}")
@@ -5670,18 +6304,31 @@ class PixelChallengeConsole:
         falcon_inner.pack(fill="x", padx=10, pady=8)
         
         tk.Label(falcon_inner, text="Falcon IP", bg="#1a1a2e", fg="white", 
-                 font=("Arial", 10)).grid(row=0, column=0, sticky="w", padx=(0, 10))
+                 font=("Arial", 10)).grid(row=0, column=0, sticky="w", padx=(0, 10), pady=2)
         
-        self.falcon_ip_entry = tk.Entry(falcon_inner, font=("Arial", 11), width=40, bg="#3a3a5c", fg="white", insertbackground="white")
+        self.falcon_ip_entry = tk.Entry(falcon_inner, font=("Arial", 11), width=24, bg="#3a3a5c", fg="white", insertbackground="white")
         self.falcon_ip_entry.insert(0, self.falcon_ip)
-        self.falcon_ip_entry.grid(row=0, column=1, sticky="w", padx=(0, 20))
+        self.falcon_ip_entry.grid(row=0, column=1, sticky="w", padx=(0, 10), pady=2)
         
+        tk.Button(falcon_inner, text="FIND FALCON", command=self.find_falcon_from_setup,
+                  bg="#1b63ff", fg="white", font=("Arial", 10, "bold"), 
+                  width=14, cursor="hand2").grid(row=0, column=2, sticky="w", padx=(0, 8), pady=2)
         tk.Button(falcon_inner, text="TEST FALCON", command=lambda: self.test_falcon(self.falcon_ip_entry.get()),
-                  bg="#2ea62e", fg="white", font=("Arial", 11, "bold"), 
-                  width=14, cursor="hand2").grid(row=0, column=2, sticky="e")
+                  bg="#2ea62e", fg="white", font=("Arial", 10, "bold"), 
+                  width=14, cursor="hand2").grid(row=0, column=3, sticky="e", pady=2)
+
+        tk.Label(falcon_inner, text="Pixels / Lane", bg="#1a1a2e", fg="white",
+                 font=("Arial", 10)).grid(row=1, column=0, sticky="w", padx=(0, 10), pady=2)
+        self.pixels_per_lane_entry = tk.Entry(falcon_inner, textvariable=self.pixels_per_lane_var,
+                                              font=("Arial", 11), width=8,
+                                              bg="#3a3a5c", fg="white", insertbackground="white")
+        self.pixels_per_lane_entry.grid(row=1, column=1, sticky="w", pady=2)
+        tk.Label(falcon_inner, text="1-170 per lane/universe; Dot Dash uses this on next game start",
+                 bg="#1a1a2e", fg="#888888", font=("Arial", 9, "italic")
+                 ).grid(row=1, column=2, columnspan=2, sticky="w", pady=2)
         
-        tk.Label(falcon_inner, text="(applies immediately on Save/Apply)", bg="#1a1a2e", fg="#888888", 
-                 font=("Arial", 9, "italic")).grid(row=1, column=0, columnspan=2, sticky="w", pady=(2, 0))
+        tk.Label(falcon_inner, text="(IP and pixel count apply on SAVE)", bg="#1a1a2e", fg="#888888", 
+                 font=("Arial", 9, "italic")).grid(row=2, column=0, columnspan=4, sticky="w", pady=(2, 0))
 
         # === DMX Hardware Configuration ===
         dmx_hw_frame = tk.LabelFrame(self.setup_window, text="DMX Hardware Configuration",
@@ -5820,6 +6467,16 @@ class PixelChallengeConsole:
             display_str = profile_listbox.get(sel[0])
             pid = _profile_display_to_id(display_str)
             return next((p for p in self.dmx_profiles.get("profiles", []) if p.get("id") == pid), None)
+
+        def _on_profile_list_selected(event=None):
+            profile = _selected_profile_from_list()
+            if not profile:
+                return
+            self.dmx_profile_id.set(profile.get("id", ""))
+            selected_display.set(f"{profile.get('manufacturer','')} - {profile.get('model','')}")
+            self._sync_profile_runtime_to_vars(profile)
+
+        profile_listbox.bind("<<ListboxSelect>>", _on_profile_list_selected)
 
         def _add_profile():
             self._open_add_profile_dialog(profile_listbox, profile_combo, profile_display, profile_ids, selected_display)
@@ -6102,9 +6759,10 @@ class PixelChallengeConsole:
         self.setup_window = None
 
     def save_setup(self):
-        # Update falcon IP from entry
+        # Update Falcon hardware settings from setup entries
         if hasattr(self, 'falcon_ip_entry'):
             self.falcon_ip = self.falcon_ip_entry.get().strip() or DEFAULT_FALCON_IP
+        self.pixels_per_lane = self.get_pixels_per_lane()
         
         # Save geometry
         if self.setup_window:
@@ -6121,7 +6779,7 @@ class PixelChallengeConsole:
             self.falcon.stop()
         except Exception:
             pass
-        self.falcon = FalconService(self.falcon_ip, PIXELS_PER_LANE,
+        self.falcon = FalconService(self.falcon_ip, self.get_pixels_per_lane(),
                                     dmx_universe=self.dmx_universe_num.get())
         self.attract.falcon = self.falcon
         # Re-create DMX service with updated settings
@@ -6138,8 +6796,8 @@ class PixelChallengeConsole:
                 pass
         self.apply_brightness_for_state()
         
-        self.log(f"Setup saved. Falcon IP: {self.falcon_ip}")
-        messagebox.showinfo("Setup", "Settings saved successfully.")
+        self.log(f"Setup saved. Falcon IP: {self.falcon_ip}; Pixels/Lane: {self.get_pixels_per_lane()}")
+        messagebox.showinfo("Setup", f"Settings saved successfully.\nFalcon IP: {self.falcon_ip}\nPixels per lane: {self.get_pixels_per_lane()}")
         self.close_setup_window()
 
     def _open_add_profile_dialog(self, profile_listbox, profile_combo,
@@ -6150,7 +6808,7 @@ class PixelChallengeConsole:
         is_edit = source_profile is not None and not copy_mode
         dialog_title = "Edit Fixture Profile" if is_edit else ("Copy Fixture Profile" if copy_mode else "Add Fixture Profile")
         dlg.title(dialog_title)
-        dlg.geometry("540x620")
+        dlg.geometry("600x700")
         dlg.transient(self.setup_window)
         dlg.grab_set()
 
@@ -6168,14 +6826,21 @@ class PixelChallengeConsole:
             "program_speed": "Speed", "pan": "Pan", "tilt": "Tilt",
         }
         source_profile = source_profile or {}
+        runtime_cfg = dict(source_profile.get("runtime_config") or {})
         manufacturer_var = tk.StringVar(value=str(source_profile.get("manufacturer", "")))
         model_var = tk.StringVar(value=str(source_profile.get("model", "")))
-        channels_var = tk.StringVar(value=str(_safe_int(source_profile.get("channels", 8), 8)))
+        channels_var = tk.StringVar(value=str(_safe_int(source_profile.get("channels", runtime_cfg.get("dmx_channels_per_fixture", self.dmx_channels_per_fixture_var.get())), self.dmx_channels_per_fixture_var.get())))
+        universe_var = tk.StringVar(value=str(_safe_int(runtime_cfg.get("dmx_universe", self.dmx_universe_num.get()), self.dmx_universe_num.get())))
+        num_fixtures_var = tk.StringVar(value=str(_safe_int(runtime_cfg.get("dmx_num_fixtures", self.dmx_num_fixtures.get()), self.dmx_num_fixtures.get())))
+        start_address_var = tk.StringVar(value=str(_safe_int(runtime_cfg.get("dmx_start_address", self.dmx_start_address.get()), self.dmx_start_address.get())))
 
         for row, (lbl, var, width) in enumerate([
-            ("Manufacturer", manufacturer_var, 24),
-            ("Model",        model_var,         24),
-            ("Channels",     channels_var,       6),
+            ("Manufacturer",       manufacturer_var, 24),
+            ("Model",              model_var,        24),
+            ("DMX Universe",       universe_var,      6),
+            ("Number of Fixtures", num_fixtures_var,  6),
+            ("Start Address",      start_address_var, 6),
+            ("Channels",           channels_var,      6),
         ]):
             tk.Label(form, text=lbl, bg="#1a1a2e", fg="white",
                      font=("Arial", 10)).grid(row=row, column=0, sticky="e", padx=(0, 8), pady=3)
@@ -6224,7 +6889,8 @@ class PixelChallengeConsole:
                 if source_profile.get("channel_map"):
                     assigned = "Not Used"
                     for key, mapped_ch in source_profile.get("channel_map", {}).items():
-                        if _safe_int(mapped_ch, 0) == ch_idx:
+                        mapped_channels = mapped_ch if isinstance(mapped_ch, list) else [mapped_ch]
+                        if any(_safe_int(one_ch, 0) == ch_idx for one_ch in mapped_channels):
                             assigned = key_to_func.get(str(key), "Not Used")
                             break
                     v.set(assigned)
@@ -6293,7 +6959,18 @@ class PixelChallengeConsole:
                 func = v.get()
                 key = func_to_key.get(func)
                 if key:
-                    channel_map[key] = ch_idx
+                    # v28.9.0: if the same function is assigned to multiple
+                    # channels, preserve all channels instead of overwriting the
+                    # previous one.  This is useful for 4-channel dimmer/switch
+                    # packs where CH1-CH4 may all be "Switch".
+                    if key in channel_map:
+                        existing = channel_map[key]
+                        if isinstance(existing, list):
+                            existing.append(ch_idx)
+                        else:
+                            channel_map[key] = [existing, ch_idx]
+                    else:
+                        channel_map[key] = ch_idx
 
             profile_payload = {
                 "manufacturer": mfr,
@@ -6301,10 +6978,10 @@ class PixelChallengeConsole:
                 "channels": channels,
                 "channel_map": channel_map,
                 "runtime_config": {
-                    "dmx_universe": max(1, _safe_int(self.dmx_universe_num.get(), 9)),
-                    "dmx_num_fixtures": max(1, _safe_int(self.dmx_num_fixtures.get(), 1)),
+                    "dmx_universe": max(1, _safe_int(universe_var.get(), 9)),
+                    "dmx_num_fixtures": max(1, _safe_int(num_fixtures_var.get(), 1)),
                     "dmx_channels_per_fixture": channels,
-                    "dmx_start_address": max(1, _safe_int(self.dmx_start_address.get(), 1)),
+                    "dmx_start_address": max(1, _safe_int(start_address_var.get(), 1)),
                 },
                 "strobe_range": {"off_max": strobe_off_var.get(),
                                   "min": strobe_min_var.get(),
@@ -6352,7 +7029,12 @@ class PixelChallengeConsole:
             selected_display.set(f"{saved_profile.get('manufacturer','')} - {saved_profile.get('model','')}")
             self.dmx_profile_id.set(pid)
             self._sync_profile_runtime_to_vars(saved_profile)
-            self.log(f"DMX profile {action}: {pid}")
+            rt = saved_profile.get("runtime_config", {})
+            self.log(
+                f"DMX profile {action}: {pid} "
+                f"U{rt.get('dmx_universe')} start {rt.get('dmx_start_address')} "
+                f"fixtures {rt.get('dmx_num_fixtures')} ch {rt.get('dmx_channels_per_fixture')}"
+            )
             dlg.grab_release()
             dlg.destroy()
 
@@ -6377,6 +7059,183 @@ class PixelChallengeConsole:
                 self.log(f"Reboot failed: {e}")
                 messagebox.showerror("Reboot", f"Failed to reboot: {e}")
 
+
+    def _local_ipv4_networks(self) -> list:
+        """Return small local IPv4 networks to scan for the Falcon controller."""
+        networks = []
+        try:
+            result = subprocess.run(
+                ["ip", "-o", "-4", "addr", "show", "scope", "global"],
+                capture_output=True, text=True, timeout=2
+            )
+            for line in result.stdout.splitlines():
+                parts = line.split()
+                if "inet" not in parts:
+                    continue
+                addr = parts[parts.index("inet") + 1]
+                try:
+                    iface = ipaddress.ip_interface(addr)
+                    net = iface.network
+                    # Keep discovery quick. If the Pi is on a big network, scan
+                    # only the /24 that contains the Pi instead of a giant range.
+                    if net.prefixlen < 24:
+                        net = ipaddress.ip_network(f"{iface.ip}/24", strict=False)
+                    networks.append(net)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # If the current saved Falcon IP is on a private /24, include that too.
+        try:
+            ip = ipaddress.ip_address((self.falcon_ip or "").strip())
+            if ip.version == 4 and ip.is_private:
+                networks.append(ipaddress.ip_network(f"{ip}/24", strict=False))
+        except Exception:
+            pass
+
+        unique = []
+        seen = set()
+        for net in networks:
+            key = str(net)
+            if key not in seen:
+                seen.add(key)
+                unique.append(net)
+        return unique[:4]
+
+    def _ping_quick(self, ip: str) -> bool:
+        try:
+            result = subprocess.run(
+                ["ping", "-c", "1", "-W", "1", ip],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=1.5
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    def _http_probe_falcon(self, ip: str) -> tuple[bool, str]:
+        """Return (looks_like_falcon, summary) for a candidate IP."""
+        try:
+            req = Request(f"http://{ip}/", headers={"User-Agent": "PixelChallengeConsole/28.10"})
+            with urlopen(req, timeout=0.75) as resp:
+                body = resp.read(4096).decode("utf-8", errors="ignore")
+                text = body.lower()
+                keywords = ("falcon", "f16", "f48", "f4v", "pixel controller", "e1.31", "sacn")
+                looks_like = any(k in text for k in keywords)
+                title = ""
+                m = re.search(r"<title[^>]*>(.*?)</title>", body, re.I | re.S)
+                if m:
+                    title = re.sub(r"\s+", " ", m.group(1)).strip()
+                return looks_like, title or "web server"
+        except Exception:
+            return False, ""
+
+    def _discover_falcon_ips(self) -> list[tuple[str, str]]:
+        """Scan nearby private subnets for a Falcon-looking web interface."""
+        networks = self._local_ipv4_networks()
+        candidates = []
+        for net in networks:
+            for ip in net.hosts():
+                candidates.append(str(ip))
+        # Try the saved/current entry first even if it is not in the interface list.
+        try:
+            current = self.falcon_ip_entry.get().strip() if hasattr(self, "falcon_ip_entry") else self.falcon_ip
+            if current and current not in candidates:
+                candidates.insert(0, current)
+        except Exception:
+            pass
+
+        if not candidates:
+            return []
+
+        responsive = []
+        max_workers = min(64, max(8, len(candidates)))
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            future_map = {pool.submit(self._ping_quick, ip): ip for ip in candidates}
+            for fut in as_completed(future_map):
+                ip = future_map[fut]
+                try:
+                    if fut.result():
+                        responsive.append(ip)
+                except Exception:
+                    pass
+
+        found = []
+        fallback_web = []
+        with ThreadPoolExecutor(max_workers=24) as pool:
+            future_map = {pool.submit(self._http_probe_falcon, ip): ip for ip in responsive}
+            for fut in as_completed(future_map):
+                ip = future_map[fut]
+                try:
+                    ok, summary = fut.result()
+                    if ok:
+                        found.append((ip, summary or "Falcon-like device"))
+                    elif summary:
+                        fallback_web.append((ip, summary))
+                except Exception:
+                    pass
+
+        # Prefer Falcon-looking pages. If no keyword match, return web devices as
+        # a manual fallback so the operator can still pick/check an IP.
+        found.sort(key=lambda item: tuple(int(part) for part in item[0].split(".")))
+        fallback_web.sort(key=lambda item: tuple(int(part) for part in item[0].split(".")))
+        return found or fallback_web[:8]
+
+    def _apply_falcon_discovery_result(self, results: list[tuple[str, str]]):
+        if not results:
+            self.log("Find Falcon: no Falcon-like web device found on local subnet(s).")
+            messagebox.showwarning(
+                "Find Falcon",
+                "No Falcon-like web interface was found.\n\nMake sure the Falcon is powered, connected to the same network, and DHCP has finished."
+            )
+            return
+        ip, summary = results[0]
+        try:
+            if hasattr(self, "falcon_ip_entry"):
+                self.falcon_ip_entry.delete(0, "end")
+                self.falcon_ip_entry.insert(0, ip)
+        except Exception:
+            pass
+        if len(results) == 1:
+            self.log(f"Find Falcon: found {ip} ({summary})")
+            messagebox.showinfo("Find Falcon", f"Found Falcon candidate:\n{ip}\n\n{summary}\n\nClick SAVE to use it.")
+        else:
+            listing = "\n".join([f"{addr}  -  {desc}" for addr, desc in results[:8]])
+            self.log(f"Find Falcon: found {len(results)} candidates; selected {ip}")
+            messagebox.showinfo(
+                "Find Falcon",
+                f"Found {len(results)} web candidates.\nSelected the first one:\n{ip}\n\nAll candidates:\n{listing}\n\nClick SAVE to use the selected IP, or edit the IP manually."
+            )
+
+    def find_falcon_from_setup(self):
+        """Run Falcon discovery without freezing the setup window."""
+        self.log("Find Falcon: scanning local subnet(s)...")
+        try:
+            if hasattr(self, "falcon_ip_entry"):
+                self.falcon_ip_entry.configure(bg="#5a4a1f")
+        except Exception:
+            pass
+
+        def worker():
+            try:
+                results = self._discover_falcon_ips()
+            except Exception as e:
+                results = []
+                self.log(f"Find Falcon error: {e}")
+            try:
+                self.root.after(0, lambda: self._finish_find_falcon(results))
+            except Exception:
+                pass
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _finish_find_falcon(self, results: list[tuple[str, str]]):
+        try:
+            if hasattr(self, "falcon_ip_entry"):
+                self.falcon_ip_entry.configure(bg="#3a3a5c")
+        except Exception:
+            pass
+        self._apply_falcon_discovery_result(results)
 
     def test_falcon(self, ip_addr: str):
         ip = ip_addr.strip() or self.falcon_ip

@@ -64,7 +64,16 @@ class SurroundSession(GameSession):
         self.mode = self.game_info.get("mode", 1)
         
         # Lane configuration
-        self.lane_length = 100
+        # v28.10.0: use the console System Setup pixel count instead of
+        # assuming every lane is physically 100 pixels long.
+        settings = settings or {}
+        self.lane_length = max(1, min(170, int(
+            settings.get("lane_length",
+                settings.get("lane_pixel_count",
+                    settings.get("field_length_px", self.config.get("field_length_px", 100))
+                )
+            )
+        )))
         self.lanes = ["left", "right"]
         
         # Player movement speed (pixels per input)

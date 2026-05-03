@@ -191,7 +191,11 @@ class PixelPopSession(GameSession):
             self.config = merge_config(self.config, settings)
         
         # Lane setup
-        self.lane_length = 100  # pixels per lane
+        # v28.10.0 console passes lane_length from System Setup so test rigs
+        # with 50-pixel lanes and show rigs with 100-pixel lanes use the same code.
+        self.lane_length = max(1, min(170, int(
+            self.config.get("lane_length", self.config.get("lane_pixel_count", 100))
+        )))  # pixels per lane
         
         # Timing
         self.game_start_time: float | None = None

@@ -137,8 +137,13 @@
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
-          "effect": null,
-          "apply_to": "No Fixtures"
+          "layers": [
+            {
+              "effect": null,
+              "apply_to": "No Fixtures"
+            }
+          ],
+          "active_target": "ThinTri Heads"
         },
         "Bonus": {
           "effect": null,
@@ -169,8 +174,13 @@
           "apply_to": "No Fixtures"
         },
         "Overlay 4": {
-          "effect": null,
-          "apply_to": "No Fixtures"
+          "layers": [
+            {
+              "effect": null,
+              "apply_to": "No Fixtures"
+            }
+          ],
+          "active_target": "No Fixtures"
         }
       }
     },
@@ -183,94 +193,54 @@
           "layers": [
             {
               "effect": null,
-              "apply_to": "All Fixtures"
+              "apply_to": "No Fixtures"
             },
             {
-              "effect": "Cool Blue Static (Copy)",
-              "apply_to": "f1-4"
+              "effect": "Dimmer Up/Down",
+              "apply_to": "DMX Dimmers"
             },
             {
-              "effect": "Switch Ping Pong",
-              "apply_to": "F1 F4"
+              "effect": "Dimmer Off",
+              "apply_to": "DMX Switches"
+            },
+            {
+              "effect": "Rainbow Wave (Copy)",
+              "apply_to": "ThinTri Heads"
             }
           ],
-          "active_target": "F1 F4"
+          "active_target": "ThinTri Heads"
         },
         "Bonus": {
-          "layers": [
-            {
-              "effect": null,
-              "apply_to": "All Fixtures"
-            }
-          ],
-          "active_target": "No Fixtures"
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Danger": {
-          "layers": [
-            {
-              "effect": "Red Alert",
-              "apply_to": "All Fixtures"
-            }
-          ],
-          "active_target": "F1 F4"
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Special": {
-          "layers": [
-            {
-              "effect": null,
-              "apply_to": "All Fixtures"
-            }
-          ],
-          "active_target": "No Fixtures"
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Randomizer": {
-          "layers": [
-            {
-              "effect": null,
-              "apply_to": "All Fixtures"
-            }
-          ],
-          "active_target": "No Fixtures"
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Overlay 1": {
-          "layers": [
-            {
-              "effect": null,
-              "apply_to": "All Fixtures"
-            }
-          ],
-          "active_target": "All Fixtures"
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Overlay 2": {
-          "layers": [
-            {
-              "effect": "Violet Cascade",
-              "apply_to": "All Fixtures"
-            },
-            {
-              "effect": "Sapphire Wave",
-              "apply_to": "No Fixtures"
-            }
-          ],
-          "active_target": "No Fixtures"
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Overlay 3": {
-          "layers": [
-            {
-              "effect": null,
-              "apply_to": "All Fixtures"
-            }
-          ],
-          "active_target": "All Fixtures"
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Overlay 4": {
-          "layers": [
-            {
-              "effect": "Static Dark Blue",
-              "apply_to": "All Fixtures"
-            }
-          ],
-          "active_target": "f1-4"
+          "effect": null,
+          "apply_to": "No Fixtures"
         }
       }
     },
@@ -281,39 +251,39 @@
       "assignments": {
         "Gameplay": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Bonus": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Danger": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Special": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Randomizer": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 1": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 2": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 3": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 4": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         }
       }
     },
@@ -324,39 +294,39 @@
       "assignments": {
         "Gameplay": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Bonus": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Danger": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Special": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Randomizer": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 1": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 2": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 3": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 4": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         }
       }
     },
@@ -367,39 +337,39 @@
       "assignments": {
         "Gameplay": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Bonus": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Danger": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Special": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Randomizer": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 1": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 2": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 3": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 4": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         }
       }
     },
@@ -410,39 +380,39 @@
       "assignments": {
         "Gameplay": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Bonus": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Danger": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Special": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Randomizer": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 1": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 2": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 3": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 4": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         }
       }
     },
@@ -582,39 +552,39 @@
       "assignments": {
         "Gameplay": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Bonus": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Danger": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Special": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Randomizer": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 1": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 2": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 3": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 4": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         }
       }
     },

@@ -27,7 +27,7 @@
       "notes": "Dimmer CH4 must be >0 for output. Color macros CH6: 0-15 no function, 16-255 overrides RGB.",
       "runtime_config": {
         "dmx_universe": 9,
-        "dmx_num_fixtures": 8,
+        "dmx_num_fixtures": 4,
         "dmx_channels_per_fixture": 8,
         "dmx_start_address": 1
       }
@@ -58,11 +58,23 @@
       "id": "dps_switch"
     },
     {
-      "manufacturer": "elasion",
-      "model": "dp-dmx4b",
+      "id": "elation_dp_dmx4b",
+      "manufacturer": "Elation",
+      "model": "DP-DMX4B",
       "channels": 4,
       "channel_map": {
-        "dimmer": 1
+        "switch": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "dimmer": [
+          1,
+          2,
+          3,
+          4
+        ]
       },
       "runtime_config": {
         "dmx_universe": 9,
@@ -79,8 +91,33 @@
         "off": 0,
         "full": 255
       },
-      "notes": "",
-      "id": "elasion_dp-dmx4b"
+      "notes": "4-channel dimmer/switch pack at address 37. This one profile drives all four pack outputs together. For independent output control, add four one-channel fixtures at addresses 37, 38, 39, and 40 instead."
+    },
+    {
+      "id": "elation_dp_dmx4b_port",
+      "manufacturer": "Elation",
+      "model": "DP-DMX4B Port",
+      "channels": 1,
+      "channel_map": {
+        "dimmer": 1,
+        "switch": 1
+      },
+      "runtime_config": {
+        "dmx_universe": 9,
+        "dmx_num_fixtures": 4,
+        "dmx_channels_per_fixture": 1,
+        "dmx_start_address": 37
+      },
+      "strobe_range": {
+        "off_max": 15,
+        "min": 16,
+        "max": 255
+      },
+      "dimmer_range": {
+        "off": 0,
+        "full": 255
+      },
+      "notes": "Use this profile for each independent output port on an Elation DP-DMX4B: F9=37, F10=38, F11=39, F12=40. Use the 4-channel pack profile only when one fixture should represent the whole pack."
     }
   ]
 }

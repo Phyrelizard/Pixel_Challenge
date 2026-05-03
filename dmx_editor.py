@@ -5,10 +5,11 @@ from __future__ import annotations
 import json
 import os
 import math
+import time
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 
-VISUALIZER_VERSION = "v1.8.1"
+VISUALIZER_VERSION = "v1.8.2"
 ALL_FIXTURES_TARGET = "All Fixtures"
 NO_FIXTURES_TARGET = "No Fixtures"
 NO_EFFECT_LABEL = "— No Effect —"
@@ -26,6 +27,12 @@ CYCLE_STEP_MS = 100
 CYCLE_MIN_MS = 100
 CYCLE_MAX_MS = 3000
 CYCLE_DEFAULT_MS = 500
+RGB_CYCLE_PATTERN_TYPES = {
+    "chase", "sweep", "bounce", "alternating", "palette_cycle",
+    "wave", "wave_center", "wave_lr", "wave_player", "pulse",
+    "random_flash", "fade", "fade_loop", "sparkle",
+    "build_up", "explosion",
+}
 
 # Category ordering for the effect list
 _CATEGORY_ORDER = [
@@ -208,6 +215,11 @@ def _generated_dimmer_effects() -> list[dict]:
         {"name": "Dimmer 75%", "palette": ["#bfbfbf"], "pattern_type": "static", "category": "dimmer", "speed": 0, "fade_time": 0.0, "brightness": 0.75, "dimmer_level": 191},
         {"name": "Dimmer 100%", "palette": ["#ffffff"], "pattern_type": "static", "category": "dimmer", "speed": 0, "fade_time": 0.0, "brightness": 1.0, "dimmer_level": 255},
         {"name": "Dimmer Up/Down", "palette": ["#ffffff"], "pattern_type": "breathing", "category": "dimmer", "speed": 60, "fade_time": 0.0, "brightness": 1.0, "dimmer_level": 255},
+        {"name": "Dimmer Cycle", "palette": ["#ffffff"], "pattern_type": "dimmer_cycle", "category": "dimmer", "speed": CYCLE_DEFAULT_MS, "fade_time": 0.0, "brightness": 1.0, "dimmer_level": 255},
+        {"name": "Dimmer Sequence LR", "palette": ["#ffffff"], "pattern_type": "dimmer_chase_lr", "category": "dimmer", "speed": CYCLE_DEFAULT_MS, "fade_time": 0.0, "brightness": 1.0, "dimmer_level": 255},
+        {"name": "Dimmer Sequence RL", "palette": ["#ffffff"], "pattern_type": "dimmer_chase_rl", "category": "dimmer", "speed": CYCLE_DEFAULT_MS, "fade_time": 0.0, "brightness": 1.0, "dimmer_level": 255},
+        {"name": "Dimmer Ping Pong", "palette": ["#ffffff"], "pattern_type": "dimmer_ping_pong", "category": "dimmer", "speed": CYCLE_DEFAULT_MS, "fade_time": 0.0, "brightness": 1.0, "dimmer_level": 255},
+        {"name": "Dimmer Random", "palette": ["#ffffff"], "pattern_type": "dimmer_random", "category": "dimmer", "speed": CYCLE_DEFAULT_MS, "fade_time": 0.0, "brightness": 1.0, "dimmer_level": 255},
     ]
 
 
@@ -1212,13 +1224,33 @@ class DMXLightingEditor:
         effect = self.effects_by_name.get(effect_name) if effect_name else None
         if not effect:
             return False
-        return bool(effect.get("category") == "switch" and effect.get("pattern_type") not in {"static"})
+        category = effect.get("category")
+        pattern_type = str(effect.get("pattern_type", "static") or "static")
+        if category in {"switch", "dimmer"}:
+            return pattern_type not in {"static", "breathing"}
+        # v28.10.3: RGB/ThinTri animated effects also need the cycle control.
+        # v28.10.2 gave layered scenes independent clocks, but RGB chase
+        # effects were still stuck at their legacy speed numbers (for example
+        # 63 or 70), which made them advance every 63/70 ms with no UI control.
+        return pattern_type in RGB_CYCLE_PATTERN_TYPES
 
     def _default_cycle_speed(self, effect_name: str | None = None) -> int:
         if not effect_name:
             effect_name = self._selected_effect_name()
         effect = self.effects_by_name.get(effect_name) if effect_name else None
-        speed = effect.get("speed", CYCLE_DEFAULT_MS) if effect else CYCLE_DEFAULT_MS
+        if not effect:
+            return CYCLE_DEFAULT_MS
+        category = effect.get("category")
+        pattern_type = str(effect.get("pattern_type", "static") or "static")
+        if category in {"switch", "dimmer"}:
+            speed = effect.get("speed", CYCLE_DEFAULT_MS)
+        elif pattern_type in RGB_CYCLE_PATTERN_TYPES:
+            # Legacy RGB effect speeds are 0-100-ish visualizer values, not
+            # milliseconds. Use a sane default and let the assignment store the
+            # actual per-target/per-effect ms value after the user changes it.
+            speed = CYCLE_DEFAULT_MS
+        else:
+            speed = effect.get("speed", CYCLE_DEFAULT_MS)
         return max(CYCLE_MIN_MS, min(CYCLE_MAX_MS, int(speed)))
 
     def _set_cycle_controls_enabled(self, enabled: bool):
@@ -1878,11 +1910,33 @@ class DMXLightingEditor:
             return "#101010"
 
         if effect.get("category") == "dimmer":
+            if pattern == "dimmer_cycle":
+                level = 255 if int(phase) % 2 == 0 else 0
+                return f"#{level:02x}{level:02x}{level:02x}"
+            if pattern == "dimmer_chase_lr":
+                active = int(phase) % max(total_fixtures, 1)
+                level = 255 if fixture_index == active else 0
+                return f"#{level:02x}{level:02x}{level:02x}"
+            if pattern == "dimmer_chase_rl":
+                active = (total_fixtures - 1 - (int(phase) % max(total_fixtures, 1))) if total_fixtures > 0 else 0
+                level = 255 if fixture_index == active else 0
+                return f"#{level:02x}{level:02x}{level:02x}"
+            if pattern == "dimmer_ping_pong":
+                cycle = total_fixtures * 2 - 2 if total_fixtures > 1 else 1
+                pos = int(phase) % max(cycle, 1)
+                if total_fixtures > 1 and pos >= total_fixtures:
+                    pos = cycle - pos
+                level = 255 if fixture_index == pos else 0
+                return f"#{level:02x}{level:02x}{level:02x}"
+            if pattern == "dimmer_random":
+                seed = ((int(phase) + 1) * 7919 + fixture_index * 104729) % 100
+                level = 255 if seed >= 50 else 0
+                return f"#{level:02x}{level:02x}{level:02x}"
             if effect_name == "Dimmer Off":
                 return "#101010"
             if effect_name == "Dimmer Up/Down":
                 wave = 0.25 + 0.75 * (0.5 + 0.5 * math.sin(phase * 0.18))
-                level = clamp = max(0, min(255, int(255 * wave)))
+                level = max(0, min(255, int(255 * wave)))
                 return f"#{level:02x}{level:02x}{level:02x}"
             level = max(0, min(255, int(effect.get("dimmer_level", 255))))
             return f"#{level:02x}{level:02x}{level:02x}"
@@ -2145,7 +2199,7 @@ class DMXLightingEditor:
                 return
             palette = effect.get("palette") or ["#000000"]
             pat_type = effect.get("pattern_type", "static")
-            speed = effect.get("speed", 50)
+            speed = self._default_cycle_speed(effect_name) if self._effect_uses_cycle_controls(effect_name) else effect.get("speed", 50)
             num = getattr(self.dmx, "num_fixtures", 8)
             fixtures = []
             shared_hex = palette[0] if pat_type == "strobe" else None
@@ -2336,7 +2390,18 @@ class DMXLightingEditor:
                 scene.setdefault("pattern", {})["speed"] = self._cycle_speed
                 data = getattr(self.dmx, "_active_scene_data", None)
                 if data:
-                    data["speed"] = self._cycle_speed
+                    if data.get("pattern") == "composite":
+                        current_target = self._current_target_name()
+                        for active_layer in data.get("layers", []):
+                            if (active_layer.get("effect_name") == effect_name
+                                    and str(active_layer.get("target_name") or "") == str(current_target)):
+                                active_layer["speed"] = self._cycle_speed
+                                clocks = data.setdefault("layer_clocks", {})
+                                layer_id = active_layer.get("layer_id")
+                                if layer_id:
+                                    clocks[layer_id] = time.monotonic()
+                    else:
+                        data["speed"] = self._cycle_speed
         if not self._preview_current_layers() and self.dmx:
             self._preview_dmx_effect(effect_name)
     def _animate_preview(self):

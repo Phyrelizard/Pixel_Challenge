@@ -6,10 +6,10 @@
   "players": [
     {
       "id": 1,
-      "score": 2030,
+      "score": 1030,
       "colors": [
-        "RED",
-        "GREEN"
+        "BLUE",
+        "ORANGE"
       ],
       "finished": true,
       "timed_out": false,

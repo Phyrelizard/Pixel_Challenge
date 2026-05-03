@@ -1,5 +1,5 @@
 {
-  "auto_enabled": true,
+  "auto_enabled": false,
   "cycle_enabled": true,
   "cycle_seconds": 20,
   "per_theme_speed": {
@@ -7,7 +7,7 @@
     "Bounce Chase": 7,
     "Rainbow Pulse": 9,
     "Calm Mode": 8,
-    "Team Colors": 7,
+    "Team Colors": 6,
     "Color Wash": 10,
     "Lane Chase LR": 4,
     "Ice Burst": 8,
@@ -15,8 +15,8 @@
     "Lane Chase RL": 3
   },
   "selected_themes": [
-    "Team Colors",
     "Fire Burst",
+    "Team Colors",
     "Bounce Chase"
   ],
   "sash_left_attract_bottom": 576,
@@ -32,6 +32,7 @@
   "voice_volume": 39,
   "master_volume": 51,
   "falcon_ip": "192.168.2.26",
+  "pixels_per_lane": 50,
   "wifi_dhcp": true,
   "wifi_ssid": "skynet",
   "wifi_psk": "",
@@ -47,12 +48,12 @@
   "backup_restore": true,
   "apply_reboot": true,
   "debug_logging": false,
-  "setup_geometry": "1920x998+1920+52",
+  "setup_geometry": "1920x998+1920+46",
   "game_mode": 1,
   "window_geometry": "1920x992+1920+52",
   "dmx_universe": 9,
-  "dmx_num_fixtures": 9,
-  "dmx_channels_per_fixture": 8,
-  "dmx_start_address": 1,
-  "dmx_profile_id": "elasion_dp-dmx4b"
+  "dmx_num_fixtures": 4,
+  "dmx_channels_per_fixture": 1,
+  "dmx_start_address": 37,
+  "dmx_profile_id": "elation_dp_dmx4b_port"
 }

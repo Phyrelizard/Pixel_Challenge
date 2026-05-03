@@ -8,8 +8,8 @@
           "id": "F1",
           "type": "wash",
           "profile_id": "venue_thintri38",
-          "x": 80,
-          "y": 620,
+          "x": 53,
+          "y": 671,
           "direction": "right",
           "universe": 9,
           "start_address": 1
@@ -18,8 +18,8 @@
           "id": "F2",
           "type": "wash",
           "profile_id": "venue_thintri38",
-          "x": 80,
-          "y": 430,
+          "x": 48,
+          "y": 432,
           "direction": "right",
           "universe": 9,
           "start_address": 9
@@ -28,8 +28,8 @@
           "id": "F3",
           "type": "wash",
           "profile_id": "venue_thintri38",
-          "x": 815,
-          "y": 430,
+          "x": 888,
+          "y": 421,
           "direction": "left",
           "universe": 9,
           "start_address": 17
@@ -38,8 +38,8 @@
           "id": "F4",
           "type": "wash",
           "profile_id": "venue_thintri38",
-          "x": 815,
-          "y": 620,
+          "x": 899,
+          "y": 655,
           "direction": "left",
           "universe": 9,
           "start_address": 25
@@ -86,13 +86,47 @@
         },
         {
           "id": "F9",
-          "type": "switch",
-          "profile_id": "elasion_dp-dmx4b",
-          "x": 396,
-          "y": 290,
+          "type": "dimmer",
+          "profile_id": "elation_dp_dmx4b_port",
+          "x": 327,
+          "y": 737,
+          "direction": "up",
+          "universe": 9,
+          "start_address": 37,
+          "channels": 1
+        },
+        {
+          "id": "F10",
+          "type": "dimmer",
+          "profile_id": "elation_dp_dmx4b_port",
+          "x": 312,
+          "y": 361,
           "direction": "down",
           "universe": 9,
-          "start_address": 37
+          "start_address": 38,
+          "channels": 1
+        },
+        {
+          "id": "F11",
+          "type": "dimmer",
+          "profile_id": "elation_dp_dmx4b_port",
+          "x": 582,
+          "y": 362,
+          "direction": "down",
+          "universe": 9,
+          "start_address": 39,
+          "channels": 1
+        },
+        {
+          "id": "F12",
+          "type": "dimmer",
+          "profile_id": "elation_dp_dmx4b_port",
+          "x": 610,
+          "y": 723,
+          "direction": "up",
+          "universe": 9,
+          "start_address": 40,
+          "channels": 1
         }
       ],
       "targets": {
@@ -105,7 +139,10 @@
           "F6",
           "F7",
           "F8",
-          "F9"
+          "F9",
+          "F10",
+          "F11",
+          "F12"
         ],
         "ThinTri Heads": [
           "F1",
@@ -143,12 +180,6 @@
         "F8": [
           "F8"
         ],
-        "f1-4": [
-          "F1",
-          "F2",
-          "F3",
-          "F4"
-        ],
         "F1 F4": [
           "F1",
           "F2",
@@ -161,78 +192,29 @@
           "F7",
           "F8"
         ],
-        "switch 1": [
-          "F5"
-        ],
-        "switch 2": [
-          "F6"
-        ],
-        "switch 3": [
-          "F7"
-        ],
-        "switch 4": [
-          "F8"
-        ],
-        "f33": [
-          "F5"
-        ],
-        "f34": [
-          "F6"
-        ],
-        "f35": [
-          "F7"
-        ],
-        "f36": [
-          "F8"
-        ],
-        "F33": [
-          "F5"
-        ],
-        "F34": [
-          "F6"
-        ],
-        "F35": [
-          "F7"
-        ],
-        "F36": [
-          "F8"
-        ],
-        "odd": [
-          "F1",
-          "F3",
-          "F5",
-          "F7"
-        ],
-        "even": [
-          "F2",
-          "F4",
-          "F6",
-          "F8"
-        ],
-        "Left Wash Group": [
-          "F1",
-          "F2"
-        ],
-        "Right Wash Group": [
-          "F3",
-          "F4"
-        ],
-        "Top Fixtures": [
-          "F5",
-          "F6",
-          "F7",
-          "F8"
-        ],
-        "Top Left Pair": [
-          "F5",
-          "F6"
-        ],
-        "Top Right Pair": [
-          "F7",
-          "F8"
+        "F9-F12": [
+          "F9",
+          "F10",
+          "F11",
+          "F12"
         ],
         "F9": [
           "F9"
+        ],
+        "F10": [
+          "F10"
+        ],
+        "F11": [
+          "F11"
+        ],
+        "F12": [
+          "F12"
+        ],
+        "DMX Dimmers": [
+          "F9",
+          "F10",
+          "F11",
+          "F12"
         ]
       }
     }

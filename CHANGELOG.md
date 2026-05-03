@@ -1,4 +1,116 @@
+## v28.10.4 - Falcon verification and gameplay ThinTri chase timing
+
+- Changed TEST FALCON so ping alone no longer counts as success.
+- TEST FALCON now verifies Falcon/FPP/F16 identity using web content, local/reverse hostname, neighbor name, or Falcon-like MAC clues.
+- Reloads saved visualizer profiles when gameplay DMX cues fire so newly saved cycle speeds are used during games.
+- Prevents old generated ThinTri effect speed values like 63/70 from being treated as milliseconds during gameplay.
+- Keeps layered chase effects on independent clocks with deterministic per-layer timing IDs.
+- Updated start_console.sh to launch v28.10.4 and keep the duplicate-console guard.
+
 # Changelog
+
+## v28.10.3 - ThinTri chase cycle speed controls
+
+- Added cycle-speed controls for RGB/ThinTri animated effects such as chase, sweep, bounce, alternating, palette cycle, wave, pulse, fade loop, random flash, build up, and explosion patterns.
+- Fixed ThinTri chase effects running far too fast because legacy effect speed values like 63/70 were being interpreted as milliseconds. RGB/ThinTri animated effects now default to a sane 500 ms cycle value unless the assignment has its own saved cycle speed.
+- Preserved independent layered timing so dimmer, switch, and ThinTri effects can each run at their own speed without controlling each other.
+- Updated runtime layer descriptor handling so ThinTri/RGB cycle-speed changes are passed to the live DMX animation layer, not just the layout preview.
+
+## v28.10.2 - Find Falcon progress and independent layered chase timing
+
+- Added visible **FIND FALCON** feedback on the setup screen: the button disables, the IP field highlights, an indeterminate progress bar runs, and status text shows searching/found/no-result states.
+- Changed layered/composite DMX playback to use a steady 50 ms frame clock so ThinTri RGB chase effects are no longer paced by dimmer or switch chase timing.
+- Added per-layer composite timing clocks so dimmer, switch, and ThinTri effects can keep independent phase/timing while running at the same time.
+- Prevented cycle-speed edits for one active target from overwriting the global composite scene speed used by other active targets.
+
+## v28.10.1 - Falcon discovery router/hostname fix
+
+- Reworked **FIND FALCON** so random web devices and the main router are no longer preferred over real Falcon candidates.
+- Added hostname-based discovery for router DHCP names such as `Falcon_Player` and `Falcon_Player_F16V5_EA7F`.
+- Added reverse-DNS, ARP/neighbor, and weak MAC-prefix scoring as Falcon discovery hints.
+- Ping is no longer a hard requirement; a Falcon that does not answer ping can still be found by DNS or web probing.
+- Default gateway/router IPs are heavily de-prioritized unless they clearly identify as Falcon devices.
+- Note: Falcon IP addresses above `.170` are valid. The `.170` limit only applies to pixels per E1.31 universe, not device IP addresses.
+
+## v28.10.0 - Falcon discovery and lane pixel length setup
+
+- Added a **Pixels / Lane** field to the Falcon Controller setup section. This controls the FalconService pixel buffer length and is passed into games at start.
+- Dot Dash now uses the setup pixel count instead of staying hard-coded to 100 pixels, fixing 50-pixel test lanes disappearing after pixel 50.
+- Pixel Pop and Surround also read the same setup lane length so future test/show rig swaps do not require code edits.
+- Added **FIND FALCON** on the setup screen. It scans nearby local IPv4 subnets, probes reachable web interfaces, and fills the Falcon IP field with the best Falcon-like candidate.
+- Setup save now logs both Falcon IP and Pixels/Lane, then restarts the Falcon/sACN service with the new values.
+
+## v28.9.6 - Dimmer per-port profile fix
+
+- Added an **Elation DP-DMX4B Port** one-channel fixture profile for independent dimmer outputs at addresses 37-40.
+- Updated F9-F12 in the visualizer layout to use the new one-channel port profile instead of the full 4-channel pack profile.
+- Added a runtime safety guard: if a multi-channel dimmer-pack profile is accidentally assigned to consecutive individual fixtures, the runtime treats each fixture as one output port so chase effects remain independent.
+- Fixed the F9 profile typo from the uploaded layout and kept the F9-F12 target group as a flat fixture list for independent chase, ping-pong, and random effects.
+- Added a **DMX Dimmers** target alias for F9-F12.
+
+## v28.9.5 - Dimmer chase channel independence regression fix
+
+- Fixed a regression where dimmer chase effects could treat F9-F12 as one grouped slot, causing all four dimmer channels to turn on together.
+- Treats a single bracketed target like `[F9,F10,F11,F12]` as a flat target so each dimmer channel becomes its own chase step.
+- Preserves per-channel dimmer/switch values during fade-enabled chase animation so `[255,0,0,0]` does not collapse into one shared fixture-level dimmer value.
+- Keeps the v28.9.4 ThinTri fixture-ID target safety changes intact.
+
+## v28.9.4 - Independent chase timing and ThinTri target safety
+
+- Fixed layered/composite chase timing so dimmer chases and switch chases can run at different cycle speeds at the same time.
+- Changed composite animation to calculate each layer's step from that layer's own speed instead of sharing one global chase step.
+- Hardened visualizer target resolution so fixture IDs such as F1-F4 map to the actual mixed DMX runtime fixtures instead of assuming the fixture list order.
+- Preserved direct-output dimmer/switch absolute levels while keeping ThinTri RGB wash heads on the normal brightness-scaled path.
+
+## v28.9.3 - Dimmer channel chase output fix
+
+- Fixed multi-channel dimmer/switch pack chase output so sequence effects can write independent channel levels instead of collapsing back to one fixture-level value.
+- Added runtime fallback for user-created dimmer/relay profiles with sparse channel maps: multi-channel direct-output fixtures now expand to all fixture channels for dimmer sequence effects.
+- Kept RGB wash fixtures on the normal master-brightness path; this change only applies to direct-output dimmer/switch/relay fixtures.
+
+## v28.9.2 - Dimmer percentage output fix
+
+- Fixed static dimmer percentage effects on direct dimmer-pack fixtures so Dimmer 25/50/75/100 send absolute DMX values instead of being scaled by the global DMX brightness slider.
+- Kept RGB wash-head dimmer channels tied to the global brightness slider, so ThinTri heads still behave normally.
+- Preserved raw 255 behavior for Dimmer Cycle and channel chase effects.
+
+
+## v28.9.1 - Dimmer sequence effects
+
+### Added
+- Added dimmer effects under the **DIMMERS** section:
+  - **Dimmer Cycle**
+  - **Dimmer Sequence LR**
+  - **Dimmer Sequence RL**
+  - **Dimmer Ping Pong**
+  - **Dimmer Random**
+- Added per-channel dimmer chase output for multi-channel dimmer pack profiles, so one 4-channel Elation profile can sequence channels 37-40 independently.
+
+### Changed
+- Extended the existing cycle speed controls so dimmer sequence effects can use the same timing adjustment as switch sequence effects.
+- Kept switch effects and dimmer effects separate in the editor so relay-style switches stay simple and dimmer packs get their own chase behaviors.
+
+### Fixed
+- Fixed the limitation where a 4-channel dimmer profile only copied one dimmer value to all four channels, which made sequence effects behave like all-on/all-off.
+
+## v28.9.0 - DMX profile runtime save fix
+
+### Added
+- Added runtime hardware fields directly to the fixture profile add/edit dialog: **DMX Universe**, **Number of Fixtures**, **Start Address**, and **Channels**.
+- Added support for assigning the same channel function to multiple DMX channels, such as mapping **Switch** to channels 1-4 on a four-channel dimmer/switch pack.
+- Added a reference **Elation DP-DMX4B** profile at Universe 9, start address 37, 1 fixture, 4 channels.
+
+### Changed
+- Separated selected fixture profile settings from the mixed visualizer runtime summary so profile fields no longer get replaced by the full rig summary.
+- Updated the setup profile list so selecting a profile immediately refreshes the hardware fields shown above it.
+
+### Fixed
+- Fixed a save-order bug where closing the setup window after saving could overwrite the selected profile with mixed rig values such as start address 1, 8 fixtures, and 8 channels.
+- Fixed profile save behavior so custom profiles keep their own fixture count, channel count, universe, and start address after restart.
+
+### Notes
+- In the mixed DMX rig, a profile defines how a fixture works, but the visualizer layout still decides which fixtures are actually present and driven.
+- For independent control of a four-port dimmer pack, add four one-channel fixtures at addresses 37, 38, 39, and 40.
 
 ## v28.8.0 - Mixed ThinTri + DMX switch fixture map
 
@@ -81,6 +193,20 @@
 - Standard dimmer-based lighting fixtures should continue to use the normal master brightness workflow.
 - Switch outputs should be configured as **Switch**, not **Dimmer**, when absolute on/off behavior is desired.
 
+
+## [v28.10.1] - 2026-05-02
+
+### Fixed
+- Reworked Find Falcon discovery so router/web devices are no longer preferred over Falcon candidates.
+- Added hostname-based discovery for router DHCP names such as Falcon_Player and Falcon_Player_F16V5_EA7F.
+- Added reverse-DNS, ARP/neighbor, and weak MAC-prefix scoring as Falcon discovery hints.
+- Ping is no longer a hard requirement; devices that do not answer ping can still be found by DNS or web probing.
+- Default gateway/router IPs are heavily de-prioritized unless they clearly identify as a Falcon device.
+
+### Notes
+- Falcon IP addresses above .170 are valid; the .170 limit only applies to pixels per E1.31 universe.
+
+---
 
 ## [v22.7.0] - 2026-03-31
 

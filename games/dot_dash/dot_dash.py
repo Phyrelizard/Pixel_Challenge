@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Tuple
 
 from games.base import GameMeta, GameModule, GamePhase, GameResult, GameSession, PlayerConfig
 
-VERSION_LABEL = "dot_dash_v21.7"
+VERSION_LABEL = "dot_dash_v21.8"
 
 # Type alias for RGB colors
 Color = Tuple[int, int, int]
@@ -141,7 +141,7 @@ class DotDashSession(GameSession):
 
         # Extract config values
         self.countdown_seconds = int(config["countdown_seconds"])
-        self.lane_pixel_count = int(config["lane_pixel_count"])
+        self.lane_pixel_count = max(1, min(170, int(config.get("lane_pixel_count", 100))))
         self.dash_length = int(config["dash_length"])
         self.round_timeout_sec = float(config["round_timeout_sec"])
         self.finish_blink_duration_sec = float(config["finish_blink_duration_sec"])
@@ -176,7 +176,7 @@ class DotDashSession(GameSession):
             ps.selected_colors = []
             ps.setup_complete = False
         
-        self.host.log("=== DOT DASH v21.7 ===")
+        self.host.log("=== DOT DASH v21.8 ===")
         self.host.log(f"Players: {[p.player_id for p in self.players]}")
         self.host.log("Waiting for players to select 2 colors each...")
         self.host.log("Press any colored button to select that color.")
