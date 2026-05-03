@@ -2,50 +2,124 @@
   "layouts": [
     {
       "layout_id": "small_rig_8_fixture",
-      "name": "Default Small Rig",
+      "name": "Mixed ThinTri + Switch Rig",
       "fixtures": [
         {
+          "id": "F1",
+          "type": "wash",
+          "profile_id": "venue_thintri38",
+          "x": 80,
+          "y": 620,
+          "direction": "right",
+          "universe": 9,
+          "start_address": 1
+        },
+        {
           "id": "F2",
-          "type": "custom",
-          "x": 63,
-          "y": 456,
+          "type": "wash",
+          "profile_id": "venue_thintri38",
+          "x": 80,
+          "y": 430,
           "direction": "right",
           "universe": 9,
           "start_address": 9
         },
         {
           "id": "F3",
-          "type": "custom",
+          "type": "wash",
+          "profile_id": "venue_thintri38",
           "x": 815,
-          "y": 685,
+          "y": 430,
           "direction": "left",
+          "universe": 9,
+          "start_address": 17
+        },
+        {
+          "id": "F4",
+          "type": "wash",
+          "profile_id": "venue_thintri38",
+          "x": 815,
+          "y": 620,
+          "direction": "left",
+          "universe": 9,
+          "start_address": 25
+        },
+        {
+          "id": "F5",
+          "type": "switch",
+          "profile_id": "dps_switch",
+          "x": 250,
+          "y": 120,
+          "direction": "down",
+          "universe": 9,
+          "start_address": 33
+        },
+        {
+          "id": "F6",
+          "type": "switch",
+          "profile_id": "dps_switch",
+          "x": 370,
+          "y": 120,
+          "direction": "down",
+          "universe": 9,
+          "start_address": 34
+        },
+        {
+          "id": "F7",
+          "type": "switch",
+          "profile_id": "dps_switch",
+          "x": 490,
+          "y": 120,
+          "direction": "down",
           "universe": 9,
           "start_address": 35
         },
         {
-          "id": "F4",
-          "type": "custom",
-          "x": 812,
-          "y": 458,
-          "direction": "left",
+          "id": "F8",
+          "type": "switch",
+          "profile_id": "dps_switch",
+          "x": 610,
+          "y": 120,
+          "direction": "down",
           "universe": 9,
           "start_address": 36
         },
         {
-          "id": "F1",
-          "type": "custom",
-          "x": 66,
-          "y": 701,
-          "direction": "right",
+          "id": "F9",
+          "type": "switch",
+          "profile_id": "elasion_dp-dmx4b",
+          "x": 396,
+          "y": 290,
+          "direction": "down",
           "universe": 9,
-          "start_address": 33
+          "start_address": 37
         }
       ],
       "targets": {
         "All Fixtures": [
+          "F1",
           "F2",
           "F3",
           "F4",
+          "F5",
+          "F6",
+          "F7",
+          "F8",
+          "F9"
+        ],
+        "ThinTri Heads": [
+          "F1",
+          "F2",
+          "F3",
+          "F4"
+        ],
+        "DMX Switches": [
+          "F5",
+          "F6",
+          "F7",
+          "F8"
+        ],
+        "F1": [
           "F1"
         ],
         "F2": [
@@ -57,8 +131,23 @@
         "F4": [
           "F4"
         ],
-        "F1": [
-          "F1"
+        "F5": [
+          "F5"
+        ],
+        "F6": [
+          "F6"
+        ],
+        "F7": [
+          "F7"
+        ],
+        "F8": [
+          "F8"
+        ],
+        "f1-4": [
+          "F1",
+          "F2",
+          "F3",
+          "F4"
         ],
         "F1 F4": [
           "F1",
@@ -66,20 +155,84 @@
           "F3",
           "F4"
         ],
+        "f5-8": [
+          "F5",
+          "F6",
+          "F7",
+          "F8"
+        ],
+        "switch 1": [
+          "F5"
+        ],
+        "switch 2": [
+          "F6"
+        ],
+        "switch 3": [
+          "F7"
+        ],
+        "switch 4": [
+          "F8"
+        ],
+        "f33": [
+          "F5"
+        ],
+        "f34": [
+          "F6"
+        ],
+        "f35": [
+          "F7"
+        ],
+        "f36": [
+          "F8"
+        ],
+        "F33": [
+          "F5"
+        ],
+        "F34": [
+          "F6"
+        ],
+        "F35": [
+          "F7"
+        ],
+        "F36": [
+          "F8"
+        ],
         "odd": [
-          [
-            "F1",
-            "F3"
-          ]
+          "F1",
+          "F3",
+          "F5",
+          "F7"
         ],
         "even": [
           "F2",
+          "F4",
+          "F6",
+          "F8"
+        ],
+        "Left Wash Group": [
+          "F1",
+          "F2"
+        ],
+        "Right Wash Group": [
+          "F3",
           "F4"
         ],
-        "f1 to f3": [
-          "F1",
-          "F2",
-          "F3"
+        "Top Fixtures": [
+          "F5",
+          "F6",
+          "F7",
+          "F8"
+        ],
+        "Top Left Pair": [
+          "F5",
+          "F6"
+        ],
+        "Top Right Pair": [
+          "F7",
+          "F8"
+        ],
+        "F9": [
+          "F9"
         ]
       }
     }

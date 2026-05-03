@@ -8,7 +8,7 @@ import math
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 
-VISUALIZER_VERSION = "v1.8.0"
+VISUALIZER_VERSION = "v1.8.1"
 ALL_FIXTURES_TARGET = "All Fixtures"
 NO_FIXTURES_TARGET = "No Fixtures"
 NO_EFFECT_LABEL = "— No Effect —"
@@ -410,24 +410,34 @@ class DMXLightingEditor:
             "layouts": [
                 {
                     "layout_id": "small_rig_8_fixture",
-                    "name": "Default Small Rig",
+                    "name": "Mixed ThinTri + Switch Rig",
                     "fixtures": [
-                        {"id": "F1", "type": "wash", "x": 80, "y": 580, "direction": "left"},
-                        {"id": "F2", "type": "wash", "x": 80, "y": 420, "direction": "left"},
-                        {"id": "F3", "type": "top", "x": 250, "y": 100, "direction": "down"},
-                        {"id": "F4", "type": "top", "x": 370, "y": 100, "direction": "down"},
-                        {"id": "F5", "type": "top", "x": 490, "y": 100, "direction": "down"},
-                        {"id": "F6", "type": "top", "x": 610, "y": 100, "direction": "down"},
-                        {"id": "F7", "type": "wash", "x": 780, "y": 420, "direction": "right"},
-                        {"id": "F8", "type": "wash", "x": 780, "y": 580, "direction": "right"},
+                        {"id": "F1", "type": "wash", "profile_id": "venue_thintri38", "x": 80, "y": 620, "direction": "right", "universe": 9, "start_address": 1},
+                        {"id": "F2", "type": "wash", "profile_id": "venue_thintri38", "x": 80, "y": 430, "direction": "right", "universe": 9, "start_address": 9},
+                        {"id": "F3", "type": "wash", "profile_id": "venue_thintri38", "x": 815, "y": 430, "direction": "left", "universe": 9, "start_address": 17},
+                        {"id": "F4", "type": "wash", "profile_id": "venue_thintri38", "x": 815, "y": 620, "direction": "left", "universe": 9, "start_address": 25},
+                        {"id": "F5", "type": "switch", "profile_id": "dps_switch", "x": 250, "y": 120, "direction": "down", "universe": 9, "start_address": 33},
+                        {"id": "F6", "type": "switch", "profile_id": "dps_switch", "x": 370, "y": 120, "direction": "down", "universe": 9, "start_address": 34},
+                        {"id": "F7", "type": "switch", "profile_id": "dps_switch", "x": 490, "y": 120, "direction": "down", "universe": 9, "start_address": 35},
+                        {"id": "F8", "type": "switch", "profile_id": "dps_switch", "x": 610, "y": 120, "direction": "down", "universe": 9, "start_address": 36},
                     ],
                     "targets": {
                         "All Fixtures": ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"],
+                        "ThinTri Heads": ["F1", "F2", "F3", "F4"],
+                        "DMX Switches": ["F5", "F6", "F7", "F8"],
+                        "f1-4": ["F1", "F2", "F3", "F4"],
+                        "F1 F4": ["F1", "F2", "F3", "F4"],
+                        "f5-8": ["F5", "F6", "F7", "F8"],
+                        "switch 1": ["F5"], "switch 2": ["F6"], "switch 3": ["F7"], "switch 4": ["F8"],
+                        "f33": ["F5"], "f34": ["F6"], "f35": ["F7"], "f36": ["F8"],
+                        "F33": ["F5"], "F34": ["F6"], "F35": ["F7"], "F36": ["F8"],
+                        "odd": ["F1", "F3", "F5", "F7"],
+                        "even": ["F2", "F4", "F6", "F8"],
                         "Left Wash Group": ["F1", "F2"],
-                        "Right Wash Group": ["F7", "F8"],
-                        "Top Fixtures": ["F3", "F4", "F5", "F6"],
-                        "Top Left Pair": ["F3", "F4"],
-                        "Top Right Pair": ["F5", "F6"],
+                        "Right Wash Group": ["F3", "F4"],
+                        "Top Fixtures": ["F5", "F6", "F7", "F8"],
+                        "Top Left Pair": ["F5", "F6"],
+                        "Top Right Pair": ["F7", "F8"],
                     },
                 }
             ]
@@ -1551,53 +1561,145 @@ class DMXLightingEditor:
     def _fixture_meta_text(self, fixture: dict) -> str:
         universe = fixture.get("universe")
         address = fixture.get("start_address")
+        profile_id = str(fixture.get("profile_id") or "").strip()
         parts = []
+        if profile_id:
+            parts.append(profile_id.replace("venue_", "").replace("dps_", ""))
         if universe not in (None, ""):
             parts.append(f"U{universe}")
         if address not in (None, ""):
             parts.append(f"A{address}")
         return " ".join(parts)
 
+    def _profile_for_id(self, profile_id: str) -> dict:
+        profile_id = str(profile_id or "").strip()
+        if not profile_id or not isinstance(self.profiles, dict):
+            return {}
+        for profile in self.profiles.get("profiles", []):
+            if isinstance(profile, dict) and str(profile.get("id") or "") == profile_id:
+                return profile
+        return {}
+
+    def _fixture_type_for_profile_id(self, profile_id: str) -> str:
+        """Return a layout-friendly fixture type for a saved hardware profile."""
+        profile = self._profile_for_id(profile_id)
+        profile_id_l = str(profile_id or "").lower()
+        manufacturer = str(profile.get("manufacturer") or "").lower()
+        model = str(profile.get("model") or "").lower()
+        channel_map = profile.get("channel_map") if isinstance(profile.get("channel_map"), dict) else {}
+        searchable = " ".join([profile_id_l, manufacturer, model])
+        if "switch" in channel_map or any(token in searchable for token in ("switch", "relay")):
+            return "switch"
+        if any(token in searchable for token in ("dimmer", "dp-dmx4b", "vpdmx4b", "dps")):
+            return "switch"
+        return "wash"
+
     def _show_fixture_dialog(self, title: str, initial: dict | None = None, x_root: int | None = None, y_root: int | None = None):
         initial = dict(initial or {})
         result = {}
+
         dialog = tk.Toplevel(self.window)
         dialog.title(title)
         dialog.configure(bg="#202833")
         dialog.transient(self.window)
         dialog.resizable(False, False)
 
+        # v28.8.0 fix: the profile field made the old 360x230 dialog too short
+        # on the Pi touchscreen/desktop, hiding the Save/Cancel buttons.  Use a
+        # taller modal dialog and keep the action buttons in a dedicated bottom
+        # row so Add Fixture and Edit Fixture always have an obvious save path.
+        width, height = 430, 320
         if x_root is None or y_root is None:
             x_root = self.window.winfo_rootx() + 120
             y_root = self.window.winfo_rooty() + 120
-        dialog.geometry(f"300x178+{int(x_root)}+{int(y_root)}")
+        dialog.geometry(f"{width}x{height}+{int(x_root)}+{int(y_root)}")
+        dialog.minsize(width, height)
 
-        tk.Label(dialog, text=title, bg="#202833", fg="white", font=("Arial", 13, "bold")).pack(anchor="w", padx=14, pady=(12, 10))
+        dialog.grid_columnconfigure(0, weight=1)
+        dialog.grid_rowconfigure(1, weight=1)
 
-        form = tk.Frame(dialog, bg="#202833")
-        form.pack(fill="x", padx=14)
+        tk.Label(
+            dialog,
+            text=title,
+            bg="#202833",
+            fg="white",
+            font=("Arial", 13, "bold"),
+        ).grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 8))
 
-        def _row(label_text, var):
-            row = tk.Frame(form, bg="#202833")
-            row.pack(fill="x", pady=4)
-            tk.Label(row, text=label_text, width=12, anchor="w", bg="#202833", fg="#cfd8e3", font=("Arial", 11, "bold")).pack(side="left")
-            entry = tk.Entry(row, textvariable=var, bg="#111820", fg="white", insertbackground="white", relief="flat", font=("Arial", 11))
-            entry.pack(side="left", fill="x", expand=True, ipady=4)
+        body = tk.Frame(dialog, bg="#202833")
+        body.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 6))
+        body.grid_columnconfigure(1, weight=1)
+
+        def _row(row_index, label_text, var):
+            tk.Label(
+                body,
+                text=label_text,
+                width=12,
+                anchor="w",
+                bg="#202833",
+                fg="#cfd8e3",
+                font=("Arial", 11, "bold"),
+            ).grid(row=row_index, column=0, sticky="w", pady=5)
+            entry = tk.Entry(
+                body,
+                textvariable=var,
+                bg="#111820",
+                fg="white",
+                insertbackground="white",
+                relief="flat",
+                font=("Arial", 11),
+            )
+            entry.grid(row=row_index, column=1, sticky="ew", pady=5, ipady=4)
             return entry
 
         id_var = tk.StringVar(master=dialog, value=str(initial.get("id") or ""))
         universe_var = tk.StringVar(master=dialog, value=str(initial.get("universe") or self._default_fixture_universe()))
         address_var = tk.StringVar(master=dialog, value=str(initial.get("start_address") or ""))
+        profile_ids = [
+            str(p.get("id") or "")
+            for p in (self.profiles.get("profiles", []) if isinstance(self.profiles, dict) else [])
+            if isinstance(p, dict) and p.get("id")
+        ]
+        default_profile = str(initial.get("profile_id") or initial.get("dmx_profile_id") or (profile_ids[0] if profile_ids else "venue_thintri38"))
+        profile_var = tk.StringVar(master=dialog, value=default_profile)
 
-        id_entry = _row("Name", id_var)
-        universe_entry = _row("Universe", universe_var)
-        address_entry = _row("Address", address_var)
+        id_entry = _row(0, "Name", id_var)
+        _row(1, "Universe", universe_var)
+        _row(2, "Address", address_var)
+
+        tk.Label(
+            body,
+            text="Profile",
+            width=12,
+            anchor="w",
+            bg="#202833",
+            fg="#cfd8e3",
+            font=("Arial", 11, "bold"),
+        ).grid(row=3, column=0, sticky="w", pady=5)
+        profile_entry = ttk.Combobox(
+            body,
+            textvariable=profile_var,
+            values=profile_ids,
+            state="readonly" if profile_ids else "normal",
+            font=("Arial", 10),
+        )
+        profile_entry.grid(row=3, column=1, sticky="ew", pady=5, ipady=3)
 
         error_var = tk.StringVar(master=dialog, value="")
-        tk.Label(dialog, textvariable=error_var, bg="#202833", fg="#ff9f9f", font=("Arial", 10, "bold")).pack(anchor="w", padx=14, pady=(6, 0))
+        tk.Label(
+            body,
+            textvariable=error_var,
+            bg="#202833",
+            fg="#ff9f9f",
+            font=("Arial", 10, "bold"),
+            anchor="w",
+            justify="left",
+        ).grid(row=4, column=0, columnspan=2, sticky="ew", pady=(8, 0))
 
         btns = tk.Frame(dialog, bg="#202833")
-        btns.pack(fill="x", padx=14, pady=(10, 12))
+        btns.grid(row=2, column=0, sticky="ew", padx=16, pady=(6, 16))
+        btns.grid_columnconfigure(0, weight=1)
+        btns.grid_columnconfigure(1, weight=1)
 
         def close_dialog(event=None):
             if dialog.winfo_exists():
@@ -1621,34 +1723,49 @@ class DMXLightingEditor:
             if universe < 1 or address < 1:
                 error_var.set("Universe and address must be 1 or higher.")
                 return
+            profile_id = profile_var.get().strip()
+            if profile_ids and profile_id not in profile_ids:
+                error_var.set("Choose a saved fixture profile.")
+                return
             result.update({
                 "id": fixture_id,
                 "universe": universe,
                 "start_address": address,
+                "profile_id": profile_id,
             })
             close_dialog()
 
-        tk.Button(btns, text="SAVE", bg="#2f9b4e", fg="white", activebackground="#44ba66", relief="flat", font=("Arial", 11, "bold"), command=save_dialog).pack(side="left", fill="x", expand=True, padx=(0, 6), ipady=5)
-        tk.Button(btns, text="CANCEL", bg="#5b3540", fg="white", activebackground="#7a4655", relief="flat", font=("Arial", 11, "bold"), command=close_dialog).pack(side="left", fill="x", expand=True, padx=(6, 0), ipady=5)
+        save_btn = tk.Button(
+            btns,
+            text="SAVE FIXTURE",
+            bg="#2f9b4e",
+            fg="white",
+            activebackground="#44ba66",
+            relief="flat",
+            font=("Arial", 11, "bold"),
+            command=save_dialog,
+        )
+        save_btn.grid(row=0, column=0, sticky="ew", padx=(0, 7), ipady=7)
+        cancel_btn = tk.Button(
+            btns,
+            text="CANCEL",
+            bg="#5b3540",
+            fg="white",
+            activebackground="#7a4655",
+            relief="flat",
+            font=("Arial", 11, "bold"),
+            command=close_dialog,
+        )
+        cancel_btn.grid(row=0, column=1, sticky="ew", padx=(7, 0), ipady=7)
 
         dialog.bind("<Escape>", close_dialog)
         dialog.bind("<Return>", save_dialog)
-
-        def _cancel_if_focus_left():
-            try:
-                focus = dialog.focus_displayof()
-                if focus is None:
-                    close_dialog()
-                    return
-                top = focus.winfo_toplevel()
-                if top is not dialog:
-                    close_dialog()
-            except Exception:
-                pass
-
-        dialog.bind("<FocusOut>", lambda _e: dialog.after(80, _cancel_if_focus_left))
         dialog.protocol("WM_DELETE_WINDOW", close_dialog)
-        dialog.after(10, id_entry.focus_set)
+        try:
+            dialog.grab_set()
+        except Exception:
+            pass
+        dialog.after(50, id_entry.focus_set)
         dialog.wait_window()
         return result or None
 
@@ -1657,6 +1774,7 @@ class DMXLightingEditor:
             "id": "",
             "universe": self._default_fixture_universe(),
             "start_address": "",
+            "profile_id": "venue_thintri38",
         }
         data = self._show_fixture_dialog("Add Fixture", defaults, x_root, y_root)
         if not data:
@@ -1665,7 +1783,8 @@ class DMXLightingEditor:
         max_y = max(self.canvas.winfo_height() - 60, 20)
         fixture = {
             "id": data["id"],
-            "type": "custom",
+            "type": self._fixture_type_for_profile_id(data.get("profile_id")),
+            "profile_id": data.get("profile_id") or "venue_thintri38",
             "x": max(20, min(int(x), max_x)),
             "y": max(20, min(int(y), max_y)),
             "direction": "down",
@@ -1689,6 +1808,8 @@ class DMXLightingEditor:
         fixture["id"] = new_id
         fixture["universe"] = data["universe"]
         fixture["start_address"] = data["start_address"]
+        fixture["profile_id"] = data.get("profile_id") or fixture.get("profile_id") or "venue_thintri38"
+        fixture["type"] = self._fixture_type_for_profile_id(fixture.get("profile_id"))
         if old_id != new_id:
             self._rename_fixture_in_targets(old_id, new_id)
             default = self.default_fixture_positions.pop(old_id, None)

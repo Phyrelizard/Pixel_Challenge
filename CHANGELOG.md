@@ -1,13 +1,32 @@
 # Changelog
 
-## v28.7.1 - Switch cycle timing fix
+## v28.8.0 - Mixed ThinTri + DMX switch fixture map
+
+### Added
+- Added mixed DMX fixture support so the original four **Venue ThinTri 38** heads and the four 1-channel DMX switch outputs can share the same universe.
+- Added per-fixture profile mapping in the visualizer layout.
+- Added an 8-fixture default hardware map:
+  - **F1-F4**: ThinTri 38 heads at DMX addresses **1, 9, 17, 25**.
+  - **F5-F8**: DMX switch outputs at DMX addresses **33, 34, 35, 36**.
+- Added editor fixture profile selection when adding or editing layout fixtures.
+
+### Changed
+- Updated the DMX runtime so output is written by each fixture's own profile/channel map instead of assuming one profile, one start address, and one channel width for the whole rig.
+- Updated switch handling so RGB wash effects do not accidentally energize relay/switch outputs when a broad target such as **All Fixtures** is used.
+- Updated default targets with **ThinTri Heads**, **DMX Switches**, switch aliases, and address-style aliases for the existing switch outputs.
 
 ### Fixed
-- Fixed switch effect cycle timing so the **Cycle** control now changes the actual live animation rate.
-- Fixed switch animation scheduling so grouped switch effects no longer ignore the per-effect cycle timing.
+- Fixed Add Fixture / Edit Fixture dialogs so the **SAVE FIXTURE** and **CANCEL** buttons are always visible after adding the fixture profile selector.
+- Fixed Add Fixture / Edit Fixture save handling so newly selected fixture profiles are written back to the visualizer layout.
+- Fixed v28.8.0 startup ordering so visualizer layouts are loaded before the mixed DMX service is created.
+- Added a defensive layout fallback so mixed DMX startup cannot crash if layout data has not been attached yet.
+- Fixed the limitation where selecting the switch profile effectively removed the original ThinTri heads from live DMX control.
+- Fixed mixed-target frame generation so the switch channels at **33-36** no longer require giving up the ThinTri channels at **1-32**.
 
 ### Notes
-- **Switch Cycle**, **Switch Sequence LR**, **Switch Sequence RL**, **Switch Ping Pong**, and **Switch Random** now respond correctly to the **Cycle** control.
+- Use **ThinTri Heads** when assigning color wash/strobe effects to the original DMX lights.
+- Use **DMX Switches** or **switch 1-4** when assigning relay/switch effects.
+- The DMX universe remains **Universe 9**.
 
 ## v28.7.0 - Switch effect expansion
 

@@ -27,7 +27,7 @@
       "notes": "Dimmer CH4 must be >0 for output. Color macros CH6: 0-15 no function, 16-255 overrides RGB.",
       "runtime_config": {
         "dmx_universe": 9,
-        "dmx_num_fixtures": 4,
+        "dmx_num_fixtures": 8,
         "dmx_channels_per_fixture": 8,
         "dmx_start_address": 1
       }
@@ -56,6 +56,31 @@
       },
       "notes": "",
       "id": "dps_switch"
+    },
+    {
+      "manufacturer": "elasion",
+      "model": "dp-dmx4b",
+      "channels": 4,
+      "channel_map": {
+        "dimmer": 1
+      },
+      "runtime_config": {
+        "dmx_universe": 9,
+        "dmx_num_fixtures": 1,
+        "dmx_channels_per_fixture": 4,
+        "dmx_start_address": 37
+      },
+      "strobe_range": {
+        "off_max": 15,
+        "min": 16,
+        "max": 255
+      },
+      "dimmer_range": {
+        "off": 0,
+        "full": 255
+      },
+      "notes": "",
+      "id": "elasion_dp-dmx4b"
     }
   ]
 }

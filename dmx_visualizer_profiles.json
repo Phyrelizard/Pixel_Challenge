@@ -137,94 +137,40 @@
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
-          "layers": [
-            {
-              "effect": "Dimmer Off",
-              "apply_to": "f1-4"
-            },
-            {
-              "effect": "Dimmer Off",
-              "apply_to": "switch 1"
-            },
-            {
-              "effect": "Dimmer 50%",
-              "apply_to": "f10"
-            },
-            {
-              "effect": "Green Chase Up (Copy)",
-              "apply_to": "f33"
-            },
-            {
-              "effect": "Rainbow Wave (Copy)",
-              "apply_to": "f34"
-            },
-            {
-              "effect": "Rainbow Wave (Copy)",
-              "apply_to": "F35"
-            },
-            {
-              "effect": "Bounce Green Fresh",
-              "apply_to": "F36"
-            },
-            {
-              "effect": "Dimmer 100%",
-              "apply_to": "F9"
-            },
-            {
-              "effect": "Switch Cycle",
-              "apply_to": "F1 F4"
-            }
-          ],
-          "active_target": "F1 F4"
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Bonus": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Danger": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Special": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Randomizer": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 1": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 2": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 3": {
           "effect": null,
-          "apply_to": "All Fixtures"
+          "apply_to": "No Fixtures"
         },
         "Overlay 4": {
-          "layers": [
-            {
-              "effect": null,
-              "apply_to": "All Fixtures"
-            },
-            {
-              "effect": "Switch Off",
-              "apply_to": "F1"
-            },
-            {
-              "effect": "Switch On",
-              "apply_to": "F2"
-            },
-            {
-              "effect": "Dimmer 100%",
-              "apply_to": "F3"
-            }
-          ],
-          "active_target": "F3"
+          "effect": null,
+          "apply_to": "No Fixtures"
         }
       }
     },
@@ -590,7 +536,7 @@
               "apply_to": "No Fixtures"
             },
             {
-              "effect": "Color Roulette",
+              "effect": "Switch Ping Pong",
               "apply_to": "F1 F4"
             }
           ],
