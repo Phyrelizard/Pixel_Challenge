@@ -1,3 +1,29 @@
+## v28.10.8 - Copy profiles across game lists
+- Added COPY TO GAME in the DMX Visualizer profile controls so a finished profile can be cloned into another game profile dropdown.
+- Cross-game copies preserve all element layer assignments, independent timing values, fade settings, strobe speeds, targets, and sync timing flags for matching game elements.
+- Added an All Other Games target option and automatic duplicate-name suffixing when the copied profile name already exists in the target game.
+- Updated start_console.sh to launch v28.10.8.
+
+## v28.10.7 - Persist independent timing edits
+- Fixed timing edits not being written to `dmx_visualizer_profiles.json` until a manual profile save, which could make gameplay keep using the old synchronized 500 ms timing.
+- Timing buttons now save immediately per selected target layer when `SYNC TIMING: OFF`, or propagate and save when `SYNC TIMING: ON`.
+- Effect selection, target changes, fade timing, strobe speed, and cycle speed now persist immediately so game cues reload the actual values the editor shows.
+- Gameplay and console DMX cue logs now include the loaded per-layer timing summary for quick verification.
+- Updated start_console.sh to launch v28.10.7.
+
+## v28.10.6 - Sync timing ON/OFF mode
+- Changed the editor timing sync from a one-shot copy button into a saved per-element ON/OFF mode labeled `SYNC TIMING: ON` or `SYNC TIMING: OFF`.
+- Default behavior remains independent timing: ThinTri, DMX dimmer, and DMX switch layers keep separate cycle/fade/strobe timing unless sync is turned ON.
+- When sync timing is ON, future timing edits on the selected target layer are copied to compatible layers in that same element; when OFF, timing edits only affect the selected target layer.
+- Updated start_console.sh to launch v28.10.6.
+
+## v28.10.5 - Optional DMX layer timing sync
+
+- Keeps timing independent per saved target layer by default, so ThinTri, DMX switch, and DMX dimmer layers can each keep their own cycle/strobe/fade timing inside the same element.
+- Adds a **SYNC TIMING** button to the DMX Visualizer configuration page. It copies the selected target layer timing to compatible layers in the currently selected element only.
+- Stores default timing fields directly on newly selected effect layers so gameplay cues do not rely on hidden scene defaults.
+- Updated start_console.sh to launch v28.10.5 and keep the duplicate-console guard.
+
 ## v28.10.4 - Falcon verification and gameplay ThinTri chase timing
 
 - Changed TEST FALCON so ping alone no longer counts as success.

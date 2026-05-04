@@ -9,7 +9,7 @@ import time
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 
-VISUALIZER_VERSION = "v1.8.2"
+VISUALIZER_VERSION = "v1.8.5"
 ALL_FIXTURES_TARGET = "All Fixtures"
 NO_FIXTURES_TARGET = "No Fixtures"
 NO_EFFECT_LABEL = "— No Effect —"
@@ -291,18 +291,24 @@ class DMXLightingEditor:
         self._preview_paused = False
         self._preview_speed_ms = 110  # default animation interval
 
-        # Fade controls state (per-element, synced from assignment)
+        # Fade controls state (per-target layer, synced from assignment)
         self._fade_enabled = False
         self._fade_in_ms = FADE_DEFAULT_MS
         self._fade_out_ms = FADE_DEFAULT_MS
 
-        # Strobe controls state (per-element, only enabled for strobe effects)
+        # Strobe controls state (per-target layer, only enabled for strobe effects)
         self._strobe_speed = STROBE_SPEED_DEFAULT
         self._strobe_enabled = False
 
-        # Cycle controls state (per-element, used by animated switch effects)
+        # Cycle controls state (per-target layer, used by animated effects)
         self._cycle_speed = CYCLE_DEFAULT_MS
         self._cycle_enabled = False
+
+        # Sync timing is a per-element mode. Default OFF keeps ThinTri,
+        # dimmer, and switch layers independently timed. When ON, changing
+        # timing on the active target copies compatible timing values to the
+        # other layers in the same element.
+        self._sync_timing_enabled = False
 
         self.drag_fixture = None
         self.drag_start = None
@@ -587,6 +593,111 @@ class DMXLightingEditor:
                 clean[key] = src.get(key)
         return clean
 
+    def _ensure_layer_timing_defaults(self, layer: dict | None) -> dict:
+        """Make timing explicit on a single target layer without touching others."""
+        if not isinstance(layer, dict):
+            return {}
+        effect_name = layer.get("effect")
+        if not effect_name:
+            return layer
+        layer.setdefault("fade_enabled", False)
+        layer.setdefault("fade_in_ms", FADE_DEFAULT_MS)
+        layer.setdefault("fade_out_ms", FADE_DEFAULT_MS)
+        if self._effect_is_strobe(effect_name):
+            layer.setdefault("strobe_speed", self._default_effect_speed(effect_name))
+        if self._effect_uses_cycle_controls(effect_name):
+            layer.setdefault("cycle_speed", self._default_cycle_speed(effect_name))
+        return layer
+
+    def _timing_snapshot_for_layer(self, layer: dict | None) -> dict:
+        """Return the timing values that should be copied by SYNC TIMING."""
+        layer = self._ensure_layer_timing_defaults(layer if isinstance(layer, dict) else {})
+        snapshot = {
+            "fade_enabled": bool(layer.get("fade_enabled", False)),
+            "fade_in_ms": int(layer.get("fade_in_ms", FADE_DEFAULT_MS) or 0),
+            "fade_out_ms": int(layer.get("fade_out_ms", FADE_DEFAULT_MS) or 0),
+        }
+        effect_name = layer.get("effect")
+        if "strobe_speed" in layer or self._effect_is_strobe(effect_name):
+            snapshot["strobe_speed"] = int(layer.get("strobe_speed", self._default_effect_speed(effect_name)) or STROBE_SPEED_DEFAULT)
+        if "cycle_speed" in layer or self._effect_uses_cycle_controls(effect_name):
+            snapshot["cycle_speed"] = int(layer.get("cycle_speed", self._default_cycle_speed(effect_name)) or CYCLE_DEFAULT_MS)
+        return snapshot
+
+    def _update_sync_timing_button(self):
+        """Refresh the SYNC TIMING ON/OFF button for the selected element."""
+        if not hasattr(self, "_sync_timing_btn") or self._sync_timing_btn is None:
+            return
+        enabled = bool(getattr(self, "_sync_timing_enabled", False))
+        if enabled:
+            self._sync_timing_btn.configure(
+                text="SYNC TIMING: ON",
+                bg="#2f9b4e",
+                activebackground="#42b864",
+            )
+        else:
+            self._sync_timing_btn.configure(
+                text="SYNC TIMING: OFF",
+                bg="#5a4aa0",
+                activebackground="#7264bd",
+            )
+
+    def _sync_timing_ui(self):
+        record = self._assignment_record(create=True)
+        self._sync_timing_enabled = bool(record.get("sync_timing", False))
+        self._update_sync_timing_button()
+
+    def _copy_timing_from_current_layer(self) -> int:
+        """Copy current target timing to compatible layers in the selected element."""
+        record = self._assignment_record(create=True)
+        source_target = self._current_target_name()
+        source = self._find_layer_for_target(record, source_target)
+        if source is None or not source.get("effect"):
+            return 0
+
+        self._ensure_layer_timing_defaults(source)
+        snapshot = self._timing_snapshot_for_layer(source)
+        source_target = str(source.get("apply_to") or NO_FIXTURES_TARGET)
+        changed = 0
+
+        for layer in record.get("layers", []):
+            if not isinstance(layer, dict):
+                continue
+            if str(layer.get("apply_to") or NO_FIXTURES_TARGET) == source_target:
+                continue
+            effect_name = layer.get("effect")
+            if not effect_name:
+                continue
+            self._ensure_layer_timing_defaults(layer)
+
+            before = dict(layer)
+
+            # Fade timing can be copied across ThinTri, dimmer, and switch layers.
+            layer["fade_enabled"] = snapshot["fade_enabled"]
+            layer["fade_in_ms"] = snapshot["fade_in_ms"]
+            layer["fade_out_ms"] = snapshot["fade_out_ms"]
+
+            # Cycle speed is milliseconds and is compatible across animated
+            # ThinTri/RGB, dimmer, and switch patterns.
+            if "cycle_speed" in snapshot and ("cycle_speed" in layer or self._effect_uses_cycle_controls(effect_name)):
+                layer["cycle_speed"] = snapshot["cycle_speed"]
+
+            # Strobe speed is fixture/hardware speed, not milliseconds. Only
+            # copy it to other strobe-capable layers.
+            if "strobe_speed" in snapshot and ("strobe_speed" in layer or self._effect_is_strobe(effect_name)):
+                layer["strobe_speed"] = snapshot["strobe_speed"]
+
+            if layer != before:
+                changed += 1
+        return changed
+
+    def _propagate_timing_if_synced(self) -> bool:
+        record = self._assignment_record(create=True)
+        if not bool(record.get("sync_timing", False)):
+            return False
+        self._copy_timing_from_current_layer()
+        return True
+
     def _default_assignments(self, elements=None):
         names = list(elements or self.game_elements)
         return {name: self._blank_assignment_layer() for name in names}
@@ -683,24 +794,29 @@ class DMXLightingEditor:
         record = None
         if isinstance(raw, dict) and isinstance(raw.get("layers"), list):
             layers = [
-                self._sanitize_assignment_layer(layer)
+                self._ensure_layer_timing_defaults(self._sanitize_assignment_layer(layer))
                 for layer in raw.get("layers", [])
                 if isinstance(layer, dict)
             ]
             if not layers and raw.get("effect") is not None:
-                layers = [self._sanitize_assignment_layer(raw)]
+                layers = [self._ensure_layer_timing_defaults(self._sanitize_assignment_layer(raw))]
             active_target = str(raw.get("active_target") or (layers[-1].get("apply_to") if layers else NO_FIXTURES_TARGET))
-            record = {"layers": layers, "active_target": active_target}
+            record = {
+                "layers": layers,
+                "active_target": active_target,
+                "sync_timing": bool(raw.get("sync_timing", False)),
+            }
         elif isinstance(raw, dict):
             layers = []
             if raw.get("effect") is not None or raw.get("apply_to"):
-                layers.append(self._sanitize_assignment_layer(raw))
+                layers.append(self._ensure_layer_timing_defaults(self._sanitize_assignment_layer(raw)))
             record = {
                 "layers": layers,
                 "active_target": str(raw.get("apply_to") or NO_FIXTURES_TARGET),
+                "sync_timing": bool(raw.get("sync_timing", False)),
             }
         else:
-            record = {"layers": [], "active_target": NO_FIXTURES_TARGET}
+            record = {"layers": [], "active_target": NO_FIXTURES_TARGET, "sync_timing": False}
 
         if create or raw is None or raw != record:
             assignments[element] = record
@@ -761,6 +877,7 @@ class DMXLightingEditor:
         target_name = str(layer_data.get("apply_to") or ALL_FIXTURES_TARGET)
         layer = self._find_layer_for_target(record, target_name)
         clean = self._sanitize_assignment_layer(layer_data, target_name)
+        self._ensure_layer_timing_defaults(clean)
         if layer is None:
             record.setdefault("layers", []).append(clean)
         else:
@@ -803,6 +920,74 @@ class DMXLightingEditor:
 
     def _get_profile_names_for_game(self, game_key):
         return [p["profile_name"] for p in self.profiles_data.get("profiles", []) if p.get("game") == game_key]
+
+    def _game_display_name(self, game_key: str) -> str:
+        labels = {
+            "dot_dash": "Dot Dash",
+            "pixel_pop": "Pixel Pop",
+            "surround": "Surround",
+            "ascend": "Ascend",
+            "global": "Global",
+            "console": "Console",
+        }
+        key = self._game_key(game_key)
+        return labels.get(key, key.replace("_", " ").title())
+
+    def _copyable_game_keys(self, source_game_key: str | None = None) -> list[str]:
+        """Return game profile buckets that can receive a copied game profile."""
+        source_game_key = self._game_key(source_game_key or self.game_var.get())
+        preferred_order = ["dot_dash", "pixel_pop", "surround", "ascend"]
+        seen = set()
+        keys = []
+
+        def add_key(raw):
+            key = self._game_key(raw)
+            if not key or key in seen:
+                return
+            # Cross-game profile copy is for playable games, not the console/global
+            # buckets which have different element names and behavior.
+            if key in ("global", "console"):
+                return
+            if key == source_game_key:
+                return
+            seen.add(key)
+            keys.append(key)
+
+        for raw in list(self.game_list or []):
+            add_key(raw)
+        for raw in preferred_order:
+            add_key(raw)
+        for profile in self.profiles_data.get("profiles", []):
+            if isinstance(profile, dict):
+                add_key(profile.get("game"))
+        return keys
+
+    def _unique_profile_name_for_game(self, game_key: str, requested_name: str) -> str:
+        base = str(requested_name or "Copied Profile").strip() or "Copied Profile"
+        existing = {
+            str(p.get("profile_name") or "").strip()
+            for p in self.profiles_data.get("profiles", [])
+            if p.get("game") == game_key
+        }
+        if base not in existing:
+            return base
+        idx = 2
+        while f"{base} ({idx})" in existing:
+            idx += 1
+        return f"{base} ({idx})"
+
+    def _clone_assignments_for_game(self, source_profile: dict, target_game_key: str) -> dict:
+        """Deep-copy source assignments into the target game's element set."""
+        source_assignments = json.loads(json.dumps(source_profile.get("assignments", {})))
+        target_elements = self._elements_for_game(target_game_key)
+        defaults = self._default_assignments(target_elements)
+        cloned = {}
+        for element_name in target_elements:
+            if element_name in source_assignments:
+                cloned[element_name] = source_assignments[element_name]
+            else:
+                cloned[element_name] = defaults[element_name]
+        return cloned
 
     def _refresh_profile_combo(self):
         game_key = self._game_key(self.game_var.get())
@@ -969,14 +1154,21 @@ class DMXLightingEditor:
         self._speed_down_btn.pack(side="left", padx=(4, 0), ipady=2)
         self._speed_up_btn = tk.Button(target_wrap, text="▲", bg="#3b4552", fg="white", activebackground="#506074", relief="flat", font=("Arial", 13, "bold"), width=3, command=self._speed_up)
         self._speed_up_btn.pack(side="left", padx=(4, 0), ipady=2)
+        self._sync_timing_btn = tk.Button(
+            target_wrap, text="SYNC TIMING: OFF", bg="#5a4aa0", fg="white",
+            activebackground="#7264bd", relief="flat", font=("Arial", 10, "bold"),
+            command=self._toggle_sync_timing_for_current_element,
+        )
+        self._sync_timing_btn.pack(side="left", padx=(8, 0), ipady=4, ipadx=6)
 
         button_row = tk.Frame(left, bg="#242b35")
         button_row.pack(fill="x", padx=20, pady=(0, 18))
-        tk.Button(button_row, text="SAVE PROFILE", bg="#2f9b4e", fg="white", relief="flat", font=("Arial", 11, "bold"), command=self._save_profile).pack(side="left", expand=True, fill="x", padx=(0, 4), ipady=6)
-        tk.Button(button_row, text="EDIT PROFILE", bg="#2f6b9e", fg="white", relief="flat", font=("Arial", 11, "bold"), command=self._edit_profile).pack(side="left", expand=True, fill="x", padx=4, ipady=6)
-        tk.Button(button_row, text="COPY", bg="#cf8f2b", fg="white", relief="flat", font=("Arial", 11, "bold"), command=self._copy_profile).pack(side="left", expand=True, fill="x", padx=4, ipady=6)
-        tk.Button(button_row, text="RESET GAME", bg="#8c3f22", fg="white", relief="flat", font=("Arial", 11, "bold"), command=self._reset_selected_game_effects).pack(side="left", expand=True, fill="x", padx=4, ipady=6)
-        tk.Button(button_row, text="DELETE PROFILE", bg="#30445e", fg="white", relief="flat", font=("Arial", 11, "bold"), command=self._delete_profile).pack(side="left", expand=True, fill="x", padx=(4, 0), ipady=6)
+        tk.Button(button_row, text="SAVE PROFILE", bg="#2f9b4e", fg="white", relief="flat", font=("Arial", 10, "bold"), command=self._save_profile).pack(side="left", expand=True, fill="x", padx=(0, 3), ipady=6)
+        tk.Button(button_row, text="EDIT PROFILE", bg="#2f6b9e", fg="white", relief="flat", font=("Arial", 10, "bold"), command=self._edit_profile).pack(side="left", expand=True, fill="x", padx=3, ipady=6)
+        tk.Button(button_row, text="COPY", bg="#cf8f2b", fg="white", relief="flat", font=("Arial", 10, "bold"), command=self._copy_profile).pack(side="left", expand=True, fill="x", padx=3, ipady=6)
+        tk.Button(button_row, text="COPY TO GAME", bg="#b56d24", fg="white", relief="flat", font=("Arial", 10, "bold"), command=self._copy_profile_to_game).pack(side="left", expand=True, fill="x", padx=3, ipady=6)
+        tk.Button(button_row, text="RESET GAME", bg="#8c3f22", fg="white", relief="flat", font=("Arial", 10, "bold"), command=self._reset_selected_game_effects).pack(side="left", expand=True, fill="x", padx=3, ipady=6)
+        tk.Button(button_row, text="DELETE PROFILE", bg="#30445e", fg="white", relief="flat", font=("Arial", 10, "bold"), command=self._delete_profile).pack(side="left", expand=True, fill="x", padx=(3, 0), ipady=6)
 
         canvas_wrap = tk.Frame(right, bg="#202833")
         canvas_wrap.pack(fill="both", expand=True, padx=18, pady=(0, 18))
@@ -1059,6 +1251,7 @@ class DMXLightingEditor:
         self._sync_fade_ui()
         self._sync_strobe_ui()
         self._sync_cycle_ui()
+        self._sync_timing_ui()
         self._draw_layout()
         if self.window and self.window.winfo_exists():
             self.window.after_idle(self._end_sync)
@@ -1113,6 +1306,7 @@ class DMXLightingEditor:
 
         if eff_idx == -1:
             self._remove_assignment_layer(target_name)
+            self._save_profiles()
             self.hover_effect_name = None
             self._sync_strobe_ui()
             self._sync_cycle_ui()
@@ -1141,7 +1335,10 @@ class DMXLightingEditor:
         existing = self._current_assignment(create=False)
         layer = self._sanitize_assignment_layer(existing, target_name)
         layer["effect"] = effect["name"]
+        self._ensure_layer_timing_defaults(layer)
         self._upsert_assignment_layer(layer)
+        self._propagate_timing_if_synced()
+        self._save_profiles()
         self.hover_effect_name = effect["name"]
         self._sync_strobe_ui(effect["name"])
         self._sync_cycle_ui(effect["name"])
@@ -1205,18 +1402,24 @@ class DMXLightingEditor:
             return
         self._strobe_speed = max(STROBE_SPEED_MIN, self._strobe_speed - STROBE_SPEED_STEP)
         self._strobe_speed_lbl.configure(text=str(self._strobe_speed))
-        assignment = self._current_assignment()
+        assignment = self._current_assignment(create=True)
         assignment["strobe_speed"] = self._strobe_speed
+        self._propagate_timing_if_synced()
+        self._save_profiles()
         self._push_strobe_speed_to_dmx()
+        self._preview_current_layers()
 
     def _strobe_speed_up(self):
         if not self._effect_is_strobe():
             return
         self._strobe_speed = min(STROBE_SPEED_MAX, self._strobe_speed + STROBE_SPEED_STEP)
         self._strobe_speed_lbl.configure(text=str(self._strobe_speed))
-        assignment = self._current_assignment()
+        assignment = self._current_assignment(create=True)
         assignment["strobe_speed"] = self._strobe_speed
+        self._propagate_timing_if_synced()
+        self._save_profiles()
         self._push_strobe_speed_to_dmx()
+        self._preview_current_layers()
 
     def _effect_uses_cycle_controls(self, effect_name: str | None = None) -> bool:
         if not effect_name:
@@ -1285,18 +1488,47 @@ class DMXLightingEditor:
             return
         self._cycle_speed = max(CYCLE_MIN_MS, self._cycle_speed - CYCLE_STEP_MS)
         self._cycle_speed_lbl.configure(text=str(self._cycle_speed))
-        assignment = self._current_assignment()
+        assignment = self._current_assignment(create=True)
         assignment["cycle_speed"] = self._cycle_speed
+        self._propagate_timing_if_synced()
+        self._save_profiles()
         self._push_cycle_speed_to_dmx()
+        self._preview_current_layers()
 
     def _cycle_speed_up(self):
         if not self._effect_uses_cycle_controls():
             return
         self._cycle_speed = min(CYCLE_MAX_MS, self._cycle_speed + CYCLE_STEP_MS)
         self._cycle_speed_lbl.configure(text=str(self._cycle_speed))
-        assignment = self._current_assignment()
+        assignment = self._current_assignment(create=True)
         assignment["cycle_speed"] = self._cycle_speed
+        self._propagate_timing_if_synced()
+        self._save_profiles()
         self._push_cycle_speed_to_dmx()
+        self._preview_current_layers()
+
+    def _toggle_sync_timing_for_current_element(self):
+        """Toggle per-element timing sync mode on/off."""
+        record = self._assignment_record(create=True)
+        enabled = not bool(record.get("sync_timing", False))
+        record["sync_timing"] = enabled
+        self._sync_timing_enabled = enabled
+
+        if enabled:
+            # Make ON match the old behavior intentionally: copy the selected
+            # target layer timing to compatible layers now, then keep copying
+            # future timing changes while this mode stays ON.
+            self._copy_timing_from_current_layer()
+            self._preview_current_layers()
+        else:
+            # OFF means no future timing edits are propagated. Existing copied
+            # values are left alone so the user can adjust each device type
+            # from that starting point.
+            self._preview_current_layers()
+
+        self._update_sync_timing_button()
+        self._save_profiles()
+        self._draw_layout()
 
     def _open_target_dropup(self):
         menu = tk.Menu(self.window, tearoff=0, bg="#1f2732", fg="white", activebackground="#8ec5ff", activeforeground="#0a1a2b")
@@ -1316,6 +1548,7 @@ class DMXLightingEditor:
         record["active_target"] = target_name
         idx = self.element_listbox.curselection()[0] if self.element_listbox and self.element_listbox.curselection() else 0
         self._sync_element_selection(idx)
+        self._save_profiles()
 
     def _save_profile(self):
         game_key = self._game_key(self.game_var.get())
@@ -1381,6 +1614,115 @@ class DMXLightingEditor:
         self._save_profiles()
         self._refresh_profile_combo()
         messagebox.showinfo("DMX Visualizer", "Profile copied.", parent=self.window)
+
+    def _copy_profile_to_game(self):
+        source_game_key = self._game_key(self.game_var.get())
+        source_game_label = self._game_display_name(source_game_key)
+        current_name = self.profile_name_var.get().strip() or self.active_profile.get("profile_name", "Default Small Rig")
+
+        # Make sure the current profile header is current before cloning it.
+        self.active_profile["game"] = source_game_key
+        self.active_profile["profile_name"] = current_name
+        self.active_profile["layout_id"] = self.active_profile.get("layout_id", "small_rig_8_fixture")
+        self._save_profiles()
+
+        target_keys = self._copyable_game_keys(source_game_key)
+        if not target_keys:
+            messagebox.showinfo("Copy To Game", "No other game profile lists are available to copy into.", parent=self.window)
+            return
+
+        dialog = tk.Toplevel(self.window)
+        dialog.title("Copy Profile To Game")
+        dialog.configure(bg="#202833")
+        dialog.transient(self.window.winfo_toplevel())
+        dialog.grab_set()
+        dialog.resizable(False, False)
+
+        label_to_key = {self._game_display_name(key): key for key in target_keys}
+        all_label = "All Other Games"
+        target_labels = [all_label] + [self._game_display_name(key) for key in target_keys]
+        target_var = tk.StringVar(master=dialog, value=target_labels[1] if len(target_labels) > 1 else all_label)
+        name_var = tk.StringVar(master=dialog, value=current_name)
+        make_active_var = tk.BooleanVar(master=dialog, value=True)
+        status_var = tk.StringVar(master=dialog, value="")
+
+        body = tk.Frame(dialog, bg="#202833")
+        body.pack(fill="both", expand=True, padx=18, pady=18)
+
+        tk.Label(
+            body,
+            text=f'Copy "{current_name}" from {source_game_label} into:',
+            bg="#202833", fg="white", font=("Arial", 12, "bold"), anchor="w",
+        ).grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 12))
+
+        tk.Label(body, text="Target game", bg="#202833", fg="#cfd8e3", font=("Arial", 11, "bold")).grid(row=1, column=0, sticky="w", pady=(0, 6))
+        target_combo = ttk.Combobox(body, textvariable=target_var, values=target_labels, state="readonly", font=("Arial", 11), width=26)
+        target_combo.grid(row=1, column=1, sticky="ew", pady=(0, 6), padx=(10, 0))
+
+        tk.Label(body, text="New profile name", bg="#202833", fg="#cfd8e3", font=("Arial", 11, "bold")).grid(row=2, column=0, sticky="w", pady=(0, 6))
+        name_entry = tk.Entry(body, textvariable=name_var, bg="#111820", fg="white", insertbackground="white", relief="flat", font=("Arial", 11), width=28)
+        name_entry.grid(row=2, column=1, sticky="ew", pady=(0, 6), padx=(10, 0), ipady=4)
+
+        tk.Checkbutton(
+            body, text="Make copied profile active in target game", variable=make_active_var,
+            bg="#202833", fg="white", selectcolor="#111820", activebackground="#202833",
+            activeforeground="white", font=("Arial", 10, "bold"), anchor="w",
+        ).grid(row=3, column=0, columnspan=2, sticky="w", pady=(4, 10))
+
+        tk.Label(body, textvariable=status_var, bg="#202833", fg="#ffcc66", font=("Arial", 10), anchor="w", wraplength=420).grid(row=4, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+
+        btns = tk.Frame(body, bg="#202833")
+        btns.grid(row=5, column=0, columnspan=2, sticky="ew")
+        body.columnconfigure(1, weight=1)
+
+        def do_copy():
+            requested_name = name_var.get().strip()
+            if not requested_name:
+                status_var.set("Profile name cannot be blank.")
+                return
+            selected = target_var.get()
+            selected_targets = list(target_keys) if selected == all_label else [label_to_key.get(selected)]
+            selected_targets = [key for key in selected_targets if key]
+            if not selected_targets:
+                status_var.set("Choose a target game.")
+                return
+
+            profiles = self.profiles_data.setdefault("profiles", [])
+            created = []
+            for target_game_key in selected_targets:
+                final_name = self._unique_profile_name_for_game(target_game_key, requested_name)
+                cloned = {
+                    "game": target_game_key,
+                    "profile_name": final_name,
+                    "layout_id": self.active_profile.get("layout_id", "small_rig_8_fixture"),
+                    "assignments": self._clone_assignments_for_game(self.active_profile, target_game_key),
+                }
+                profiles.append(cloned)
+                if bool(make_active_var.get()):
+                    self._set_active_profile_name_for_game(target_game_key, final_name)
+                created.append(f'{self._game_display_name(target_game_key)}: {final_name}')
+
+            self._save_profiles()
+            self._refresh_profile_combo()
+            dialog.destroy()
+            messagebox.showinfo(
+                "Copy To Game",
+                "Copied profile into:\n\n" + "\n".join(created),
+                parent=self.window,
+            )
+
+        tk.Button(btns, text="COPY", bg="#cf8f2b", fg="white", relief="flat", font=("Arial", 11, "bold"), command=do_copy).pack(side="right", padx=(8, 0), ipadx=14, ipady=5)
+        tk.Button(btns, text="CANCEL", bg="#3b4552", fg="white", relief="flat", font=("Arial", 11, "bold"), command=dialog.destroy).pack(side="right", ipadx=12, ipady=5)
+
+        name_entry.focus_set()
+        name_entry.selection_range(0, "end")
+        dialog.update_idletasks()
+        try:
+            x = self.window.winfo_rootx() + max(40, (self.window.winfo_width() - dialog.winfo_width()) // 2)
+            y = self.window.winfo_rooty() + max(40, (self.window.winfo_height() - dialog.winfo_height()) // 2)
+            dialog.geometry(f"+{x}+{y}")
+        except Exception:
+            pass
 
     def _reset_selected_game_effects(self):
         game_label = self.game_var.get().strip() or "Current Game"
@@ -2279,33 +2621,48 @@ class DMXLightingEditor:
     def _on_fade_toggle(self):
         """Handle Fade checkbox toggle — persist to current assignment."""
         self._fade_enabled = self._fade_var.get()
-        assignment = self._current_assignment()
+        assignment = self._current_assignment(create=True)
         assignment["fade_enabled"] = self._fade_enabled
+        self._propagate_timing_if_synced()
+        self._save_profiles()
         self._push_fade_to_dmx()
+        self._preview_current_layers()
 
     def _fade_in_down(self):
         self._fade_in_ms = max(FADE_MIN_MS, self._fade_in_ms - FADE_STEP_MS)
         self._fade_in_lbl.configure(text=str(self._fade_in_ms))
-        self._current_assignment()["fade_in_ms"] = self._fade_in_ms
+        self._current_assignment(create=True)["fade_in_ms"] = self._fade_in_ms
+        self._propagate_timing_if_synced()
+        self._save_profiles()
         self._push_fade_to_dmx()
+        self._preview_current_layers()
 
     def _fade_in_up(self):
         self._fade_in_ms = min(FADE_MAX_MS, self._fade_in_ms + FADE_STEP_MS)
         self._fade_in_lbl.configure(text=str(self._fade_in_ms))
-        self._current_assignment()["fade_in_ms"] = self._fade_in_ms
+        self._current_assignment(create=True)["fade_in_ms"] = self._fade_in_ms
+        self._propagate_timing_if_synced()
+        self._save_profiles()
         self._push_fade_to_dmx()
+        self._preview_current_layers()
 
     def _fade_out_down(self):
         self._fade_out_ms = max(FADE_MIN_MS, self._fade_out_ms - FADE_STEP_MS)
         self._fade_out_lbl.configure(text=str(self._fade_out_ms))
-        self._current_assignment()["fade_out_ms"] = self._fade_out_ms
+        self._current_assignment(create=True)["fade_out_ms"] = self._fade_out_ms
+        self._propagate_timing_if_synced()
+        self._save_profiles()
         self._push_fade_to_dmx()
+        self._preview_current_layers()
 
     def _fade_out_up(self):
         self._fade_out_ms = min(FADE_MAX_MS, self._fade_out_ms + FADE_STEP_MS)
         self._fade_out_lbl.configure(text=str(self._fade_out_ms))
-        self._current_assignment()["fade_out_ms"] = self._fade_out_ms
+        self._current_assignment(create=True)["fade_out_ms"] = self._fade_out_ms
+        self._propagate_timing_if_synced()
+        self._save_profiles()
         self._push_fade_to_dmx()
+        self._preview_current_layers()
 
     def _sync_fade_ui(self):
         """Refresh fade panel from the current assignment data."""

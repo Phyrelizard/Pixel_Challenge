@@ -6,42 +6,46 @@
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
-          "effect": "Inferno Chase",
-          "apply_to": "All Fixtures"
+          "layers": [
+            {
+              "effect": null,
+              "apply_to": "No Fixtures"
+            }
+          ],
+          "active_target": "ThinTri Heads",
+          "sync_timing": false
         },
         "Bonus": {
-          "effect": "\u2500\u2500 STATIC \u2500\u2500",
-          "apply_to": "All Fixtures"
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Danger": {
-          "effect": "Red Alert",
-          "apply_to": "All Fixtures",
-          "strobe_speed": 60,
-          "fade_enabled": false
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Special": {
-          "effect": "\u2500\u2500 STATIC \u2500\u2500",
-          "apply_to": "All Fixtures"
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Randomizer": {
-          "effect": "\u2500\u2500 STATIC \u2500\u2500",
-          "apply_to": "All Fixtures"
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Overlay 1": {
-          "effect": "\u2500\u2500 STATIC \u2500\u2500",
-          "apply_to": "All Fixtures"
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Overlay 2": {
-          "effect": "Static Blue",
-          "apply_to": "All Fixtures"
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Overlay 3": {
-          "effect": "\u2500\u2500 STATIC \u2500\u2500",
-          "apply_to": "All Fixtures"
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Overlay 4": {
-          "effect": "Static Red",
-          "apply_to": "All Fixtures"
+          "effect": null,
+          "apply_to": "No Fixtures"
         }
       }
     },
@@ -141,9 +145,34 @@
             {
               "effect": null,
               "apply_to": "No Fixtures"
+            },
+            {
+              "effect": "Rainbow Wave (Copy)",
+              "apply_to": "ThinTri Heads",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 300
+            },
+            {
+              "effect": "Switch Sequence RL",
+              "apply_to": "DMX Switches",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 700
+            },
+            {
+              "effect": "Dimmer Ping Pong",
+              "apply_to": "DMX Dimmers",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 1600
             }
           ],
-          "active_target": "ThinTri Heads"
+          "active_target": "DMX Dimmers",
+          "sync_timing": false
         },
         "Bonus": {
           "effect": null,
@@ -196,19 +225,32 @@
               "apply_to": "No Fixtures"
             },
             {
-              "effect": "Dimmer Up/Down",
-              "apply_to": "DMX Dimmers"
+              "effect": "Dimmer Ping Pong",
+              "apply_to": "DMX Dimmers",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 900
             },
             {
-              "effect": "Dimmer Off",
-              "apply_to": "DMX Switches"
+              "effect": "Switch Ping Pong",
+              "apply_to": "DMX Switches",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 1300
             },
             {
               "effect": "Rainbow Wave (Copy)",
-              "apply_to": "ThinTri Heads"
+              "apply_to": "ThinTri Heads",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 400
             }
           ],
-          "active_target": "ThinTri Heads"
+          "active_target": "DMX Switches",
+          "sync_timing": false
         },
         "Bonus": {
           "effect": null,
@@ -422,40 +464,40 @@
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
-          "effect": "\u2500\u2500 STATIC \u2500\u2500",
-          "apply_to": "All Fixtures"
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Bonus": {
-          "effect": "\u2500\u2500 STATIC \u2500\u2500",
-          "apply_to": "All Fixtures"
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Danger": {
-          "effect": "\u2500\u2500 STATIC \u2500\u2500",
-          "apply_to": "All Fixtures"
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Special": {
-          "effect": "\u2500\u2500 STATIC \u2500\u2500",
-          "apply_to": "All Fixtures"
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Randomizer": {
-          "effect": "\u2500\u2500 STATIC \u2500\u2500",
-          "apply_to": "All Fixtures"
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Overlay 1": {
-          "effect": "\u2500\u2500 STATIC \u2500\u2500",
-          "apply_to": "All Fixtures"
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Overlay 2": {
-          "effect": "\u2500\u2500 STATIC \u2500\u2500",
-          "apply_to": "All Fixtures"
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Overlay 3": {
-          "effect": "\u2500\u2500 STATIC \u2500\u2500",
-          "apply_to": "All Fixtures"
+          "effect": null,
+          "apply_to": "No Fixtures"
         },
         "Overlay 4": {
-          "effect": "\u2500\u2500 STATIC \u2500\u2500",
-          "apply_to": "All Fixtures"
+          "effect": null,
+          "apply_to": "No Fixtures"
         }
       }
     },
@@ -472,10 +514,15 @@
             },
             {
               "effect": "Rainbow Wave",
-              "apply_to": "F1 F4"
+              "apply_to": "F1 F4",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 500
             }
           ],
-          "active_target": "F1 F4"
+          "active_target": "F1 F4",
+          "sync_timing": false
         },
         "Check-In Open": {
           "layers": [
@@ -503,14 +550,45 @@
           "layers": [
             {
               "effect": "Color Roulette",
-              "apply_to": "No Fixtures"
+              "apply_to": "No Fixtures",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 500
             },
             {
-              "effect": "Switch Ping Pong",
-              "apply_to": "F1 F4"
+              "effect": "Rainbow Wave (Copy)",
+              "apply_to": "ThinTri Heads",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 100
+            },
+            {
+              "effect": "Dimmer Up/Down",
+              "apply_to": "DMX Dimmers",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250
+            },
+            {
+              "effect": "Switch Random",
+              "apply_to": "TRIO",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 200
+            },
+            {
+              "effect": "Switch On",
+              "apply_to": "Beacon",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250
             }
           ],
-          "active_target": "F1 F4"
+          "active_target": "Beacon",
+          "sync_timing": false
         },
         "Countdown": {
           "layers": [
@@ -538,10 +616,15 @@
             },
             {
               "effect": "Rainbow Wave (Copy)",
-              "apply_to": "F1 F4"
+              "apply_to": "F1 F4",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 500
             }
           ],
-          "active_target": "F1 F4"
+          "active_target": "F1 F4",
+          "sync_timing": false
         }
       }
     },
@@ -622,11 +705,157 @@
           "apply_to": "No Fixtures"
         }
       }
+    },
+    {
+      "game": "dot_dash",
+      "profile_name": "Default Copy",
+      "layout_id": "small_rig_8_fixture",
+      "assignments": {
+        "Gameplay": {
+          "layers": [
+            {
+              "effect": null,
+              "apply_to": "No Fixtures"
+            },
+            {
+              "effect": "Dimmer Ping Pong",
+              "apply_to": "DMX Dimmers",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 900
+            },
+            {
+              "effect": "Switch Ping Pong",
+              "apply_to": "DMX Switches",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 1300
+            },
+            {
+              "effect": "Rainbow Wave (Copy)",
+              "apply_to": "ThinTri Heads",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 400
+            }
+          ],
+          "active_target": "DMX Dimmers",
+          "sync_timing": false
+        },
+        "Bonus": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Danger": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Special": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Randomizer": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Overlay 1": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Overlay 2": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Overlay 3": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Overlay 4": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        }
+      }
+    },
+    {
+      "game": "pixel_pop",
+      "profile_name": "Default Copy",
+      "layout_id": "small_rig_8_fixture",
+      "assignments": {
+        "Gameplay": {
+          "layers": [
+            {
+              "effect": null,
+              "apply_to": "No Fixtures"
+            },
+            {
+              "effect": "Dimmer Ping Pong",
+              "apply_to": "DMX Dimmers",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 900
+            },
+            {
+              "effect": "Switch Ping Pong",
+              "apply_to": "DMX Switches",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 1300
+            },
+            {
+              "effect": "Rainbow Wave (Copy)",
+              "apply_to": "ThinTri Heads",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 400
+            }
+          ],
+          "active_target": "ThinTri Heads",
+          "sync_timing": false
+        },
+        "Bonus": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Danger": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Special": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Randomizer": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Overlay 1": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Overlay 2": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Overlay 3": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Overlay 4": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        }
+      }
     }
   ],
   "active_profiles": {
-    "dot_dash": "Default",
-    "pixel_pop": "Default Small Rig",
+    "dot_dash": "Default Copy",
+    "pixel_pop": "Default Copy",
     "surround": "Default Small Rig",
     "ascend": "Default Small Rig",
     "global": "Default Small Rig",

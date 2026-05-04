@@ -3,7 +3,7 @@ sleep 3
 
 LOCK_FILE="/tmp/pixel_challenge_console.lock"
 APP_DIR="/home/ledgame/easter_game"
-APP_SCRIPT="/home/ledgame/easter_game/pixel_challenge_console_v28.10.4.py"
+APP_SCRIPT="/home/ledgame/easter_game/pixel_challenge_console_v28.10.8.py"
 
 warn_already_running() {
     MSG="$1"
