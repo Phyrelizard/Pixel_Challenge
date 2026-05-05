@@ -9,7 +9,7 @@ import time
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 
-VISUALIZER_VERSION = "v1.8.5"
+VISUALIZER_VERSION = "v1.8.7"
 ALL_FIXTURES_TARGET = "All Fixtures"
 NO_FIXTURES_TARGET = "No Fixtures"
 NO_EFFECT_LABEL = "— No Effect —"
@@ -30,18 +30,19 @@ CYCLE_DEFAULT_MS = 500
 RGB_CYCLE_PATTERN_TYPES = {
     "chase", "sweep", "bounce", "alternating", "palette_cycle",
     "wave", "wave_center", "wave_lr", "wave_player", "pulse",
-    "random_flash", "fade", "fade_loop", "sparkle",
+    "random_flash", "fade", "fade_loop", "sparkle", "candle",
     "build_up", "explosion",
 }
 
 # Category ordering for the effect list
 _CATEGORY_ORDER = [
-    "static", "fade", "pulse", "chase", "sweep",
+    "static", "candle", "fade", "pulse", "chase", "sweep",
     "wave", "bounce", "alternating", "strobe", "random_flash",
     "palette_cycle", "switch", "dimmer", "other",
 ]
 _CATEGORY_LABELS = {
     "static": "── STATIC ──",
+    "candle": "── CANDLE ──",
     "fade": "── FADES ──",
     "pulse": "── PULSES ──",
     "chase": "── CHASES ──",
@@ -104,7 +105,13 @@ _COLOR_NAMES = {
     "#cc00ff": "Purp",
     "#26aaa0": "Teal", "#88aa77": "Sage", "#ccbd1e": "Olive",
     "#060066": "DkBlu", "#cd9173": "Tan", "#8678e0": "LavBlu",
+    "#3a1000": "DkOrg", "#ffd080": "Warm", "#fff2b8": "WarmWhite",
+    "#006bff": "Blu", "#8fe8ff": "Ice", "#2b0000": "DkRed",
+    "#cc1600": "Red", "#ff7a2a": "Org", "#ffd0a0": "Peach",
+    "#002b12": "DkGrn", "#00aa3a": "Grn", "#99ff66": "Lime",
+    "#e8ffd0": "PaleGrn", "#180300": "Ember", "#7a1500": "DkOrg",
 }
+
 
 
 def _color_name(hex_color: str) -> str:
@@ -131,6 +138,37 @@ def _hex_to_rgb(hex_color: str):
     if len(h) != 6:
         return (0, 0, 0)
     return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+
+
+def _rgb_to_hex(r: int, g: int, b: int) -> str:
+    return f"#{max(0, min(255, int(r))):02x}{max(0, min(255, int(g))):02x}{max(0, min(255, int(b))):02x}"
+
+
+def _mix_rgb(a, b, frac: float):
+    frac = max(0.0, min(1.0, float(frac)))
+    return (
+        max(0, min(255, int(a[0] + (b[0] - a[0]) * frac))),
+        max(0, min(255, int(a[1] + (b[1] - a[1]) * frac))),
+        max(0, min(255, int(a[2] + (b[2] - a[2]) * frac))),
+    )
+
+
+def _candle_preview_rgb(palette: list[str], phase: float, fixture_index: int, total_fixtures: int):
+    palette = [c for c in (palette or []) if isinstance(c, str) and c.startswith("#")]
+    if not palette:
+        palette = ["#3A1000", "#FF6A00", "#FFD080"]
+    base = _hex_to_rgb(palette[0])
+    mid = _hex_to_rgb(palette[1] if len(palette) > 1 else palette[0])
+    peak = _hex_to_rgb(palette[2] if len(palette) > 2 else palette[-1])
+    seed = (fixture_index + 1) * 1.618 + max(1, total_fixtures) * 0.071
+    n1 = 0.5 + 0.5 * math.sin(phase * 0.91 + seed * 1.7)
+    n2 = 0.5 + 0.5 * math.sin(phase * 1.73 + seed * 2.9)
+    n3 = 0.5 + 0.5 * math.sin(phase * 0.37 + seed * 5.1)
+    pop = 0.16 if ((int(phase) * 37 + fixture_index * 101) % 29) in (0, 1) else 0.0
+    flicker = max(0.22, min(1.0, 0.34 + (n1 * 0.34) + (n2 * 0.18) + (n3 * 0.10) + pop))
+    if flicker < 0.62:
+        return _mix_rgb(base, mid, flicker / 0.62)
+    return _mix_rgb(mid, peak, (flicker - 0.62) / 0.38)
 
 
 def _parse_grouped_target_text(text: str):
@@ -514,6 +552,11 @@ class DMXLightingEditor:
             ("Neon Rush", ["#00FFC8", "#11B5FF", "#9F4BFF"], "chase", 70),
             ("Frost Bite", ["#0D2E5B", "#5AA5FF", "#D0F3FF"], "pulse", 49),
             ("Lava Flow", ["#4B0A00", "#A61D00", "#FF6A00"], "sweep", 57),
+            ("Orange Candle", ["#3A1000", "#FF6A00", "#FFD080", "#FFF2B8"], "candle", 180),
+            ("Blue Flame", ["#00143A", "#006BFF", "#8FE8FF", "#FFFFFF"], "candle", 165),
+            ("Red Flame", ["#2B0000", "#CC1600", "#FF7A2A", "#FFD0A0"], "candle", 165),
+            ("Green Flame", ["#002B12", "#00AA3A", "#99FF66", "#E8FFD0"], "candle", 170),
+            ("Ember Glow", ["#180300", "#7A1500", "#FF5A00"], "candle", 260),
             ("Electric Surge", ["#00D4FF", "#48A4FF", "#A5F5FF"], "strobe", 88),
             ("Midnight Bloom", ["#050A1F", "#322A7A", "#B86BFF"], "fade", 38),
             ("Copper Sunset", ["#331800", "#B05A22", "#F4B178"], "fade", 34),
@@ -1447,6 +1490,11 @@ class DMXLightingEditor:
         pattern_type = str(effect.get("pattern_type", "static") or "static")
         if category in {"switch", "dimmer"}:
             speed = effect.get("speed", CYCLE_DEFAULT_MS)
+        elif pattern_type == "candle":
+            # Candle speeds are real milliseconds, not legacy 0-100 visualizer
+            # values. Keep the natural flicker defaults unless the user changes
+            # the cycle controls for that target layer.
+            speed = effect.get("speed", 120)
         elif pattern_type in RGB_CYCLE_PATTERN_TYPES:
             # Legacy RGB effect speeds are 0-100-ish visualizer values, not
             # milliseconds. Use a sane default and let the assignment store the
@@ -2282,6 +2330,10 @@ class DMXLightingEditor:
                 return f"#{level:02x}{level:02x}{level:02x}"
             level = max(0, min(255, int(effect.get("dimmer_level", 255))))
             return f"#{level:02x}{level:02x}{level:02x}"
+
+        if pattern == "candle":
+            r, g, b = _candle_preview_rgb(palette, phase, fixture_index, total_fixtures)
+            return _rgb_to_hex(r, g, b)
 
         if pattern == "static":
             # Static: show first palette color (or per-fixture if enough colors)

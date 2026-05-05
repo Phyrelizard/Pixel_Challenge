@@ -55,8 +55,17 @@
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
-          "effect": "Cool Blue Static",
-          "apply_to": "All Fixtures"
+          "layers": [
+            {
+              "effect": "Cool Blue Static",
+              "apply_to": "All Fixtures",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250
+            }
+          ],
+          "active_target": "All Fixtures",
+          "sync_timing": false
         },
         "Bonus": {
           "effect": "Solar Flare",
@@ -147,31 +156,32 @@
               "apply_to": "No Fixtures"
             },
             {
-              "effect": "Rainbow Wave (Copy)",
+              "effect": "Midnight Bloom",
               "apply_to": "ThinTri Heads",
-              "fade_enabled": false,
+              "fade_enabled": true,
               "fade_in_ms": 250,
               "fade_out_ms": 250,
               "cycle_speed": 300
             },
             {
-              "effect": "Switch Sequence RL",
-              "apply_to": "DMX Switches",
-              "fade_enabled": false,
-              "fade_in_ms": 250,
-              "fade_out_ms": 250,
-              "cycle_speed": 700
+              "effect": "Dimmer Off",
+              "apply_to": "DMX Dimmers",
+              "fade_enabled": true,
+              "fade_in_ms": 750,
+              "fade_out_ms": 750,
+              "cycle_speed": 1000
             },
             {
-              "effect": "Dimmer Ping Pong",
-              "apply_to": "DMX Dimmers",
+              "effect": "Orange Candle",
+              "apply_to": "BET",
               "fade_enabled": false,
               "fade_in_ms": 250,
               "fade_out_ms": 250,
-              "cycle_speed": 1600
+              "strobe_speed": 90,
+              "cycle_speed": 800
             }
           ],
-          "active_target": "DMX Dimmers",
+          "active_target": "BET",
           "sync_timing": false
         },
         "Bonus": {
@@ -718,12 +728,12 @@
               "apply_to": "No Fixtures"
             },
             {
-              "effect": "Dimmer Ping Pong",
+              "effect": "Dimmer Off",
               "apply_to": "DMX Dimmers",
               "fade_enabled": false,
               "fade_in_ms": 250,
               "fade_out_ms": 250,
-              "cycle_speed": 900
+              "cycle_speed": 100
             },
             {
               "effect": "Switch Ping Pong",
@@ -740,9 +750,25 @@
               "fade_in_ms": 250,
               "fade_out_ms": 250,
               "cycle_speed": 400
+            },
+            {
+              "effect": "Static Green",
+              "apply_to": "BETOP1",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 500
+            },
+            {
+              "effect": "Green Flame",
+              "apply_to": "BET",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 100
             }
           ],
-          "active_target": "DMX Dimmers",
+          "active_target": "BET",
           "sync_timing": false
         },
         "Bonus": {
@@ -774,8 +800,28 @@
           "apply_to": "No Fixtures"
         },
         "Overlay 4": {
-          "effect": null,
-          "apply_to": "No Fixtures"
+          "layers": [
+            {
+              "effect": null,
+              "apply_to": "No Fixtures"
+            },
+            {
+              "effect": "Static Dark Blue",
+              "apply_to": "BET",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250
+            },
+            {
+              "effect": "Dimmer 100%",
+              "apply_to": "DMX Dimmers",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250
+            }
+          ],
+          "active_target": "BET",
+          "sync_timing": false
         }
       }
     },
@@ -851,12 +897,85 @@
           "apply_to": "No Fixtures"
         }
       }
+    },
+    {
+      "game": "surround",
+      "profile_name": "Default Copy",
+      "layout_id": "small_rig_8_fixture",
+      "assignments": {
+        "Gameplay": {
+          "layers": [
+            {
+              "effect": null,
+              "apply_to": "No Fixtures"
+            },
+            {
+              "effect": "Dimmer Ping Pong",
+              "apply_to": "DMX Dimmers",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 900
+            },
+            {
+              "effect": "Switch Ping Pong",
+              "apply_to": "DMX Switches",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 1300
+            },
+            {
+              "effect": "Rainbow Wave (Copy)",
+              "apply_to": "ThinTri Heads",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 400
+            }
+          ],
+          "active_target": "DMX Dimmers",
+          "sync_timing": false
+        },
+        "Bonus": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Danger": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Special": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Randomizer": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Overlay 1": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Overlay 2": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Overlay 3": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Overlay 4": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        }
+      }
     }
   ],
   "active_profiles": {
     "dot_dash": "Default Copy",
     "pixel_pop": "Default Copy",
-    "surround": "Default Small Rig",
+    "surround": "Default Copy",
     "ascend": "Default Small Rig",
     "global": "Default Small Rig",
     "console": "Default",

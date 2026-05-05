@@ -127,6 +127,26 @@
           "universe": 9,
           "start_address": 40,
           "channels": 1
+        },
+        {
+          "id": "F13",
+          "type": "wash",
+          "profile_id": "betopper_lpc-019-h_7-ch",
+          "x": 76,
+          "y": 144,
+          "direction": "down",
+          "universe": 9,
+          "start_address": 41
+        },
+        {
+          "id": "F14",
+          "type": "wash",
+          "profile_id": "betopper_lpc-019-h_7-ch",
+          "x": 821,
+          "y": 176,
+          "direction": "down",
+          "universe": 9,
+          "start_address": 48
         }
       ],
       "targets": {
@@ -142,7 +162,9 @@
           "F9",
           "F10",
           "F11",
-          "F12"
+          "F12",
+          "F13",
+          "F14"
         ],
         "ThinTri Heads": [
           "F1",
@@ -223,6 +245,16 @@
           "F5",
           "F6",
           "F7"
+        ],
+        "F13": [
+          "F13"
+        ],
+        "F14": [
+          "F14"
+        ],
+        "BET": [
+          "F13",
+          "F14"
         ]
       }
     }

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "dot_dash": {
-    "sample_count": 182,
+    "sample_count": 183,
     "last_calibrated": 1777876778.7032425,
     "reaction_times_ms": [
       556.0,
@@ -183,7 +183,8 @@
       402.0,
       293.0,
       249.0,
-      485.0
+      485.0,
+      169.0
     ],
     "accuracies": [
       0.93,
@@ -367,6 +368,7 @@
       1.0,
       0.97,
       1.0,
+      0.99,
       0.99
     ],
     "thresholds": {

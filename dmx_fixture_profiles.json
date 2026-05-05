@@ -30,7 +30,9 @@
         "dmx_num_fixtures": 4,
         "dmx_channels_per_fixture": 8,
         "dmx_start_address": 1
-      }
+      },
+      "intensity_scale": 1.0,
+      "intensity_cap_percent": 100
     },
     {
       "manufacturer": "dps",
@@ -55,7 +57,9 @@
         "full": 255
       },
       "notes": "",
-      "id": "dps_switch"
+      "id": "dps_switch",
+      "intensity_scale": 1.0,
+      "intensity_cap_percent": 100
     },
     {
       "id": "elation_dp_dmx4b",
@@ -91,7 +95,9 @@
         "off": 0,
         "full": 255
       },
-      "notes": "4-channel dimmer/switch pack at address 37. This one profile drives all four pack outputs together. For independent output control, add four one-channel fixtures at addresses 37, 38, 39, and 40 instead."
+      "notes": "4-channel dimmer/switch pack at address 37. This one profile drives all four pack outputs together. For independent output control, add four one-channel fixtures at addresses 37, 38, 39, and 40 instead.",
+      "intensity_scale": 1.0,
+      "intensity_cap_percent": 100
     },
     {
       "id": "elation_dp_dmx4b_port",
@@ -117,7 +123,38 @@
         "off": 0,
         "full": 255
       },
-      "notes": "Use this profile for each independent output port on an Elation DP-DMX4B: F9=37, F10=38, F11=39, F12=40. Use the 4-channel pack profile only when one fixture should represent the whole pack."
+      "notes": "Use this profile for each independent output port on an Elation DP-DMX4B: F9=37, F10=38, F11=39, F12=40. Use the 4-channel pack profile only when one fixture should represent the whole pack.",
+      "intensity_scale": 1.0,
+      "intensity_cap_percent": 100
+    },
+    {
+      "manufacturer": "BeTopper",
+      "model": "LPC-019-H 7-CH",
+      "channels": 3,
+      "channel_map": {
+        "red": 1,
+        "green": 2,
+        "blue": 3
+      },
+      "runtime_config": {
+        "dmx_universe": 9,
+        "dmx_num_fixtures": 2,
+        "dmx_channels_per_fixture": 3,
+        "dmx_start_address": 41
+      },
+      "intensity_scale": 0.3,
+      "intensity_cap_percent": 30,
+      "strobe_range": {
+        "off_max": 15,
+        "min": 16,
+        "max": 255
+      },
+      "dimmer_range": {
+        "off": 0,
+        "full": 255
+      },
+      "notes": "",
+      "id": "betopper_lpc-019-h_7-ch"
     }
   ]
 }

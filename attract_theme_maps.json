@@ -1,5 +1,5 @@
 {
-  "auto_enabled": false,
+  "auto_enabled": true,
   "cycle_enabled": true,
   "cycle_seconds": 20,
   "per_theme_speed": {
@@ -15,10 +15,40 @@
     "Lane Chase RL": 3
   },
   "selected_themes": [
-    "Color Wash",
-    "Bounce Chase",
-    "Galaxy Wave"
+    "Ember Glow"
   ],
+  "flame_theme_tuning": {
+    "Candle Flame": {
+      "height": 25,
+      "rate": 85,
+      "bite": 78,
+      "smooth": 25
+    },
+    "Blue Flame": {
+      "height": 22,
+      "rate": 50,
+      "bite": 45,
+      "smooth": 25
+    },
+    "Red Flame": {
+      "height": 56,
+      "rate": 82,
+      "bite": 48,
+      "smooth": 28
+    },
+    "Green Flame": {
+      "height": 58,
+      "rate": 80,
+      "bite": 42,
+      "smooth": 30
+    },
+    "Ember Glow": {
+      "height": 30,
+      "rate": 80,
+      "bite": 16,
+      "smooth": 42
+    }
+  },
   "sash_left_attract_bottom": 576,
   "sash_center_ctrl": 401,
   "sash_main_info": 504,
@@ -52,8 +82,8 @@
   "game_mode": 1,
   "window_geometry": "1920x992+1920+52",
   "dmx_universe": 9,
-  "dmx_num_fixtures": 4,
-  "dmx_channels_per_fixture": 1,
-  "dmx_start_address": 37,
-  "dmx_profile_id": "elation_dp_dmx4b_port"
+  "dmx_num_fixtures": 2,
+  "dmx_channels_per_fixture": 3,
+  "dmx_start_address": 41,
+  "dmx_profile_id": "betopper_lpc-019-h_7-ch"
 }

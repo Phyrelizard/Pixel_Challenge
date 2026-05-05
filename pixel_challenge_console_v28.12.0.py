@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v28.10.8
+Pixel Challenge Host Console v28.12.0
 
 """
 
@@ -33,7 +33,7 @@ from games.base import PlayerConfig
 from sla import SLAStore, SLACalibration
 from dmx_editor import DMXLightingEditor
 
-VERSION_LABEL = "v28.10.8"
+VERSION_LABEL = "v28.12.0"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 DEFAULT_FALCON_IP = "192.168.2.113"
@@ -105,6 +105,17 @@ def _safe_int(value, default: int) -> int:
         return int(float(text))
     except Exception:
         return int(default)
+
+
+def _safe_float(value, default: float) -> float:
+    """Parse a float-like value safely, tolerating blanks during Tk edits."""
+    try:
+        text = str(value).strip().replace("%", "")
+        if text == "":
+            return float(default)
+        return float(text)
+    except Exception:
+        return float(default)
 
 
 def scale_color(rgb, factor: float):
@@ -280,6 +291,130 @@ class FalconService:
             self.send_lane_pixels(player_id, "left", [COLOR_MAP[test_colors[player_id]["left"]]] * self.pixels_per_lane)
             self.send_lane_pixels(player_id, "right", [COLOR_MAP[test_colors[player_id]["right"]]] * self.pixels_per_lane)
 
+    def _mix_rgb(self, a, b, t: float):
+        """Blend two RGB tuples with t clamped to 0.0-1.0."""
+        t = max(0.0, min(1.0, float(t)))
+        return (
+            clamp8(a[0] + (b[0] - a[0]) * t),
+            clamp8(a[1] + (b[1] - a[1]) * t),
+            clamp8(a[2] + (b[2] - a[2]) * t),
+        )
+
+    def _smooth_wave(self, phase: float, seed: float) -> float:
+        """Deterministic pseudo-noise in the 0.0-1.0 range.
+
+        This avoids harsh random jumps while still giving each lane a unique
+        motion profile.  It is intentionally made from mixed sine waves so the
+        flame can be redrawn from frame number alone without keeping per-lane
+        animation state.
+        """
+        v = (
+            math.sin(phase + seed) * 0.52
+            + math.sin((phase * 0.43) + (seed * 1.91)) * 0.31
+            + math.sin((phase * 1.37) + (seed * 0.57)) * 0.17
+        )
+        return 0.5 + 0.5 * max(-1.0, min(1.0, v))
+
+    def _flame_theme_pixels(self, theme_name: str, lane_slot: int, step: int):
+        """Render a vertical flame for one lane.
+
+        v28.12.0: each pixel lane is treated as its own candle wick.  The
+        bottom of the lane is the flame base, the height eases up/down, and the
+        tip is intentionally more unstable than the body.  Global Theme/Game
+        Brightness still acts as the final master intensity in _build_frame().
+        """
+        n = max(1, int(self.pixels_per_lane))
+        name = (theme_name or "").lower()
+        configs = {
+            "candle flame": {
+                "core": (255, 205, 95), "mid": (255, 105, 0), "edge": (160, 24, 0), "bg": (10, 1, 0),
+                "base": 0.55, "swing": 0.22, "floor": 0.06, "speed": 1.00, "spark": 0.13,
+            },
+            "orange flame": {
+                "core": (255, 210, 95), "mid": (255, 95, 0), "edge": (155, 18, 0), "bg": (10, 1, 0),
+                "base": 0.56, "swing": 0.23, "floor": 0.06, "speed": 1.03, "spark": 0.14,
+            },
+            "blue flame": {
+                "core": (185, 235, 255), "mid": (0, 120, 255), "edge": (0, 16, 170), "bg": (0, 0, 14),
+                "base": 0.60, "swing": 0.22, "floor": 0.05, "speed": 1.10, "spark": 0.10,
+            },
+            "red flame": {
+                "core": (255, 85, 25), "mid": (230, 0, 0), "edge": (95, 0, 0), "bg": (12, 0, 0),
+                "base": 0.52, "swing": 0.22, "floor": 0.05, "speed": 1.12, "spark": 0.12,
+            },
+            "green flame": {
+                "core": (205, 255, 85), "mid": (0, 225, 55), "edge": (0, 82, 22), "bg": (0, 10, 3),
+                "base": 0.55, "swing": 0.21, "floor": 0.05, "speed": 1.06, "spark": 0.11,
+            },
+            "ember glow": {
+                "core": (255, 95, 18), "mid": (150, 24, 0), "edge": (52, 4, 0), "bg": (5, 0, 0),
+                "base": 0.34, "swing": 0.13, "floor": 0.08, "speed": 0.58, "spark": 0.05,
+            },
+        }
+        cfg = configs.get(name, configs["candle flame"])
+        seed = 1.73 + lane_slot * 2.619
+        t = step * 0.145 * cfg["speed"]
+
+        height_noise = self._smooth_wave(t * 1.20, seed)
+        height = cfg["base"] + cfg["swing"] * (height_noise - 0.5) * 2.0
+        height = max(0.16, min(0.92, height))
+
+        # Occasional deterministic flare/dip.  This is small enough to feel
+        # like a flame flutter, not a whole-lane blink.
+        flare_wave = math.sin((step * 0.39 * cfg["speed"]) + seed * 3.17)
+        if flare_wave > 0.88:
+            height += (flare_wave - 0.88) * 0.30
+        elif flare_wave < -0.93:
+            height -= (-0.93 - flare_wave) * 0.22
+        height = max(0.14, min(0.96, height))
+
+        pixels = []
+        denom = max(1, n - 1)
+        for i in range(n):
+            # Treat pixel 0 as the bottom/base of the vertical lane.  If a lane
+            # is physically wired upside-down, this is the one place to flip.
+            y = i / denom
+
+            tip_wiggle = (
+                0.055 * math.sin((step * 0.30 * cfg["speed"]) + seed + y * 9.0)
+                + 0.035 * math.sin((step * 0.73 * cfg["speed"]) + seed * 0.4 + y * 21.0)
+            )
+            local_height = max(0.08, min(1.0, height + tip_wiggle))
+
+            if y > local_height:
+                fade = max(0.0, 1.0 - ((y - local_height) / 0.10))
+                pixels.append(scale_color(cfg["bg"], cfg["floor"] + fade * 0.18))
+                continue
+
+            pos = y / max(0.01, local_height)
+            body = max(0.0, 1.0 - pos)
+            shimmer = 0.86 + 0.14 * math.sin((step * 0.86 * cfg["speed"]) + seed * 1.31 + y * 17.0)
+            tip_flutter = 1.0 + (0.22 * math.sin((step * 1.10 * cfg["speed"]) + seed * 2.1 + y * 31.0) * max(0.0, pos - 0.58))
+            level = (cfg["floor"] + (body ** 0.55) * 0.94) * shimmer * tip_flutter
+
+            # Small bright lick that travels through the flame body, different
+            # for every lane slot.
+            lick_center = 0.18 + 0.55 * self._smooth_wave((step * 0.10 * cfg["speed"]) + seed * 0.2, seed * 1.7)
+            lick = max(0.0, 1.0 - abs(pos - lick_center) / 0.12)
+            level += lick * 0.16
+
+            # Rare little spark/hot pop near the upper body.
+            spark_phase = math.sin((step * 0.47 * cfg["speed"]) + seed * 4.7)
+            if spark_phase > (1.0 - cfg["spark"]):
+                spark_pos = 0.55 + 0.32 * self._smooth_wave((step * 0.21) + seed, seed * 3.2)
+                spark = max(0.0, 1.0 - abs(pos - spark_pos) / 0.035)
+                level += spark * 0.45
+
+            level = max(0.0, min(1.0, level))
+            if pos < 0.26:
+                color = self._mix_rgb(cfg["core"], cfg["mid"], pos / 0.26)
+            elif pos < 0.78:
+                color = self._mix_rgb(cfg["mid"], cfg["edge"], (pos - 0.26) / 0.52)
+            else:
+                color = self._mix_rgb(cfg["edge"], cfg["bg"], (pos - 0.78) / 0.22)
+            pixels.append(scale_color(color, level))
+        return pixels
+
     def render_theme_frame(self, theme_name: str, step: int):
         lane_slots = [
             (1, "left"), (1, "right"), (2, "left"), (2, "right"),
@@ -300,6 +435,8 @@ class FalconService:
 
     def _theme_pixels(self, theme_name: str, lane_slot: int, step: int):
         n = self.pixels_per_lane
+        if theme_name in {"candle flame", "orange flame", "blue flame", "red flame", "green flame", "ember glow"}:
+            return self._flame_theme_pixels(theme_name, lane_slot, step)
         if theme_name == "rainbow pulse":
             return [hsv_rgb((i / n) + (step * 0.02) + (lane_slot * 0.08), 1.0, 0.35 + 0.30 * (0.5 + 0.5 * math.sin(step * 0.18))) for i in range(n)]
         if theme_name == "fire burst":
@@ -433,6 +570,27 @@ class DMXService:
             has_rgb = isinstance(cmap, dict) and any(k in cmap for k in ("red", "green", "blue", "white", "amber", "uv"))
             return channels > 1 and has_output and not has_rgb
 
+        def _coerce_intensity_scale(*values) -> float:
+            """Return a 0.0-1.0 fixture/profile intensity cap.
+
+            Profiles store the preferred value as intensity_scale.  For convenience,
+            also accept percent-style values such as 12 or "12%".
+            """
+            for value in values:
+                if value is None:
+                    continue
+                try:
+                    text = str(value).strip().replace("%", "")
+                    if text == "":
+                        continue
+                    number = float(text)
+                    if number > 1.0:
+                        number = number / 100.0
+                    return max(0.0, min(1.0, number))
+                except Exception:
+                    continue
+            return 1.0
+
         # Detect profiles used as four independent ports instead of one pack.
         # A run like 37,38,39,40 with the same multi-channel direct profile means
         # each layout fixture should own only its start address.
@@ -477,6 +635,13 @@ class DMXService:
             profile_obj = self.profiles_by_id.get(profile_id) or {}
             channel_map = dict(profile_obj.get("channel_map") or raw.get("channel_map") or self.profile or {})
             channels = int(profile_obj.get("channels") or raw.get("channels") or raw.get("channels_per_fixture") or self.channels_per_fixture or 1)
+            intensity_scale = _coerce_intensity_scale(
+                raw.get("intensity_scale"),
+                raw.get("intensity_cap_percent"),
+                profile_obj.get("intensity_scale"),
+                profile_obj.get("intensity_cap_percent"),
+                profile_obj.get("intensity_cap"),
+            )
 
             if profile_id in per_port_profile_ids and _profile_is_direct_pack(profile_obj):
                 # Per-port layout: F9=37, F10=38, F11=39, F12=40.  Force each
@@ -495,6 +660,7 @@ class DMXService:
                 "start_address": start_address,
                 "channels": channels,
                 "channel_map": channel_map,
+                "intensity_scale": intensity_scale,
             })
         return normalized
 
@@ -508,6 +674,23 @@ class DMXService:
         if self.fixture_defs and 0 <= fixture_index < len(self.fixture_defs):
             return dict(self.fixture_defs[fixture_index].get("channel_map") or {})
         return dict(self.profile or {})
+
+    def _fixture_intensity_scale(self, fixture_index: int) -> float:
+        """Return a 0.0-1.0 profile brightness cap for this fixture.
+
+        This lets high-output RGB fixtures, such as 3CH Betopper cans, be
+        globally trimmed without reducing the rest of the DMX rig.
+        """
+        raw = 1.0
+        if self.fixture_defs and 0 <= fixture_index < len(self.fixture_defs):
+            raw = self.fixture_defs[fixture_index].get("intensity_scale", 1.0)
+        try:
+            value = float(str(raw).strip().replace("%", ""))
+            if value > 1.0:
+                value = value / 100.0
+            return max(0.0, min(1.0, value))
+        except Exception:
+            return 1.0
 
     def _fixture_uses_switch_channel(self, fixture_index: int) -> bool:
         return "switch" in self._fixture_profile(fixture_index)
@@ -722,6 +905,105 @@ class DMXService:
             return []
         return [self._step_pattern_level(pattern, step, channel_idx, count) for channel_idx in range(count)]
 
+    def _mix_rgb(self, a: tuple[int, int, int], b: tuple[int, int, int], frac: float) -> tuple[int, int, int]:
+        """Blend two RGB colors by frac 0.0-1.0."""
+        frac = max(0.0, min(1.0, float(frac)))
+        return (
+            clamp8(a[0] + (b[0] - a[0]) * frac),
+            clamp8(a[1] + (b[1] - a[1]) * frac),
+            clamp8(a[2] + (b[2] - a[2]) * frac),
+        )
+
+    def _candle_slot(self, colors: list, phase: float, slot_index: int, slot_count: int = 1) -> tuple[int, int, int, int]:
+        """Return independent candle/flame RGB + dimmer for one fixture slot.
+
+        v28.11.1: Candle effects now use continuous eased motion instead of
+        step-to-step random jumps.  Each selected fixture still has its own
+        independent wick, but the normal flame body drifts smoothly and only
+        the small flicker accents move quickly.
+        """
+        palette = [c for c in (colors or []) if isinstance(c, str) and c.startswith("#")]
+        if not palette:
+            palette = ["#4A1400", "#FF6A00", "#FFD080"]
+        base = _hex_to_rgb(palette[0])
+        mid = _hex_to_rgb(palette[1] if len(palette) > 1 else palette[0])
+        peak = _hex_to_rgb(palette[2] if len(palette) > 2 else palette[-1])
+        sparkle = _hex_to_rgb(palette[3] if len(palette) > 3 else palette[-1])
+
+        # "phase" is a continuous time value, not a discrete frame number.
+        # Speed controls in the editor still matter because callers derive this
+        # from elapsed_ms / speed_ms.  The coefficients below intentionally keep
+        # the main flame slow, then add rare short pulses/dips on top.
+        try:
+            t = float(phase)
+        except Exception:
+            t = 0.0
+        slot_count = max(1, int(slot_count or 1))
+        seed = (slot_index + 1) * 2.173 + slot_count * 0.097
+        ember_style = len(palette) <= 3
+
+        slow_body = 0.5 + 0.5 * math.sin(t * 0.42 + seed * 1.31)
+        soft_drift = 0.5 + 0.5 * math.sin(t * 0.89 + seed * 2.17)
+        tiny_flutter = 0.5 + 0.5 * math.sin(t * 2.65 + seed * 4.71)
+
+        # Deterministic impulse generator: a few short smooth pulses/dips, not
+        # hard frame jumps.  Different fixture slots get different buckets so a
+        # group still looks like multiple separate candle wicks.
+        bucket_pos = t * (0.72 if ember_style else 1.18) + seed * 0.33
+        bucket = math.floor(bucket_pos)
+        frac = bucket_pos - bucket
+        hash_val = int(abs(math.sin((bucket + 1) * 12.9898 + (slot_index + 1) * 78.233) * 43758.5453)) % 100
+        accent = 0.0
+        if hash_val < (7 if ember_style else 14):
+            # quick bright lick
+            width = 0.32
+            if frac < width:
+                accent = (math.sin((frac / width) * math.pi) ** 1.4) * (0.10 if ember_style else 0.17)
+        elif hash_val < (12 if ember_style else 24):
+            # quick oxygen dip
+            width = 0.42
+            if frac < width:
+                accent = -(math.sin((frac / width) * math.pi) ** 1.2) * (0.08 if ember_style else 0.14)
+
+        if ember_style:
+            flicker = 0.30 + slow_body * 0.42 + soft_drift * 0.18 + tiny_flutter * 0.03 + accent
+        else:
+            flicker = 0.28 + slow_body * 0.34 + soft_drift * 0.22 + tiny_flutter * 0.08 + accent
+        flicker = max(0.18 if ember_style else 0.22, min(1.0, flicker))
+
+        # Use the eased brightness to drift through the palette.  The fourth
+        # palette color is used only near the top of the flame as a small sparkle
+        # so white/yellow accents do not dominate the whole effect.
+        if flicker < 0.58:
+            color = self._mix_rgb(base, mid, flicker / 0.58)
+        elif flicker < 0.90:
+            color = self._mix_rgb(mid, peak, (flicker - 0.58) / 0.32)
+        else:
+            color = self._mix_rgb(peak, sparkle, (flicker - 0.90) / 0.10)
+
+        # Keep the bottom of the candle visible but not harsh.  Fixture/profile
+        # intensity caps still apply later in _send_dmx_frame(), so the big
+        # Betoppers remain tamed here.
+        floor = 0.22 if ember_style else 0.28
+        dimmer = clamp8(self.brightness * (floor + (1.0 - floor) * flicker))
+        return color[0], color[1], color[2], dimmer
+
+    def _candle_phase(self, step: int, speed_ms: int | float | None = None, started_monotonic: float | None = None) -> float:
+        """Continuous candle phase derived from real elapsed time when possible."""
+        try:
+            speed = float(speed_ms if speed_ms is not None else 120)
+        except Exception:
+            speed = 120.0
+        speed = max(40.0, speed)
+        if started_monotonic is not None:
+            try:
+                return max(0.0, (time.monotonic() - float(started_monotonic)) * 1000.0 / speed)
+            except Exception:
+                pass
+        # Fallback for callers that only have an integer animation tick.  The
+        # scene timer is normally 50 ms for candle, so this still moves smoothly.
+        return max(0.0, float(step) * 50.0 / speed)
+
     def set_brightness(self, brightness_percent: int):
         """Set master brightness 0-100.
 
@@ -779,6 +1061,7 @@ class DMXService:
                 "colors": scene.get("colors", []),
                 "pattern": pat_type,
                 "speed": pattern.get("speed", 100),
+                "started_monotonic": time.monotonic(),
             }
             # Propagate fade envelope data if present
             fade = scene.get("fade")
@@ -864,6 +1147,7 @@ class DMXService:
         # Store pattern info for animated playback via animate_scene_step
         self._active_scene_data = {
             "colors": fc, "pattern": pat_type, "speed": speed,
+            "started_monotonic": time.monotonic(),
         }
         self._send_dmx_frame()
 
@@ -941,6 +1225,7 @@ class DMXService:
         # Store pattern info for animated playback via animate_scene_step
         self._active_scene_data = {
             "colors": fc, "pattern": pat_type, "speed": speed,
+            "started_monotonic": time.monotonic(),
         }
         self._send_dmx_frame()
 
@@ -1079,6 +1364,10 @@ class DMXService:
                         r, g, b = _hex_to_rgb(colors[layer_step % len(colors)])
                     strobe_val = max(16, min(255, speed))
                     dimmer_val = self.brightness
+                elif pattern == "candle":
+                    candle_phase = self._candle_phase(layer_step, speed, started)
+                    r, g, b, dimmer_val = self._candle_slot(colors, candle_phase, i, n)
+                    strobe_val = 0
                 elif pattern == "pulse":
                     if colors:
                         color_idx = (layer_step // 4) % len(colors)
@@ -1312,6 +1601,10 @@ class DMXService:
                 # the same RGB at each step so strobe themes remain visually
                 # consistent across the rig.
                 strobe_val = max(16, min(255, data.get("speed", 100)))
+            elif pat_type == "candle":
+                candle_phase = self._candle_phase(step, data.get("speed", 120), data.get("started_monotonic"))
+                r, g, b, dimmer_val = self._candle_slot(fc, candle_phase, i, n)
+                strobe_val = 0
             elif pat_type == "pulse":
                 import math
                 if fc:
@@ -1577,14 +1870,17 @@ class DMXService:
                     else:
                         _safe_set(offsets, value)
 
-                # RGB-only fixtures, like 3CH PAR cans, do not have a physical
-                # dimmer channel.  For those fixtures, apply the fixture dimmer
-                # value by scaling RGB directly.  Fixtures with a real dimmer
-                # channel, like ThinTri heads, keep full RGB and use the dimmer
-                # channel normally.
+                # v28.10.9: profile intensity cap.
+                # RGB-only fixtures (3CH PAR cans) have no physical dimmer, so
+                # apply both the scene/global dimmer and the profile cap by
+                # scaling RGB. Fixtures with a real dimmer channel keep full RGB
+                # and get the cap on their dimmer output instead.
+                intensity_scale = self._fixture_intensity_scale(i)
+                has_rgb = self._fixture_uses_rgb_channels(i)
+                has_dimmer = self._fixture_uses_dimmer_channel(i)
                 rgb_scale = 1.0
-                if self._fixture_uses_rgb_channels(i) and not self._fixture_uses_dimmer_channel(i):
-                    rgb_scale = clamp8(state.get("dimmer", self.brightness)) / 255.0
+                if has_rgb and not has_dimmer:
+                    rgb_scale = (clamp8(state.get("dimmer", self.brightness)) / 255.0) * intensity_scale
 
                 if "red" in p:
                     _safe_set_many(p["red"], clamp8(state.get("r", 0) * rgb_scale))
@@ -1623,7 +1919,10 @@ class DMXService:
                             _safe_set_many_or_list(output_offsets, state.get("switch", state.get("dimmer", 0)), "switch_channels")
                 else:
                     if "dimmer" in p:
-                        _safe_set_many_or_list(p["dimmer"], state.get("dimmer", 255), "dimmer_channels")
+                        dimmer_out = state.get("dimmer", 255)
+                        if has_rgb:
+                            dimmer_out = clamp8(dimmer_out * intensity_scale)
+                        _safe_set_many_or_list(p["dimmer"], dimmer_out, "dimmer_channels")
                     if "switch" in p:
                         _safe_set_many_or_list(p["switch"], state.get("switch", state.get("dimmer", 0)), "switch_channels")
                 if "dimmer_speed" in p:
@@ -1975,6 +2274,7 @@ class PixelChallengeConsole:
 
         self.theme_names = [
             "Rainbow Pulse", "Fire Burst", "Ice Burst", "Galaxy Wave", "Team Colors",
+            "Candle Flame", "Blue Flame", "Red Flame", "Green Flame", "Ember Glow",
             "Calm Mode", "Lane Chase LR", "Lane Chase RL", "Bounce Chase", "Color Wash",
         ]
         self.theme_vars = {}
@@ -2499,6 +2799,8 @@ class PixelChallengeConsole:
                         "dmx_channels_per_fixture": 8,
                         "dmx_start_address": 1,
                     },
+                    "intensity_scale": 1.0,
+                    "intensity_cap_percent": 100,
                     "strobe_range": {"off_max": 15, "min": 16, "max": 255},
                     "dimmer_range": {"off": 0, "full": 255},
                     "notes": "ThinTri 38 8CH mode: CH4 color macros override RGB at 16-255; CH5 strobe works when CH6 is 0-31; CH6 selects fixture pulse/auto/sound modes; CH7 dimmer must be >0 for visible output."
@@ -2524,6 +2826,15 @@ class PixelChallengeConsole:
                 runtime.setdefault("dmx_start_address", 1)
                 profile["runtime_config"] = runtime
                 profile["channels"] = _safe_int(profile.get("channels", runtime.get("dmx_channels_per_fixture", 8)), 8)
+                raw_scale = profile.get("intensity_scale", None)
+                if raw_scale is None and profile.get("intensity_cap_percent", None) is not None:
+                    raw_scale = _safe_float(profile.get("intensity_cap_percent", 100), 100.0) / 100.0
+                scale = _safe_float(raw_scale if raw_scale is not None else 1.0, 1.0)
+                if scale > 1.0:
+                    scale = scale / 100.0
+                scale = max(0.0, min(1.0, scale))
+                profile["intensity_scale"] = scale
+                profile["intensity_cap_percent"] = int(round(scale * 100))
             data = data if isinstance(data, dict) else {"profiles": profiles}
             data["profiles"] = profiles
             return data
@@ -2771,7 +3082,7 @@ class PixelChallengeConsole:
         return {
             "chase", "sweep", "bounce", "alternating", "palette_cycle",
             "wave", "wave_center", "wave_lr", "wave_player", "pulse",
-            "random_flash", "fade", "fade_loop", "sparkle",
+            "random_flash", "fade", "fade_loop", "sparkle", "candle",
             "build_up", "explosion",
         }
 
@@ -2786,6 +3097,8 @@ class PixelChallengeConsole:
         pattern = str(pattern or "static")
         if self.dmx and self.dmx._is_channel_step_pattern(pattern):
             return 500
+        if pattern == "candle":
+            return 180
         if pattern in self._visualizer_cycle_patterns():
             return 500
         return 100
@@ -3137,6 +3450,8 @@ class PixelChallengeConsole:
                 "profile_id": profile_id,
                 "channels": channels,
                 "channel_map": dict(profile.get("channel_map") or {}),
+                "intensity_scale": profile.get("intensity_scale", 1.0),
+                "intensity_cap_percent": profile.get("intensity_cap_percent", 100),
             })
             match = re.match(r"^F(\d+)$", fid)
             if match:
@@ -3293,6 +3608,11 @@ class PixelChallengeConsole:
         ("Neon Rush", ["#00FFC8", "#11B5FF", "#9F4BFF"], "chase", 70),
         ("Frost Bite", ["#0D2E5B", "#5AA5FF", "#D0F3FF"], "pulse", 49),
         ("Lava Flow", ["#4B0A00", "#A61D00", "#FF6A00"], "sweep", 57),
+        ("Orange Candle", ["#3A1000", "#FF6A00", "#FFD080", "#FFF2B8"], "candle", 180),
+        ("Blue Flame", ["#00143A", "#006BFF", "#8FE8FF", "#FFFFFF"], "candle", 165),
+        ("Red Flame", ["#2B0000", "#CC1600", "#FF7A2A", "#FFD0A0"], "candle", 165),
+        ("Green Flame", ["#002B12", "#00AA3A", "#99FF66", "#E8FFD0"], "candle", 170),
+        ("Ember Glow", ["#180300", "#7A1500", "#FF5A00"], "candle", 260),
         ("Electric Surge", ["#00D4FF", "#48A4FF", "#A5F5FF"], "strobe", 88),
         ("Midnight Bloom", ["#050A1F", "#322A7A", "#B86BFF"], "fade", 38),
         ("Copper Sunset", ["#331800", "#B05A22", "#F4B178"], "fade", 34),
@@ -3480,7 +3800,7 @@ class PixelChallengeConsole:
             "strobe", "pulse", "chase", "sweep", "bounce", "alternating",
             "palette_cycle", "wave", "random_flash", "fade_loop", "fade",
             "sparkle", "breathing", "wave_center", "wave_lr", "wave_player",
-            "build_up", "explosion",
+            "build_up", "explosion", "candle",
         }
         if pat == "composite":
             # v28.10.2/v28.10.3: composite/layered scenes need a steady
@@ -3492,6 +3812,10 @@ class PixelChallengeConsole:
             return default_interval
         if self.dmx._is_channel_step_pattern(str(pat)):
             return max(50, min(3000, int(data.get("speed", default_interval) or default_interval)))
+        # Candle needs a steady frame clock so the easing looks smooth; its
+        # saved speed still controls flame movement inside _candle_phase().
+        if str(pat) == "candle":
+            return 50
         # Non-layered RGB animated previews may also carry a cycle speed.
         if str(pat) in animated_patterns and str(pat) != "strobe":
             return max(50, min(3000, int(data.get("speed", default_interval) or default_interval)))
@@ -6911,7 +7235,7 @@ class PixelChallengeConsole:
         is_edit = source_profile is not None and not copy_mode
         dialog_title = "Edit Fixture Profile" if is_edit else ("Copy Fixture Profile" if copy_mode else "Add Fixture Profile")
         dlg.title(dialog_title)
-        dlg.geometry("600x700")
+        dlg.geometry("600x740")
         dlg.transient(self.setup_window)
         dlg.grab_set()
 
@@ -6936,6 +7260,10 @@ class PixelChallengeConsole:
         universe_var = tk.StringVar(value=str(_safe_int(runtime_cfg.get("dmx_universe", self.dmx_universe_num.get()), self.dmx_universe_num.get())))
         num_fixtures_var = tk.StringVar(value=str(_safe_int(runtime_cfg.get("dmx_num_fixtures", self.dmx_num_fixtures.get()), self.dmx_num_fixtures.get())))
         start_address_var = tk.StringVar(value=str(_safe_int(runtime_cfg.get("dmx_start_address", self.dmx_start_address.get()), self.dmx_start_address.get())))
+        raw_intensity = source_profile.get("intensity_cap_percent", None)
+        if raw_intensity is None:
+            raw_intensity = _safe_float(source_profile.get("intensity_scale", 1.0), 1.0) * 100.0
+        intensity_cap_var = tk.StringVar(value=str(int(round(max(0.0, min(100.0, _safe_float(raw_intensity, 100.0)))))))
 
         for row, (lbl, var, width) in enumerate([
             ("Manufacturer",       manufacturer_var, 24),
@@ -6944,6 +7272,7 @@ class PixelChallengeConsole:
             ("Number of Fixtures", num_fixtures_var,  6),
             ("Start Address",      start_address_var, 6),
             ("Channels",           channels_var,      6),
+            ("Intensity Cap %",    intensity_cap_var, 6),
         ]):
             tk.Label(form, text=lbl, bg="#1a1a2e", fg="white",
                      font=("Arial", 10)).grid(row=row, column=0, sticky="e", padx=(0, 8), pady=3)
@@ -7086,6 +7415,8 @@ class PixelChallengeConsole:
                     "dmx_channels_per_fixture": channels,
                     "dmx_start_address": max(1, _safe_int(start_address_var.get(), 1)),
                 },
+                "intensity_scale": max(0.0, min(1.0, _safe_float(intensity_cap_var.get(), 100.0) / 100.0)),
+                "intensity_cap_percent": max(0, min(100, _safe_int(intensity_cap_var.get(), 100))),
                 "strobe_range": {"off_max": strobe_off_var.get(),
                                   "min": strobe_min_var.get(),
                                   "max": strobe_max_var.get()},
@@ -7136,7 +7467,8 @@ class PixelChallengeConsole:
             self.log(
                 f"DMX profile {action}: {pid} "
                 f"U{rt.get('dmx_universe')} start {rt.get('dmx_start_address')} "
-                f"fixtures {rt.get('dmx_num_fixtures')} ch {rt.get('dmx_channels_per_fixture')}"
+                f"fixtures {rt.get('dmx_num_fixtures')} ch {rt.get('dmx_channels_per_fixture')} "
+                f"cap {saved_profile.get('intensity_cap_percent', 100)}%"
             )
             dlg.grab_release()
             dlg.destroy()

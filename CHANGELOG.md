@@ -1,3 +1,44 @@
+## v28.12.1 - Flame tuning popup and faster wick controls
+- Added a compact **TUNE** button under the theme scroll-down button for pixel Flame themes.
+- Added per-theme Flame tuning values for Height, Dip/Peak Rate, Flicker Bite, and Smoothness; values are saved in the existing attract/theme settings file.
+- Updated the pixel Flame renderer so dip/peak rate and flicker bite can be increased without changing overall Theme Brightness or Game Brightness.
+- Kept each lane independent so every lane still behaves like its own wick.
+- Updated start_console.sh to launch v28.12.1.
+
+## v28.12.1 - Flame tuning popup and faster wick controls
+- Added a compact **TUNE** button under the theme scroll-down button for pixel Flame themes.
+- Added per-theme Flame tuning values for Height, Dip/Peak Rate, Flicker Bite, and Smoothness; values are saved in the existing attract/theme settings file.
+- Updated the pixel Flame renderer so the dip/peak rate and flicker bite can be increased without changing overall Theme Brightness.
+- Kept the existing Theme Brightness and Game Brightness controls as overall intensity controls.
+- Updated start_console.sh to launch v28.12.1.
+
+## v28.12.0 - Pixel lane Flame themes
+- Added new pixel-lane Flame themes for attract mode: Candle Flame, Blue Flame, Red Flame, Green Flame, and Ember Glow.
+- Each vertical pixel lane now renders as its own independent wick with a base glow, moving flame body, bouncing tip, subtle color gradient, and occasional small spark/flicker accents.
+- The existing Theme Brightness and Game Brightness controls remain overall intensity controls; per-theme speed sliders still control the flame motion rate.
+- No DMX candle effect names or fixture intensity cap settings were changed.
+- Updated start_console.sh to launch v28.12.0.
+
+## v28.11.1 - Smoother candle flame motion
+- Refined Candle effects so brightness and color drift smoothly between targets instead of jumping to a new random level every update.
+- Added a steady 50 ms candle frame clock while keeping each effect's saved speed value as the flame movement rate.
+- Kept independent per-fixture wick behavior, but changed sharp motion to short eased flicker accents/dips so grouped fixtures look more natural.
+- Betopper 3CH RGB fixtures still obey Intensity Cap %, and Candle effects still avoid hardware strobe/switch channels.
+- Updated start_console.sh to launch v28.11.1.
+
+## v28.11.0 - Candle flame DMX effects
+- Added a new CANDLE effect category in the DMX Visualizer.
+- Added Orange Candle, Blue Flame, Red Flame, Green Flame, and Ember Glow built-in effects.
+- Added a new runtime `candle` pattern that gives each selected fixture its own independent pseudo-random flicker, so grouped lights mimic separate candle wicks instead of blinking in sync.
+- Candle effects use RGB/dimmer animation only and do not trigger hardware strobe channels or switch/relay outputs.
+- Updated start_console.sh to launch v28.11.0.
+
+## v28.10.9 - DMX fixture intensity caps
+- Added an Intensity Cap % field to fixture profiles for balancing high-output fixtures such as Betopper 3CH RGB PAR lights.
+- RGB-only fixtures now obey the DMX/global brightness slider by scaling RGB values directly when they do not have a physical dimmer channel.
+- Fixtures with real RGB dimmer channels apply the profile cap to their dimmer output while keeping switch/relay/dimmer-pack outputs unaffected.
+- Updated start_console.sh to launch v28.10.9.
+
 ## v28.10.8 - Copy profiles across game lists
 - Added COPY TO GAME in the DMX Visualizer profile controls so a finished profile can be cloned into another game profile dropdown.
 - Cross-game copies preserve all element layer assignments, independent timing values, fade settings, strobe speeds, targets, and sync timing flags for matching game elements.
