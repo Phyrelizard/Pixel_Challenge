@@ -24,12 +24,12 @@
         "off": 0,
         "full": 255
       },
-      "notes": "Dimmer CH4 must be >0 for output. Color macros CH6: 0-15 no function, 16-255 overrides RGB.",
+      "notes": "ThinTri 38 8CH profile. Current rig uses A033, A041, A049, A057.",
       "runtime_config": {
         "dmx_universe": 9,
         "dmx_num_fixtures": 4,
         "dmx_channels_per_fixture": 8,
-        "dmx_start_address": 1
+        "dmx_start_address": 33
       },
       "intensity_scale": 1.0,
       "intensity_cap_percent": 100
@@ -84,7 +84,7 @@
         "dmx_universe": 9,
         "dmx_num_fixtures": 1,
         "dmx_channels_per_fixture": 4,
-        "dmx_start_address": 37
+        "dmx_start_address": 65
       },
       "strobe_range": {
         "off_max": 15,
@@ -95,7 +95,7 @@
         "off": 0,
         "full": 255
       },
-      "notes": "4-channel dimmer/switch pack at address 37. This one profile drives all four pack outputs together. For independent output control, add four one-channel fixtures at addresses 37, 38, 39, and 40 instead.",
+      "notes": "4-channel DP-DMX4B pack at A065. This profile represents the whole pack; for independent output control, use the DP-DMX4B Port profile for four one-channel fixtures at 65-68.",
       "intensity_scale": 1.0,
       "intensity_cap_percent": 100
     },
@@ -112,7 +112,7 @@
         "dmx_universe": 9,
         "dmx_num_fixtures": 4,
         "dmx_channels_per_fixture": 1,
-        "dmx_start_address": 37
+        "dmx_start_address": 193
       },
       "strobe_range": {
         "off_max": 15,
@@ -123,37 +123,41 @@
         "off": 0,
         "full": 255
       },
-      "notes": "Use this profile for each independent output port on an Elation DP-DMX4B: F9=37, F10=38, F11=39, F12=40. Use the 4-channel pack profile only when one fixture should represent the whole pack.",
+      "notes": "Use this profile for independent DP-DMX4B outputs: F9=65, F10=66, F11=67, F12=68.",
       "intensity_scale": 1.0,
       "intensity_cap_percent": 100
     },
     {
       "manufacturer": "BeTopper",
       "model": "LPC-019-H 7-CH",
-      "channels": 3,
+      "channels": 7,
       "channel_map": {
-        "red": 1,
-        "green": 2,
-        "blue": 3
+        "dimmer": 1,
+        "red": 2,
+        "green": 3,
+        "blue": 4,
+        "strobe": 5,
+        "mode": 6,
+        "sound_active": 7
       },
       "runtime_config": {
         "dmx_universe": 9,
-        "dmx_num_fixtures": 2,
-        "dmx_channels_per_fixture": 3,
-        "dmx_start_address": 41
+        "dmx_num_fixtures": 4,
+        "dmx_channels_per_fixture": 7,
+        "dmx_start_address": 1
       },
-      "intensity_scale": 0.3,
-      "intensity_cap_percent": 30,
+      "intensity_scale": 0.1,
+      "intensity_cap_percent": 10,
       "strobe_range": {
-        "off_max": 15,
-        "min": 16,
+        "off_max": 0,
+        "min": 1,
         "max": 255
       },
       "dimmer_range": {
         "off": 0,
         "full": 255
       },
-      "notes": "",
+      "notes": "Betopper LPC 7CH: CH1 master dimmer, CH2 red, CH3 green, CH4 blue, CH5 strobe, CH6 mode kept at 0 for DMX dimming, CH7 sound-active kept at 0.",
       "id": "betopper_lpc-019-h_7-ch"
     }
   ]

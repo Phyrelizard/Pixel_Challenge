@@ -82,8 +82,8 @@
   "game_mode": 1,
   "window_geometry": "1920x992+1920+52",
   "dmx_universe": 9,
-  "dmx_num_fixtures": 2,
-  "dmx_channels_per_fixture": 3,
-  "dmx_start_address": 41,
-  "dmx_profile_id": "betopper_lpc-019-h_7-ch"
+  "dmx_num_fixtures": 4,
+  "dmx_channels_per_fixture": 1,
+  "dmx_start_address": 193,
+  "dmx_profile_id": "elation_dp_dmx4b_port"
 }

@@ -156,22 +156,6 @@
               "apply_to": "No Fixtures"
             },
             {
-              "effect": "Midnight Bloom",
-              "apply_to": "ThinTri Heads",
-              "fade_enabled": true,
-              "fade_in_ms": 250,
-              "fade_out_ms": 250,
-              "cycle_speed": 300
-            },
-            {
-              "effect": "Dimmer Off",
-              "apply_to": "DMX Dimmers",
-              "fade_enabled": true,
-              "fade_in_ms": 750,
-              "fade_out_ms": 750,
-              "cycle_speed": 1000
-            },
-            {
               "effect": "Orange Candle",
               "apply_to": "BET",
               "fade_enabled": false,
@@ -179,9 +163,41 @@
               "fade_out_ms": 250,
               "strobe_speed": 90,
               "cycle_speed": 800
+            },
+            {
+              "effect": "Switch Sequence RL",
+              "apply_to": "Dimmers",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 500
+            },
+            {
+              "effect": "Dimmer Up/Down",
+              "apply_to": "DMX Dimmers",
+              "fade_enabled": true,
+              "fade_in_ms": 0,
+              "fade_out_ms": 0,
+              "cycle_speed": 500
+            },
+            {
+              "effect": "Ember Glow",
+              "apply_to": "ThinTri Heads",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 600
+            },
+            {
+              "effect": "Ember Glow",
+              "apply_to": "Big Dipper Cans",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 260
             }
           ],
-          "active_target": "BET",
+          "active_target": "DMX Dimmers",
           "sync_timing": false
         },
         "Bonus": {
@@ -217,9 +233,17 @@
             {
               "effect": null,
               "apply_to": "No Fixtures"
+            },
+            {
+              "effect": "Static Red",
+              "apply_to": "betopper",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250
             }
           ],
-          "active_target": "No Fixtures"
+          "active_target": "betopper",
+          "sync_timing": false
         }
       }
     },
@@ -728,7 +752,7 @@
               "apply_to": "No Fixtures"
             },
             {
-              "effect": "Dimmer Off",
+              "effect": "Dimmer 100%",
               "apply_to": "DMX Dimmers",
               "fade_enabled": false,
               "fade_in_ms": 250,
@@ -760,20 +784,33 @@
               "cycle_speed": 500
             },
             {
-              "effect": "Green Flame",
+              "effect": "Blue Flame",
               "apply_to": "BET",
               "fade_enabled": false,
               "fade_in_ms": 250,
               "fade_out_ms": 250,
               "cycle_speed": 100
+            },
+            {
+              "effect": "Dimmer 100%",
+              "apply_to": "F11",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250
             }
           ],
-          "active_target": "BET",
+          "active_target": "F11",
           "sync_timing": false
         },
         "Bonus": {
-          "effect": null,
-          "apply_to": "No Fixtures"
+          "layers": [
+            {
+              "effect": null,
+              "apply_to": "No Fixtures"
+            }
+          ],
+          "active_target": "No Fixtures",
+          "sync_timing": false
         },
         "Danger": {
           "effect": null,
@@ -968,6 +1005,108 @@
         "Overlay 4": {
           "effect": null,
           "apply_to": "No Fixtures"
+        }
+      }
+    },
+    {
+      "game": "splash",
+      "profile_name": "TEST",
+      "layout_id": "small_rig_8_fixture",
+      "assignments": {
+        "Gameplay": {
+          "layers": [
+            {
+              "effect": null,
+              "apply_to": "No Fixtures"
+            },
+            {
+              "effect": "Midnight Bloom",
+              "apply_to": "ThinTri Heads",
+              "fade_enabled": true,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 300
+            },
+            {
+              "effect": "Dimmer Off",
+              "apply_to": "DMX Dimmers",
+              "fade_enabled": true,
+              "fade_in_ms": 750,
+              "fade_out_ms": 750,
+              "cycle_speed": 1000
+            },
+            {
+              "effect": "Orange Candle",
+              "apply_to": "BET",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "strobe_speed": 90,
+              "cycle_speed": 800
+            },
+            {
+              "effect": "Static Dark Blue",
+              "apply_to": "betopper",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250
+            },
+            {
+              "effect": "Dimmer Up/Down",
+              "apply_to": "dimmers",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 500
+            }
+          ],
+          "active_target": "betopper",
+          "sync_timing": false
+        },
+        "Bonus": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Danger": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Special": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Randomizer": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Overlay 1": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Overlay 2": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Overlay 3": {
+          "effect": null,
+          "apply_to": "No Fixtures"
+        },
+        "Overlay 4": {
+          "layers": [
+            {
+              "effect": null,
+              "apply_to": "No Fixtures"
+            },
+            {
+              "effect": "Static Red",
+              "apply_to": "betopper",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250
+            }
+          ],
+          "active_target": "betopper",
+          "sync_timing": false
         }
       }
     }

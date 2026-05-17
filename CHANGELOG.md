@@ -1,3 +1,26 @@
+## v28.12.5 - Setup-to-layout DMX address sync
+- Added a safe sync from saved fixture profile runtime settings into the visualizer layout so changing a profile start address updates the actual F-number DMX output map.
+- Preserves existing layout spacing, targets, and fixture positions; for example DP-DMX4B ports at A065-A068 move cleanly to A128-A131 while Betopper cans keep their A001/A009 spacing style.
+- Handles recreated fixture profiles by matching current rig families when the profile clearly represents Betopper, ThinTri, or 1-channel DP-DMX4B dimmer ports.
+- Updated start_console.sh to launch v28.12.5.
+
+## v28.12.4 - Address Persistence Patch
+- Changed the v28.12.3 visualizer layout repair from an always-on F1-F12 reset into a one-time migration for the old DP-DMX4B 37-40 address pattern.
+- Preserves user-edited fixture addresses/channels/universe after setup changes while still filling missing profile metadata for runtime DMX mapping.
+
+## v28.12.3 - DP-DMX4B address/layout repair
+- Fixed the mixed DMX runtime so dimmer fixtures are not inferred as the old switch profile and added a startup repair for the current rig layout.
+- Updated the bundled layout to Betopper A001/A009/A017/A025, ThinTri A033/A041/A049/A057, and DP-DMX4B outputs A065-A068.
+- Updated dimmer profile runtime defaults/notes to start at 65 and added a DMX map log line for troubleshooting.
+- Updated start_console.sh to launch v28.12.3.
+
+## v28.12.2 - Betopper LPC 7CH DMX channel-map fix
+- Fixed the Betopper LPC-019-H 7CH fixture profile so CH1 is the master dimmer and RGB is mapped to CH2-CH4 instead of using the old 3CH RGB map.
+- Kept CH6 mode and CH7 sound-active at 0 during DMX output so the cans stay in DMX dimming/RGB control mode.
+- Added a profile-load repair guard for saved Betopper LPC 7CH profiles that still have the legacy 3CH-style channel map.
+- Updated the DMX profile editor channel dropdowns to preserve Mode, Dimmer Speed, and Sound Active mappings.
+- Updated start_console.sh to launch v28.12.2.
+
 ## v28.12.1 - Flame tuning popup and faster wick controls
 - Added a compact **TUNE** button under the theme scroll-down button for pixel Flame themes.
 - Added per-theme Flame tuning values for Height, Dip/Peak Rate, Flicker Bite, and Smoothness; values are saved in the existing attract/theme settings file.
