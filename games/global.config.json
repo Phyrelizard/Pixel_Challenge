@@ -2,5 +2,48 @@
   "difficulty": "normal",
   "show_scoreboard": true,
   "sound_pack": "default",
-  "notes": "auto-created by console v17.3.0; adjust as needed"
+  "invert_playfield": true,
+  "notes": "auto-created by console v17.3.0; adjust as needed",
+  "controller_rumble": {
+    "enabled": true,
+    "hit_low_frequency": 0.85,
+    "hit_high_frequency": 0.35,
+    "hit_duration_ms": 450,
+    "cooldown_ms": 250,
+    "dmx_enabled": true,
+    "dmx_duration_ms": 450
+  },
+  "controller_actions": {
+    "enabled": true,
+    "active_games": [
+      "dot_dash"
+    ],
+    "xbox_profile_enabled": true,
+    "xbox": {
+      "button_names": {
+        "0": "A",
+        "1": "B",
+        "2": "X",
+        "3": "Y",
+        "4": "L",
+        "5": "R",
+        "6": "View",
+        "7": "Menu",
+        "8": "Guide",
+        "9": "Left Stick Click",
+        "10": "Right Stick Click"
+      },
+      "color_buttons": {
+        "0": "green",
+        "1": "red",
+        "2": "blue",
+        "3": "yellow",
+        "4": "white"
+      },
+      "ready_buttons": [
+        4,
+        7
+      ]
+    }
+  }
 }

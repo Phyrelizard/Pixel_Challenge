@@ -221,6 +221,21 @@ class ConsoleHostAPI:
         except Exception as e:
             self.log(f"visual_event error: {e}")
 
+    def rumble_player(self, player_id: int, reason: str = "hit", low_frequency=None, high_frequency=None, duration_ms=None) -> bool:
+        """Trigger controller rumble for a player if the console/controller supports it."""
+        try:
+            if hasattr(self.console, 'rumble_player'):
+                return bool(self.console.rumble_player(
+                    player_id,
+                    reason=reason,
+                    low_frequency=low_frequency,
+                    high_frequency=high_frequency,
+                    duration_ms=duration_ms,
+                ))
+        except Exception as e:
+            self.log(f"rumble_player error: {e}")
+        return False
+
     def dmx_set_strobe(self, speed: int) -> None:
         """Set strobe speed on all DMX fixtures. 0=off, 16-255=speed."""
         try:

@@ -660,6 +660,86 @@
           ]
         }
       }
+    },
+    {
+      "session_id": "2026-05-17_21-36-47",
+      "timestamp": 1779079506.129687,
+      "players": {
+        "1": {
+          "games_played": 2,
+          "final_sla": 2,
+          "samples": [
+            {
+              "game_key": "dot_dash",
+              "timestamp": 1779079198.9662037,
+              "metrics": {
+                "accuracy": 0.71,
+                "reaction_time_sec": 0.527,
+                "completion_time_sec": 29.388,
+                "score": 5350
+              },
+              "calculated_sla": 3
+            },
+            {
+              "game_key": "dot_dash",
+              "timestamp": 1779079381.3838933,
+              "metrics": {
+                "accuracy": 0.76,
+                "reaction_time_sec": 0.944,
+                "completion_time_sec": 32.598,
+                "score": 5350
+              },
+              "calculated_sla": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "session_id": "2026-05-17_23-04-42",
+      "timestamp": 1779084441.9609947,
+      "players": {
+        "1": {
+          "games_played": 1,
+          "final_sla": 6,
+          "samples": [
+            {
+              "game_key": "dot_dash",
+              "timestamp": 1779084389.349117,
+              "metrics": {
+                "accuracy": 0.98,
+                "reaction_time_sec": 1.691,
+                "completion_time_sec": 15.58,
+                "score": 5350
+              },
+              "calculated_sla": 6
+            }
+          ]
+        }
+      }
+    },
+    {
+      "session_id": "2026-05-17_23-27-26",
+      "timestamp": 1779085880.2222464,
+      "players": {
+        "1": {
+          "games_played": 1,
+          "final_sla": 8,
+          "samples": [
+            {
+              "game_key": "dot_dash",
+              "timestamp": 1779085766.5507698,
+              "metrics": {
+                "accuracy": 0.97,
+                "reaction_time_sec": 0.585,
+                "completion_time_sec": 11.83,
+                "score": 5350
+              },
+              "calculated_sla": 8
+            }
+          ]
+        }
+      }
     }
   ]
 }

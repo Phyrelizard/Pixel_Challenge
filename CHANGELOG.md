@@ -1,3 +1,60 @@
+## [v28.13.2] - 2026-05-17
+
+### Added
+- Controller help-card support for the VOYEE / Switch-style black-face-button gamepad
+- Custom check-in help image showing WHITE = L and Menu as an alternate join button
+- Custom Dot Dash color-map help image showing A/B/X/Y/L color assignments
+
+### Changed
+- Check-in state message now adapts to the detected controller help profile
+- Viewer help-screen methods now support controller-specific override images while preserving safe fallbacks
+
+### Notes
+- Dot Dash remains the only game using the color-action controller profile in this rollout
+- games/global.config.json continues to ship with invert_playfield set to true
+
+---
+
+## v28.13.1 - Xbox Dot Dash check-in cleanup
+- Changed Xbox check-in/READY mapping from A to L so the join action matches the White color mapping.
+- Updated the check-in log text to say `Arcade WHITE or Xbox L/Menu to join`.
+- Added debug-gated Xbox mapping logs such as `P1: L -> READY` / `P1: A -> GREEN` for input verification.
+- Kept the Dot Dash Xbox color rollout limited to `active_games: ["dot_dash"]`.
+- Kept `invert_playfield` enabled in the bundled global config.
+- Updated start_console.sh to launch v28.13.1.
+
+## v28.13.0 - Xbox Dot Dash color action mapping
+- Added a global `controller_actions` config section for Xbox-style controllers while leaving existing arcade controller button assignments unchanged.
+- For Dot Dash only, Xbox buttons now translate to color actions: A=Green, B=Red, X=Blue, Y=Yellow, and L=White.
+- During check-in, Xbox A or Menu now counts as READY while arcade controllers can still use White.
+- Kept `invert_playfield` enabled in the bundled global config.
+- Updated start_console.sh to launch v28.13.0.
+
+## v28.12.9 - Timed Rumble DMX release
+- Added global `controller_rumble.dmx_duration_ms` so the Rumble lighting cue can be shorter or longer than the physical controller vibration.
+- Changed the Rumble DMX cue into a timed trigger that snapshots the current DMX scene, fires the Rumble element, then automatically restores the previous scene when the timer expires.
+- Kept `invert_playfield` enabled in the bundled global config.
+
+## v28.12.8 - Rumble DMX visual element
+- Kept controller rumble as a global Splash-level feature and added a game-wide `Rumble` element to DMX visualizer profiles.
+- When a player controller rumble actually plays, the console now fires the `Rumble` DMX cue as a trigger so configured lights can flash/pulse with the haptic feedback.
+- Migrates existing visualizer profile files to add the new `Rumble` element without changing saved Gameplay/Bonus/Danger/Special/Overlay assignments.
+- Bundled `games/global.config.json` now keeps `invert_playfield` set to `true` for the current upside-down physical lane wiring.
+- Updated start_console.sh to launch v28.12.8.
+
+## v28.12.7 - Controller rumble test hook
+- Added global Splash config `controller_rumble` settings for enabling/disabling controller vibration and tuning hit intensity, duration, and cooldown.
+- Added a console-level player rumble helper that maps each player back to their assigned pygame joystick and safely ignores unsupported controllers.
+- Exposed rumble through HostAPI so games can trigger player feedback without knowing the physical controller details.
+- Wired Surround player-hit/stun events to rumble the affected player's controller when they are struck by a snake, baby snake, hunter, or hunter projectile.
+- Updated start_console.sh to launch v28.12.7.
+
+## v28.12.6 - Global playfield inversion
+- Added a global `invert_playfield` setting in `games/global.config.json`, edited through the Splash config screen.
+- Reverses pixel order in the Falcon lane output path so game logic can keep using pixel 0 as the logical bottom/start while physically upside-down lanes display correctly.
+- Applies the setting at startup, after saving Splash config, and again at game start so hardware direction changes do not require per-game edits.
+- Updated start_console.sh to launch v28.12.6.
+
 ## v28.12.5 - Setup-to-layout DMX address sync
 - Added a safe sync from saved fixture profile runtime settings into the visualizer layout so changing a profile start address updates the actual F-number DMX output map.
 - Preserves existing layout spacing, targets, and fixture positions; for example DP-DMX4B ports at A065-A068 move cleanly to A128-A131 while Betopper cans keep their A001/A009 spacing style.

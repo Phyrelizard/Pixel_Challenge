@@ -300,6 +300,7 @@ class DMXLightingEditor:
 
         self.game_elements = [
             "Gameplay", "Bonus", "Danger", "Special", "Randomizer",
+            "Rumble",
             "Overlay 1", "Overlay 2", "Overlay 3", "Overlay 4",
         ]
         self.console_elements = [
@@ -777,6 +778,30 @@ class DMXLightingEditor:
                     data = json.load(f)
                 if isinstance(data, dict) and isinstance(data.get("profiles"), list):
                     data.setdefault("active_profiles", dict(seeded.get("active_profiles", {})))
+
+                    # v28.12.8: migrate older visualizer profiles so the
+                    # new game-wide Rumble element appears in the editor for
+                    # every game without changing existing assignments.
+                    changed = False
+                    for profile in data.get("profiles", []):
+                        if not isinstance(profile, dict):
+                            continue
+                        expected = self._default_assignments(self._elements_for_game(profile.get("game", "")))
+                        assignments = profile.setdefault("assignments", {})
+                        if not isinstance(assignments, dict):
+                            profile["assignments"] = dict(expected)
+                            changed = True
+                            continue
+                        for element_name, default_assignment in expected.items():
+                            if element_name not in assignments:
+                                assignments[element_name] = default_assignment
+                                changed = True
+                    if changed:
+                        try:
+                            with open(self.visualizer_profiles_file, "w", encoding="utf-8") as wf:
+                                json.dump(data, wf, indent=2)
+                        except Exception:
+                            pass
                     return data
             os.makedirs(os.path.dirname(self.visualizer_profiles_file), exist_ok=True)
             with open(self.visualizer_profiles_file, "w", encoding="utf-8") as f:

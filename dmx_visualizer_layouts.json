@@ -100,7 +100,7 @@
           "y": 737,
           "direction": "up",
           "universe": 9,
-          "start_address": 193,
+          "start_address": 65,
           "channels": 1
         },
         {
@@ -111,7 +111,7 @@
           "y": 361,
           "direction": "down",
           "universe": 9,
-          "start_address": 194,
+          "start_address": 66,
           "channels": 1
         },
         {
@@ -122,7 +122,7 @@
           "y": 362,
           "direction": "down",
           "universe": 9,
-          "start_address": 195,
+          "start_address": 67,
           "channels": 1
         },
         {
@@ -133,7 +133,7 @@
           "y": 723,
           "direction": "up",
           "universe": 9,
-          "start_address": 196,
+          "start_address": 68,
           "channels": 1
         }
       ],

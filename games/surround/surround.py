@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # -*- coding: utf-8 -*-
 """
-surround.py Game Module v1.2.1
+surround.py Game Module v1.2.2
 first tested with pixel_challenge_console.py v22.1.3
 updated for pixel_challenge_console.py v22.5.0
 
@@ -14,7 +14,7 @@ Supports two modes:
 """
 from __future__ import annotations
 
-VERSION_LABEL = "v1.2.1"
+VERSION_LABEL = "v1.2.2"
 
 import json
 import os
@@ -1093,6 +1093,10 @@ class SurroundSession(GameSession):
         
         alive = ps.take_damage(current_time)
         ps.add_score(self.scoring_config.get("player_hit_penalty", -20))
+        try:
+            self.host.rumble_player(player_id, reason="surround_player_hit")
+        except Exception:
+            pass
         self.host.play_sound("su_snake_warning")
         self.host.visual_event("Danger", "on")  # player hit danger state
         

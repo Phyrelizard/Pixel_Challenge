@@ -46,6 +46,10 @@
         "Overlay 4": {
           "effect": null,
           "apply_to": "No Fixtures"
+        },
+        "Rumble": {
+          "effect": null,
+          "apply_to": "All Fixtures"
         }
       }
     },
@@ -98,6 +102,10 @@
         "Overlay 4": {
           "effect": "Lava Flow",
           "apply_to": "Right Wash Group"
+        },
+        "Rumble": {
+          "effect": null,
+          "apply_to": "All Fixtures"
         }
       }
     },
@@ -141,6 +149,10 @@
         "Overlay 4": {
           "effect": "Midnight Bloom",
           "apply_to": "Right Wash Group"
+        },
+        "Rumble": {
+          "effect": null,
+          "apply_to": "All Fixtures"
         }
       }
     },
@@ -175,22 +187,22 @@
             {
               "effect": "Dimmer Up/Down",
               "apply_to": "DMX Dimmers",
-              "fade_enabled": true,
+              "fade_enabled": false,
               "fade_in_ms": 0,
               "fade_out_ms": 0,
               "cycle_speed": 500
             },
             {
               "effect": "Ember Glow",
-              "apply_to": "ThinTri Heads",
+              "apply_to": "Big Dipper Cans",
               "fade_enabled": false,
               "fade_in_ms": 250,
               "fade_out_ms": 250,
-              "cycle_speed": 600
+              "cycle_speed": 260
             },
             {
               "effect": "Ember Glow",
-              "apply_to": "Big Dipper Cans",
+              "apply_to": "ThinTri Heads",
               "fade_enabled": false,
               "fade_in_ms": 250,
               "fade_out_ms": 250,
@@ -244,6 +256,10 @@
           ],
           "active_target": "betopper",
           "sync_timing": false
+        },
+        "Rumble": {
+          "effect": null,
+          "apply_to": "All Fixtures"
         }
       }
     },
@@ -317,6 +333,10 @@
         "Overlay 4": {
           "effect": null,
           "apply_to": "No Fixtures"
+        },
+        "Rumble": {
+          "effect": null,
+          "apply_to": "All Fixtures"
         }
       }
     },
@@ -360,6 +380,10 @@
         "Overlay 4": {
           "effect": null,
           "apply_to": "No Fixtures"
+        },
+        "Rumble": {
+          "effect": null,
+          "apply_to": "All Fixtures"
         }
       }
     },
@@ -403,6 +427,10 @@
         "Overlay 4": {
           "effect": null,
           "apply_to": "No Fixtures"
+        },
+        "Rumble": {
+          "effect": null,
+          "apply_to": "All Fixtures"
         }
       }
     },
@@ -446,6 +474,10 @@
         "Overlay 4": {
           "effect": null,
           "apply_to": "No Fixtures"
+        },
+        "Rumble": {
+          "effect": null,
+          "apply_to": "All Fixtures"
         }
       }
     },
@@ -489,6 +521,10 @@
         "Overlay 4": {
           "effect": null,
           "apply_to": "No Fixtures"
+        },
+        "Rumble": {
+          "effect": null,
+          "apply_to": "All Fixtures"
         }
       }
     },
@@ -532,6 +568,10 @@
         "Overlay 4": {
           "effect": null,
           "apply_to": "No Fixtures"
+        },
+        "Rumble": {
+          "effect": null,
+          "apply_to": "All Fixtures"
         }
       }
     },
@@ -702,6 +742,10 @@
         "Overlay 4": {
           "effect": null,
           "apply_to": "No Fixtures"
+        },
+        "Rumble": {
+          "effect": null,
+          "apply_to": "All Fixtures"
         }
       }
     },
@@ -859,6 +903,10 @@
           ],
           "active_target": "BET",
           "sync_timing": false
+        },
+        "Rumble": {
+          "effect": null,
+          "apply_to": "All Fixtures"
         }
       }
     },
@@ -932,6 +980,10 @@
         "Overlay 4": {
           "effect": null,
           "apply_to": "No Fixtures"
+        },
+        "Rumble": {
+          "effect": null,
+          "apply_to": "All Fixtures"
         }
       }
     },
@@ -1005,6 +1057,25 @@
         "Overlay 4": {
           "effect": null,
           "apply_to": "No Fixtures"
+        },
+        "Rumble": {
+          "layers": [
+            {
+              "effect": null,
+              "apply_to": "All Fixtures"
+            },
+            {
+              "effect": "Yellow Flash test",
+              "apply_to": "Big Dipper Cans",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "strobe_speed": 55,
+              "cycle_speed": 500
+            }
+          ],
+          "active_target": "Big Dipper Cans",
+          "sync_timing": false
         }
       }
     },
@@ -1107,6 +1178,10 @@
           ],
           "active_target": "betopper",
           "sync_timing": false
+        },
+        "Rumble": {
+          "effect": null,
+          "apply_to": "All Fixtures"
         }
       }
     }

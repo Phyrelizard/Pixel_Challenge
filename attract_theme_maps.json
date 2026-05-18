@@ -1,5 +1,5 @@
 {
-  "auto_enabled": true,
+  "auto_enabled": false,
   "cycle_enabled": true,
   "cycle_seconds": 20,
   "per_theme_speed": {
@@ -15,7 +15,10 @@
     "Lane Chase RL": 3
   },
   "selected_themes": [
-    "Ember Glow"
+    "Lane Chase LR",
+    "Lane Chase RL",
+    "Bounce Chase",
+    "Color Wash"
   ],
   "flame_theme_tuning": {
     "Candle Flame": {
@@ -83,7 +86,7 @@
   "window_geometry": "1920x992+1920+52",
   "dmx_universe": 9,
   "dmx_num_fixtures": 4,
-  "dmx_channels_per_fixture": 1,
-  "dmx_start_address": 193,
-  "dmx_profile_id": "elation_dp_dmx4b_port"
+  "dmx_channels_per_fixture": 7,
+  "dmx_start_address": 1,
+  "dmx_profile_id": "betopper_lpc-019-h_7-ch"
 }

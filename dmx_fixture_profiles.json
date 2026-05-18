@@ -112,7 +112,7 @@
         "dmx_universe": 9,
         "dmx_num_fixtures": 4,
         "dmx_channels_per_fixture": 1,
-        "dmx_start_address": 193
+        "dmx_start_address": 65
       },
       "strobe_range": {
         "off_max": 15,
@@ -146,8 +146,8 @@
         "dmx_channels_per_fixture": 7,
         "dmx_start_address": 1
       },
-      "intensity_scale": 0.1,
-      "intensity_cap_percent": 10,
+      "intensity_scale": 0.3,
+      "intensity_cap_percent": 30,
       "strobe_range": {
         "off_max": 0,
         "min": 1,
