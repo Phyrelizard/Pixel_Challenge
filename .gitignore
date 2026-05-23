@@ -25,3 +25,28 @@ score_history.json
 # Older development versions
 
 old_versions/
+
+# Local Python environment
+.venv/
+__pycache__/
+*/__pycache__/
+*.pyc
+
+# Runtime logs and local state
+logs/
+*.log
+log_*.log
+controller_assignments.json
+score_history.json
+scoreboard_data.json
+viewer_state.json
+
+# Local backups / temporary files
+*.bak*
+*_bak.sh
+*.zip
+test_1080p.mp4
+test_runtime.py
+
+# Office temp files
+~$*.docx
