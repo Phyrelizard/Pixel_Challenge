@@ -1,12 +1,11 @@
 #!/bin/bash
 
+pkill -f pixel_challenge_console_v 2>/dev/null || true
 pkill -f pixel_challenge_viewer.py 2>/dev/null || true
 pkill -f ffplay 2>/dev/null || true
 
-echo "Pixel Challenge viewer stopped."
-
 if command -v zenity >/dev/null 2>&1; then
     zenity --info \
-        --title="Pixel Challenge Viewer" \
-        --text="Pixel Challenge viewer stopped."
+        --title="Pixel Challenge" \
+        --text="Pixel Challenge viewer, console, and ffplay were stopped."
 fi

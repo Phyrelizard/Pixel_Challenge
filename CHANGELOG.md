@@ -1,3 +1,20 @@
+## [v28.14.0] - 2026-05-23
+
+### Added
+- Added a safer T480s/laptop launch flow with separate manual and autostart launchers.
+- Added autostart safeguards: Wi-Fi radio OFF at login blocks autostart, USB recovery file detection, local `AUTOSTART_DISABLED` kill switch, HDMI-required startup checks, and a short cancel dialog.
+- Added desktop launcher install/update script plus Start, Stop, Enable Autostart, and Disable Autostart workflows.
+- Added optional USB maintenance-device ID blocklist support for future mouse/dongle-based safe mode.
+
+### Changed
+- Bumped console to v28.14.0 and updated `start_console.sh` to launch the new console file.
+- Converted active console/viewer launch paths from hard-coded `/home/ledgame/easter_game` references to project-relative paths.
+- Viewer and console now use the known-good laptop layout: console on the laptop display and viewer on HDMI at `1920x1080+1920+0`.
+- Manual/safe launch order is now display layout first, viewer second, console third.
+- games/global.config.json continues to ship with `invert_playfield` set to `true`.
+
+---
+
 ## [v28.13.2] - 2026-05-17
 
 ### Added

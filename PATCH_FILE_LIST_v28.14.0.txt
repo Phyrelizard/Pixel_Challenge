@@ -1,0 +1,19 @@
+Pixel Challenge v28.14.0 modified/new files:
+
+CHANGELOG.md
+README_v28.14.0_patch.txt
+AUTOSTART_BLOCK_USB_IDS.example
+attract_theme_maps.json
+pixel_challenge_console_v28.14.0.py
+pixel_challenge_viewer.py
+games/pixel_pop/pixel_pop.py
+start_console.sh
+start_viewer.sh
+stop_viewer.sh
+restart_viewer.sh
+stop_pixelchallenge_all.sh
+start_pixelchallenge_manual.sh
+start_pixelchallenge_safe.sh
+disable_pixelchallenge_autostart.sh
+enable_pixelchallenge_autostart.sh
+install_pixel_challenge_launchers.sh

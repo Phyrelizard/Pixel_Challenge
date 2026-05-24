@@ -36,7 +36,7 @@ Color = Tuple[int, int, int]
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
 
 # Audio file paths (relative to assets)
-AUDIO_DIR = "/home/ledgame/easter_game/assets/audio/pixel_pop"
+AUDIO_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "assets", "audio", "pixel_pop"))
 
 # Lane glow color
 GLOW_COLORS = {

@@ -11,16 +11,17 @@ class PixelChallengeViewer:
         self.root.title("Pixel Challenge Viewer")
         self.root.configure(bg="black")
 
-        # HDMI-A-1 = main viewer at 1920x1080+0+0
-        self.screen_x = 0
-        self.screen_y = 0
-        self.screen_w = 1920
-        self.screen_h = 1080
+        # T480s layout: laptop console at +0+0, HDMI viewer at +1920+0
+        self.app_dir = os.environ.get("PIXEL_CHALLENGE_APP_DIR") or os.path.dirname(os.path.abspath(__file__))
+        self.screen_x = int(os.environ.get("PIXEL_VIEWER_X", "1920"))
+        self.screen_y = int(os.environ.get("PIXEL_VIEWER_Y", "0"))
+        self.screen_w = int(os.environ.get("PIXEL_VIEWER_W", "1920"))
+        self.screen_h = int(os.environ.get("PIXEL_VIEWER_H", "1080"))
 
-        self.assets_dir = "/home/ledgame/easter_game/assets"
-        self.splash_path = f"{self.assets_dir}/pixel_challenge_splash_final.png"
-        self.command_file = "/home/ledgame/easter_game/viewer_command.txt"
-        self.scoreboard_file = "/home/ledgame/easter_game/scoreboard_data.json"
+        self.assets_dir = os.path.join(self.app_dir, "assets")
+        self.splash_path = os.path.join(self.assets_dir, "pixel_challenge_splash_final.png")
+        self.command_file = os.path.join(self.app_dir, "viewer_command.txt")
+        self.scoreboard_file = os.path.join(self.app_dir, "scoreboard_data.json")
 
         self.video_process = None
         self.current_overlay = None
@@ -198,19 +199,22 @@ class PixelChallengeViewer:
             self.show_black()
             self.root.update_idletasks()
 
-            # Hide Tk window so VLC is in front
+            # Hide Tk window so the video player is in front.
             self.root.withdraw()
 
             env = os.environ.copy()
-            env["DISPLAY"] = ":0"
+            env["DISPLAY"] = env.get("DISPLAY", ":0")
 
             self.video_process = subprocess.Popen(
                 [
-                    "cvlc",
-                    "--fullscreen",
-                    "--play-and-exit",
-                    "--no-video-title-show",
-                    "--quiet",
+                    "ffplay",
+                    "-autoexit",
+                    "-noborder",
+                    "-x", str(self.screen_w),
+                    "-y", str(self.screen_h),
+                    "-left", str(self.screen_x),
+                    "-top", str(self.screen_y),
+                    "-loglevel", "quiet",
                     video_path,
                 ],
                 env=env,

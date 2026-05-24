@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v28.13.2
+Pixel Challenge Host Console v28.14.0
 
 """
 
@@ -34,8 +34,18 @@ from games.base import PlayerConfig
 from sla import SLAStore, SLACalibration
 from dmx_editor import DMXLightingEditor
 
-VERSION_LABEL = "v28.13.2"
+VERSION_LABEL = "v28.14.0"
 CONSOLE_FILENAME = os.path.basename(__file__)
+
+# Project root is resolved from this file so the repo can live in one clean
+# folder such as /home/led_game/pixel_challenge without hard-coded easter_game
+# compatibility paths.
+PROJECT_ROOT = os.environ.get("PIXEL_CHALLENGE_APP_DIR") or os.path.dirname(os.path.abspath(__file__))
+
+
+def project_path(*parts):
+    return os.path.join(PROJECT_ROOT, *parts)
+
 
 DEFAULT_FALCON_IP = "192.168.2.113"
 FALCON_DISCOVERY_HOST_HINTS = ("Falcon_Player_F16V5_EA7F", "Falcon_Player", "F16V5", "Falcon")
@@ -43,17 +53,17 @@ FALCON_DISCOVERY_HOST_HINTS = ("Falcon_Player_F16V5_EA7F", "Falcon_Player", "F16
 FALCON_DISCOVERY_MAC_PREFIXES = ("02:fe",)
 DEFAULT_PIXELS_PER_LANE = 100
 PIXELS_PER_LANE = DEFAULT_PIXELS_PER_LANE  # legacy alias; use saved setup value at runtime
-ASSIGNMENTS_FILE = "/home/ledgame/easter_game/controller_assignments.json"
-SCORE_HISTORY_FILE = "/home/ledgame/easter_game/score_history.json"
-SCOREBOARD_DATA_FILE = "/home/ledgame/easter_game/scoreboard_data.json"
-ASSETS_DIR = "/home/ledgame/easter_game/assets"
-SETTINGS_FILE = "/home/ledgame/easter_game/attract_theme_maps.json"
-GAMES_ROOT = "/home/ledgame/easter_game/games"
-DMX_PROFILES_FILE = "/home/ledgame/easter_game/dmx_fixture_profiles.json"
-DMX_SCENES_FILE = "/home/ledgame/easter_game/dmx_scenes.json"
-DMX_SAVED_COLORS_FILE = "/home/ledgame/easter_game/dmx_saved_colors.json"
-DMX_VISUALIZER_PROFILES_FILE = "/home/ledgame/easter_game/dmx_visualizer_profiles.json"
-DMX_VISUALIZER_LAYOUTS_FILE = "/home/ledgame/easter_game/dmx_visualizer_layouts.json"
+ASSIGNMENTS_FILE = project_path("controller_assignments.json")
+SCORE_HISTORY_FILE = project_path("score_history.json")
+SCOREBOARD_DATA_FILE = project_path("scoreboard_data.json")
+ASSETS_DIR = project_path("assets")
+SETTINGS_FILE = project_path("attract_theme_maps.json")
+GAMES_ROOT = project_path("games")
+DMX_PROFILES_FILE = project_path("dmx_fixture_profiles.json")
+DMX_SCENES_FILE = project_path("dmx_scenes.json")
+DMX_SAVED_COLORS_FILE = project_path("dmx_saved_colors.json")
+DMX_VISUALIZER_PROFILES_FILE = project_path("dmx_visualizer_profiles.json")
+DMX_VISUALIZER_LAYOUTS_FILE = project_path("dmx_visualizer_layouts.json")
 
 # Game module versions are now read from GameMeta.version in each game module
 
@@ -2459,8 +2469,8 @@ class PixelChallengeConsole:
         self.config_text = None
         self.falcon_console_proc = None
 
-        self.log_file = f"/home/ledgame/easter_game/log_{time.strftime('%Y%m%d')}.log"
-        self.viewer_state_file = "/home/ledgame/easter_game/viewer_state.json"
+        self.log_file = project_path(f"log_{time.strftime('%Y%m%d')}.log")
+        self.viewer_state_file = project_path("viewer_state.json")
 
         self.state_var = tk.StringVar(value=f"STATE: {self.host_state.name}")
 
@@ -2475,7 +2485,7 @@ class PixelChallengeConsole:
         self.load_settings()
         self.write_startup_log()
 
-        self.viewer = ViewerService("/home/ledgame/easter_game/viewer_command.txt")
+        self.viewer = ViewerService(project_path("viewer_command.txt"))
         self.global_game_config = self.load_global_game_config()
         self.controller_rumble = self._normalize_controller_rumble_config(
             self.global_game_config.get("controller_rumble")
@@ -2950,83 +2960,83 @@ class PixelChallengeConsole:
         # Sound file mapping
         sound_paths = {
             # Pixel Pop sounds
-            "pp_shot_fire": "/home/ledgame/easter_game/assets/audio/pixel_pop/pp_shot_fire.wav",
-            "pp_shot_hit_correct": "/home/ledgame/easter_game/assets/audio/pixel_pop/pp_shot_hit_correct.wav",
-            "pp_shot_hit_wrong": "/home/ledgame/easter_game/assets/audio/pixel_pop/pp_shot_hit_wrong.wav",
-            "pp_snake_grow": "/home/ledgame/easter_game/assets/audio/pixel_pop/pp_snake_grow.wav",
-            "pp_lane_switch": "/home/ledgame/easter_game/assets/audio/pixel_pop/pp_lane_switch.wav",
-            "pp_snake_warning": "/home/ledgame/easter_game/assets/audio/pixel_pop/pp_snake_warning.wav",
-            "pp_snake_reached_end": "/home/ledgame/easter_game/assets/audio/pixel_pop/pp_snake_reached_end.wav",
-            "pp_lane_clear": "/home/ledgame/easter_game/assets/audio/pixel_pop/pp_lane_clear.wav",
-            "pp_bonus_start": "/home/ledgame/easter_game/assets/audio/pixel_pop/pp_bonus_start.ogg",
-            "pp_bonus_end": "/home/ledgame/easter_game/assets/audio/pixel_pop/pp_bonus_end.ogg",
-            "pp_round_start": "/home/ledgame/easter_game/assets/audio/pixel_pop/pp_round_start.ogg",
-            "pp_round_end": "/home/ledgame/easter_game/assets/audio/pixel_pop/pp_round_end.ogg",
-            "pp_music_gameplay": "/home/ledgame/easter_game/assets/audio/pixel_pop/pp_music_gameplay.ogg",
+            "pp_shot_fire": project_path("assets/audio/pixel_pop/pp_shot_fire.wav"),
+            "pp_shot_hit_correct": project_path("assets/audio/pixel_pop/pp_shot_hit_correct.wav"),
+            "pp_shot_hit_wrong": project_path("assets/audio/pixel_pop/pp_shot_hit_wrong.wav"),
+            "pp_snake_grow": project_path("assets/audio/pixel_pop/pp_snake_grow.wav"),
+            "pp_lane_switch": project_path("assets/audio/pixel_pop/pp_lane_switch.wav"),
+            "pp_snake_warning": project_path("assets/audio/pixel_pop/pp_snake_warning.wav"),
+            "pp_snake_reached_end": project_path("assets/audio/pixel_pop/pp_snake_reached_end.wav"),
+            "pp_lane_clear": project_path("assets/audio/pixel_pop/pp_lane_clear.wav"),
+            "pp_bonus_start": project_path("assets/audio/pixel_pop/pp_bonus_start.ogg"),
+            "pp_bonus_end": project_path("assets/audio/pixel_pop/pp_bonus_end.ogg"),
+            "pp_round_start": project_path("assets/audio/pixel_pop/pp_round_start.ogg"),
+            "pp_round_end": project_path("assets/audio/pixel_pop/pp_round_end.ogg"),
+            "pp_music_gameplay": project_path("assets/audio/pixel_pop/pp_music_gameplay.ogg"),
 
             # Surround sounds
-            "su_shot_fire": "/home/ledgame/easter_game/assets/audio/surround/su_shot_fire.wav",
-            "su_shot_hit_correct": "/home/ledgame/easter_game/assets/audio/surround/su_shot_hit_correct.wav",
-            "su_shot_hit_wrong": "/home/ledgame/easter_game/assets/audio/surround/su_shot_hit_wrong.wav",
-            "su_lane_switch": "/home/ledgame/easter_game/assets/audio/surround/su_lane_switch.wav",
-            "su_lane_clear": "/home/ledgame/easter_game/assets/audio/surround/su_lane_clear.wav",
-            "su_snake_grow": "/home/ledgame/easter_game/assets/audio/surround/su_snake_grow.wav",
-            "su_snake_warning": "/home/ledgame/easter_game/assets/audio/surround/su_snake_warning.wav",
-            "su_snake_reached_end": "/home/ledgame/easter_game/assets/audio/surround/su_snake_reached_end.wav",
-            "su_round_start": "/home/ledgame/easter_game/assets/audio/surround/su_round_start.ogg",
-            "su_round_end": "/home/ledgame/easter_game/assets/audio/surround/su_round_end.ogg",
-            "su_bonus_start": "/home/ledgame/easter_game/assets/audio/surround/su_bonus_start.ogg",
-            "su_bonus_end": "/home/ledgame/easter_game/assets/audio/surround/su_bonus_end.ogg",
-            "su_music_gameplay": "/home/ledgame/easter_game/assets/audio/surround/su_music_gameplay.ogg",
+            "su_shot_fire": project_path("assets/audio/surround/su_shot_fire.wav"),
+            "su_shot_hit_correct": project_path("assets/audio/surround/su_shot_hit_correct.wav"),
+            "su_shot_hit_wrong": project_path("assets/audio/surround/su_shot_hit_wrong.wav"),
+            "su_lane_switch": project_path("assets/audio/surround/su_lane_switch.wav"),
+            "su_lane_clear": project_path("assets/audio/surround/su_lane_clear.wav"),
+            "su_snake_grow": project_path("assets/audio/surround/su_snake_grow.wav"),
+            "su_snake_warning": project_path("assets/audio/surround/su_snake_warning.wav"),
+            "su_snake_reached_end": project_path("assets/audio/surround/su_snake_reached_end.wav"),
+            "su_round_start": project_path("assets/audio/surround/su_round_start.ogg"),
+            "su_round_end": project_path("assets/audio/surround/su_round_end.ogg"),
+            "su_bonus_start": project_path("assets/audio/surround/su_bonus_start.ogg"),
+            "su_bonus_end": project_path("assets/audio/surround/su_bonus_end.ogg"),
+            "su_music_gameplay": project_path("assets/audio/surround/su_music_gameplay.ogg"),
 
             # Dot Dash sounds
-            "dd_shot_fire": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_shot_fire.wav",
-            "dd_shot_hit_correct": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_shot_hit_correct.wav",
-            "dd_shot_hit_wrong": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_shot_hit_wrong.wav",
-            "dd_lane_switch": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_lane_switch.wav",
-            "dd_lane_clear": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_lane_clear.wav",
-            "dd_snake_grow": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_snake_grow.wav",
-            "dd_snake_warning": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_snake_warning.wav",
-            "dd_snake_reached_end": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_snake_reached_end.wav",
-            "dd_round_start": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_round_start.ogg",
-            "dd_round_end": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_round_end.ogg",
-            "dd_bonus_start": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_bonus_start.ogg",
-            "dd_bonus_end": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_bonus_end.ogg",
-            "dd_music_gameplay": "/home/ledgame/easter_game/assets/audio/dot_dash/dd_music_gameplay.ogg",
+            "dd_shot_fire": project_path("assets/audio/dot_dash/dd_shot_fire.wav"),
+            "dd_shot_hit_correct": project_path("assets/audio/dot_dash/dd_shot_hit_correct.wav"),
+            "dd_shot_hit_wrong": project_path("assets/audio/dot_dash/dd_shot_hit_wrong.wav"),
+            "dd_lane_switch": project_path("assets/audio/dot_dash/dd_lane_switch.wav"),
+            "dd_lane_clear": project_path("assets/audio/dot_dash/dd_lane_clear.wav"),
+            "dd_snake_grow": project_path("assets/audio/dot_dash/dd_snake_grow.wav"),
+            "dd_snake_warning": project_path("assets/audio/dot_dash/dd_snake_warning.wav"),
+            "dd_snake_reached_end": project_path("assets/audio/dot_dash/dd_snake_reached_end.wav"),
+            "dd_round_start": project_path("assets/audio/dot_dash/dd_round_start.ogg"),
+            "dd_round_end": project_path("assets/audio/dot_dash/dd_round_end.ogg"),
+            "dd_bonus_start": project_path("assets/audio/dot_dash/dd_bonus_start.ogg"),
+            "dd_bonus_end": project_path("assets/audio/dot_dash/dd_bonus_end.ogg"),
+            "dd_music_gameplay": project_path("assets/audio/dot_dash/dd_music_gameplay.ogg"),
 
             # Ascend sounds
-            "as_shot_fire": "/home/ledgame/easter_game/assets/audio/ascend/as_shot_fire.wav",
-            "as_shot_hit_correct": "/home/ledgame/easter_game/assets/audio/ascend/as_shot_hit_correct.wav",
-            "as_shot_hit_wrong": "/home/ledgame/easter_game/assets/audio/ascend/as_shot_hit_wrong.wav",
-            "as_lane_switch": "/home/ledgame/easter_game/assets/audio/ascend/as_lane_switch.wav",
-            "as_lane_clear": "/home/ledgame/easter_game/assets/audio/ascend/as_lane_clear.wav",
-            "as_snake_grow": "/home/ledgame/easter_game/assets/audio/ascend/as_snake_grow.wav",
-            "as_snake_warning": "/home/ledgame/easter_game/assets/audio/ascend/as_snake_warning.wav",
-            "as_snake_reached_end": "/home/ledgame/easter_game/assets/audio/ascend/as_snake_reached_end.wav",
-            "as_round_start": "/home/ledgame/easter_game/assets/audio/ascend/as_round_start.ogg",
-            "as_round_end": "/home/ledgame/easter_game/assets/audio/ascend/as_round_end.ogg",
-            "as_bonus_start": "/home/ledgame/easter_game/assets/audio/ascend/as_bonus_start.ogg",
-            "as_bonus_end": "/home/ledgame/easter_game/assets/audio/ascend/as_bonus_end.ogg",
-            "as_music_gameplay": "/home/ledgame/easter_game/assets/audio/ascend/as_music_gameplay.ogg",
+            "as_shot_fire": project_path("assets/audio/ascend/as_shot_fire.wav"),
+            "as_shot_hit_correct": project_path("assets/audio/ascend/as_shot_hit_correct.wav"),
+            "as_shot_hit_wrong": project_path("assets/audio/ascend/as_shot_hit_wrong.wav"),
+            "as_lane_switch": project_path("assets/audio/ascend/as_lane_switch.wav"),
+            "as_lane_clear": project_path("assets/audio/ascend/as_lane_clear.wav"),
+            "as_snake_grow": project_path("assets/audio/ascend/as_snake_grow.wav"),
+            "as_snake_warning": project_path("assets/audio/ascend/as_snake_warning.wav"),
+            "as_snake_reached_end": project_path("assets/audio/ascend/as_snake_reached_end.wav"),
+            "as_round_start": project_path("assets/audio/ascend/as_round_start.ogg"),
+            "as_round_end": project_path("assets/audio/ascend/as_round_end.ogg"),
+            "as_bonus_start": project_path("assets/audio/ascend/as_bonus_start.ogg"),
+            "as_bonus_end": project_path("assets/audio/ascend/as_bonus_end.ogg"),
+            "as_music_gameplay": project_path("assets/audio/ascend/as_music_gameplay.ogg"),
 
             # Shared sounds
-            "countdown_tick": "/home/ledgame/easter_game/assets/audio/shared/countdown_tick.wav",
-            "countdown_go": "/home/ledgame/easter_game/assets/audio/shared/countdown_go.wav",
+            "countdown_tick": project_path("assets/audio/shared/countdown_tick.wav"),
+            "countdown_go": project_path("assets/audio/shared/countdown_go.wav"),
 
             # Screen transition sounds (v22.7.4)
-            "screen_press_button_start": "/home/ledgame/easter_game/assets/audio/shared/screen_press_button_start.wav",
-            "screen_checkin": "/home/ledgame/easter_game/assets/audio/shared/screen_checkin.wav",
+            "screen_press_button_start": project_path("assets/audio/shared/screen_press_button_start.wav"),
+            "screen_checkin": project_path("assets/audio/shared/screen_checkin.wav"),
 
             # Screen voice prompts (v22.8.0)
-            "voice_select_two_colors": "/home/ledgame/easter_game/assets/audio/shared/voice_select_two_colors.wav",
-            "voice_press_white_to_start": "/home/ledgame/easter_game/assets/audio/shared/voice_press_white_to_start.wav",
+            "voice_select_two_colors": project_path("assets/audio/shared/voice_select_two_colors.wav"),
+            "voice_press_white_to_start": project_path("assets/audio/shared/voice_press_white_to_start.wav"),
 
             # Splash screen background music (per-game + main)
-            "splash_music_main": "/home/ledgame/easter_game/assets/audio/splash/splash_music_main.ogg",
-            "splash_music_dot_dash": "/home/ledgame/easter_game/assets/audio/splash/splash_music_dot_dash.ogg",
-            "splash_music_pixel_pop": "/home/ledgame/easter_game/assets/audio/splash/splash_music_pixel_pop.ogg",
-            "splash_music_surround": "/home/ledgame/easter_game/assets/audio/splash/splash_music_surround.ogg",
-            "splash_music_ascend": "/home/ledgame/easter_game/assets/audio/splash/splash_music_ascend.ogg",
+            "splash_music_main": project_path("assets/audio/splash/splash_music_main.ogg"),
+            "splash_music_dot_dash": project_path("assets/audio/splash/splash_music_dot_dash.ogg"),
+            "splash_music_pixel_pop": project_path("assets/audio/splash/splash_music_pixel_pop.ogg"),
+            "splash_music_surround": project_path("assets/audio/splash/splash_music_surround.ogg"),
+            "splash_music_ascend": project_path("assets/audio/splash/splash_music_ascend.ogg"),
 
         }
 

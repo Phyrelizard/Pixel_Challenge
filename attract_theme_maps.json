@@ -1,5 +1,5 @@
 {
-  "auto_enabled": false,
+  "auto_enabled": true,
   "cycle_enabled": true,
   "cycle_seconds": 20,
   "per_theme_speed": {
@@ -8,16 +8,13 @@
     "Rainbow Pulse": 9,
     "Calm Mode": 8,
     "Team Colors": 6,
-    "Color Wash": 10,
+    "Color Wash": 7,
     "Lane Chase LR": 4,
     "Ice Burst": 8,
     "Galaxy Wave": 10,
     "Lane Chase RL": 3
   },
   "selected_themes": [
-    "Lane Chase LR",
-    "Lane Chase RL",
-    "Bounce Chase",
     "Color Wash"
   ],
   "flame_theme_tuning": {
@@ -52,18 +49,18 @@
       "smooth": 42
     }
   },
-  "sash_left_attract_bottom": 576,
+  "sash_left_attract_bottom": 588,
   "sash_center_ctrl": 401,
   "sash_main_info": 504,
   "sash_bottom_log": 516,
-  "sash_center_mixer": 644,
+  "sash_center_mixer": 576,
   "sash_mixer_height": null,
-  "falcon_brightness": 30,
+  "falcon_brightness": 100,
   "gameplay_brightness": 40,
   "music_volume": 0,
   "sfx_volume": 35,
   "voice_volume": 39,
-  "master_volume": 51,
+  "master_volume": 100,
   "falcon_ip": "192.168.2.26",
   "pixels_per_lane": 50,
   "wifi_dhcp": true,
@@ -81,9 +78,9 @@
   "backup_restore": true,
   "apply_reboot": true,
   "debug_logging": false,
-  "setup_geometry": "1920x998+1920+46",
+  "setup_geometry": "1200x850+180+100",
   "game_mode": 1,
-  "window_geometry": "1920x992+1920+52",
+  "window_geometry": "1854x1011+66+32",
   "dmx_universe": 9,
   "dmx_num_fixtures": 4,
   "dmx_channels_per_fixture": 7,

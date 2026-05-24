@@ -194,14 +194,6 @@
             },
             {
               "effect": "Ember Glow",
-              "apply_to": "Big Dipper Cans",
-              "fade_enabled": false,
-              "fade_in_ms": 250,
-              "fade_out_ms": 250,
-              "cycle_speed": 260
-            },
-            {
-              "effect": "Ember Glow",
               "apply_to": "ThinTri Heads",
               "fade_enabled": false,
               "fade_in_ms": 250,
@@ -209,12 +201,18 @@
               "cycle_speed": 260
             }
           ],
-          "active_target": "DMX Dimmers",
+          "active_target": "Big Dipper Cans",
           "sync_timing": false
         },
         "Bonus": {
-          "effect": null,
-          "apply_to": "No Fixtures"
+          "layers": [
+            {
+              "effect": null,
+              "apply_to": "No Fixtures"
+            }
+          ],
+          "active_target": "F3",
+          "sync_timing": false
         },
         "Danger": {
           "effect": null,
@@ -595,30 +593,43 @@
               "cycle_speed": 500
             }
           ],
-          "active_target": "F1 F4",
+          "active_target": "All Fixtures",
           "sync_timing": false
         },
         "Check-In Open": {
           "layers": [
             {
               "effect": "Static Green",
-              "apply_to": "No Fixtures"
+              "apply_to": "No Fixtures",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250
             }
           ],
-          "active_target": "F1 F4"
+          "active_target": "F1 F4",
+          "sync_timing": false
         },
         "Game Running": {
           "layers": [
             {
               "effect": "Bounce Rainbow Rush",
-              "apply_to": "No Fixtures"
+              "apply_to": "No Fixtures",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 500
             },
             {
               "effect": "Ocean Pulse",
-              "apply_to": "F1 F4"
+              "apply_to": "F1 F4",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 500
             }
           ],
-          "active_target": "F1 F4"
+          "active_target": "F5-F8",
+          "sync_timing": false
         },
         "Results / Scoreboard": {
           "layers": [
@@ -654,33 +665,42 @@
               "cycle_speed": 200
             },
             {
-              "effect": "Switch On",
+              "effect": "Static Blue",
               "apply_to": "Beacon",
               "fade_enabled": false,
               "fade_in_ms": 250,
               "fade_out_ms": 250
             }
           ],
-          "active_target": "Beacon",
+          "active_target": "F5-F8",
           "sync_timing": false
         },
         "Countdown": {
           "layers": [
             {
               "effect": "Static Blue",
-              "apply_to": "No Fixtures"
+              "apply_to": "No Fixtures",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250
             }
           ],
-          "active_target": "F1 F4"
+          "active_target": "F5-F8",
+          "sync_timing": false
         },
         "Game Over": {
           "layers": [
             {
               "effect": "Yellow Flash test",
-              "apply_to": "No Fixtures"
+              "apply_to": "No Fixtures",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 500
             }
           ],
-          "active_target": "F1 F4"
+          "active_target": "F5-F8",
+          "sync_timing": false
         },
         "Attract Mode": {
           "layers": [
@@ -697,7 +717,7 @@
               "cycle_speed": 500
             }
           ],
-          "active_target": "F1 F4",
+          "active_target": "F5-F8",
           "sync_timing": false
         }
       }
@@ -812,14 +832,6 @@
               "cycle_speed": 1300
             },
             {
-              "effect": "Rainbow Wave (Copy)",
-              "apply_to": "ThinTri Heads",
-              "fade_enabled": false,
-              "fade_in_ms": 250,
-              "fade_out_ms": 250,
-              "cycle_speed": 400
-            },
-            {
               "effect": "Static Green",
               "apply_to": "BETOP1",
               "fade_enabled": false,
@@ -843,7 +855,7 @@
               "fade_out_ms": 250
             }
           ],
-          "active_target": "F11",
+          "active_target": "Betopper Cans",
           "sync_timing": false
         },
         "Bonus": {

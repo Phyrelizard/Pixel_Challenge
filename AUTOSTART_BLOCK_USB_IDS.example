@@ -1,0 +1,12 @@
+# Optional maintenance-mode USB ID block list.
+#
+# Add one USB vendor:product ID per line.  If any listed device is present
+# during login, Pixel Challenge autostart is cancelled.
+#
+# To identify a USB mouse/dongle:
+#   1. Run: lsusb
+#   2. Unplug the dongle
+#   3. Run: lsusb again
+#   4. Add the ID that disappeared, for example:
+#
+# 046d:c52b
