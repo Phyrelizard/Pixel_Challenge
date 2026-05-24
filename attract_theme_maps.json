@@ -1,5 +1,5 @@
 {
-  "auto_enabled": true,
+  "auto_enabled": false,
   "cycle_enabled": true,
   "cycle_seconds": 20,
   "per_theme_speed": {
@@ -15,14 +15,15 @@
     "Lane Chase RL": 3
   },
   "selected_themes": [
-    "Color Wash"
+    "Candle Flame",
+    "Ember Glow"
   ],
   "flame_theme_tuning": {
     "Candle Flame": {
-      "height": 25,
-      "rate": 85,
-      "bite": 78,
-      "smooth": 25
+      "height": 65,
+      "rate": 60,
+      "bite": 48,
+      "smooth": 50
     },
     "Blue Flame": {
       "height": 22,
@@ -57,10 +58,10 @@
   "sash_mixer_height": null,
   "falcon_brightness": 100,
   "gameplay_brightness": 40,
-  "music_volume": 0,
+  "music_volume": 13,
   "sfx_volume": 35,
   "voice_volume": 39,
-  "master_volume": 100,
+  "master_volume": 0,
   "falcon_ip": "192.168.2.26",
   "pixels_per_lane": 50,
   "wifi_dhcp": true,
@@ -77,8 +78,8 @@
   "auto_start": true,
   "backup_restore": true,
   "apply_reboot": true,
-  "debug_logging": false,
-  "setup_geometry": "1200x850+180+100",
+  "debug_logging": true,
+  "setup_geometry": "1244x922+132+31",
   "game_mode": 1,
   "window_geometry": "1854x1011+66+32",
   "dmx_universe": 9,

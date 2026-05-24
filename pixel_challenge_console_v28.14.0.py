@@ -5921,7 +5921,15 @@ class PixelChallengeConsole:
                         else:
                             color_name = self._button_index_to_color(player_id, btn_idx)
                             if color_name:
-                                self.handle_button_press(player_id, color_name)
+                                self.handle_button_press(player_id, color_name, True)
+                    elif previous_state and not current_state:
+                        # Ascend needs true press-and-hold jump behavior, so send
+                        # button release events only to that game. Existing games
+                        # keep their tested press-only behavior.
+                        if not self.button_map_mode and self.current_game_key() == "ascend":
+                            color_name = self._button_index_to_color(player_id, btn_idx)
+                            if color_name:
+                                self.handle_button_press(player_id, color_name, False)
                     self.button_last_state[js_index][btn_idx] = current_state
                 
                 # Poll joystick axes for lane switching
@@ -5981,7 +5989,7 @@ class PixelChallengeConsole:
             self.log(f"Joystick poll error: {e}")
         self.root.after(16, self.poll_joysticks)
 
-    def handle_button_press(self, player_id: int, color_name: str):
+    def handle_button_press(self, player_id: int, color_name: str, pressed: bool = True):
         color_upper = color_name.upper()
         if self.host_state == HostState.CHECKIN_OPEN:
             if color_upper in ("WHITE", "READY"):
@@ -6002,8 +6010,12 @@ class PixelChallengeConsole:
             if self.game_manager.is_running():
                 action = f"P{player_id}_{color_upper}"
                 if self.debug_logging.get():
-                    self.log(f"[INPUT] {action}")
-                self.game_manager.handle_input(player_id, action)
+                    suffix = " DOWN" if pressed else " UP"
+                    self.log(f"[INPUT] {action}{suffix}")
+                if self.current_game_key() == "ascend":
+                    self.game_manager.handle_input(player_id, action, bool(pressed))
+                elif pressed:
+                    self.game_manager.handle_input(player_id, action)
             return
 
     def _joystick_for_player(self, player_id: int):

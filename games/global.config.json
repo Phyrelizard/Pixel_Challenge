@@ -16,7 +16,8 @@
   "controller_actions": {
     "enabled": true,
     "active_games": [
-      "dot_dash"
+      "dot_dash",
+      "ascend"
     ],
     "xbox_profile_enabled": true,
     "xbox": {

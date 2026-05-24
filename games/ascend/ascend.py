@@ -1,1241 +1,901 @@
 # -*- coding: utf-8 -*-
 """
-ascend.py Game Module v1.0.0
-First tested with pixel_challenge_console.py v22.7.0
+Ascend Game Module v2.0.8-visible-spawn
 
-Ascend — A vertical-climbing, lane-switching, color-reaction game.
-Two phases:
-  Phase 1: Auto-scrolling gauntlet (300 virtual px, accelerating)
-  Phase 2: Manual ascent through static field to The Portal
+New four-leg Ascend foundation for Pixel Challenge.
+
+Legs 1-3:
+  - Player climbs upward/downward with joystick.
+  - White button hold makes the player airborne.
+  - Colored danger bands descend from the top.
+  - Bands are spacing-protected so they do not visually run into each other.
+  - Player scores mainly while grounded and moving upward.
+
+Leg 4:
+  - Player stays near bottom.
+  - Top portion becomes a static color wall.
+  - Matching color buttons break matching wall blocks.
+  - Clearing the wall triggers final auto-ascension.
 """
 from __future__ import annotations
 
 import json
 import os
 import random
-import math
-import traceback
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
 from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
 
-from games.base import (
-    GameModule, GameSession, GameMeta, GameResult,
-    GamePhase as BaseGamePhase, HostAPI, PlayerConfig,
-)
+from games.base import GameMeta, GameModule, GamePhase as BaseGamePhase, GameResult, GameSession, HostAPI, PlayerConfig
 
-from .player import AscendPlayer
-from .obstacles import (
-    Obstacle, ColorGate, Blocker, Chaser, Swapper, BonusPickup,
-    generate_phase2_field, COLOR_MAP,
-)
-from .animations import (
-    MilestoneWaveAnimation, PhaseTransitionAnimation,
-    PortalAnimation, TimerExpiredAnimation,
-)
+VERSION_LABEL = "v2.0.8-visible-spawn"
+LANE_LENGTH = 100
+RGB = Tuple[int, int, int]
 
-VERSION_LABEL = "v1.0.0"
-LANE_LENGTH = 100  # physical pixels per string
+COLORS: Dict[str, RGB] = {
+    "red": (255, 0, 0),
+    "green": (0, 255, 0),
+    "blue": (0, 0, 255),
+    "orange": (255, 110, 0),
+    "white": (255, 255, 255),
+    "yellow": (255, 220, 0),
+    "purple": (160, 0, 255),
+    "cyan": (0, 220, 255),
+}
 
-
-# ---------------------------------------------------------------------------
-# Internal phase enum
-# ---------------------------------------------------------------------------
-
-class AscendPhase(Enum):
-    WAITING           = "waiting"
-    COUNTDOWN         = "countdown"
-    RUNNING_PHASE1    = "running_phase1"
-    PHASE_TRANSITION  = "phase_transition"
-    RUNNING_PHASE2    = "running_phase2"
-    PORTAL_SEQUENCE   = "portal_sequence"
-    TIMER_EXPIRY      = "timer_expiry"
-    COMPLETE          = "complete"
-
-
-# ---------------------------------------------------------------------------
-# Portal colour cycling helper
-# ---------------------------------------------------------------------------
-
-_PORTAL_COLORS: List[Tuple[int, int, int]] = [
-    (255, 0, 0), (0, 255, 0), (0, 0, 255),
-]
+BUTTON_ALIASES = {
+    # Match current Pixel Challenge / VOYEE-S08 style controller mapping.
+    # Arcade color buttons still parse directly by color name.
+    "a": "green",
+    "b": "red",
+    "x": "blue",
+    "y": "yellow",
+    "l": "white",
+    "lb": "white",
+    "left_bumper": "white",
+    "white_button": "white",
+    "4": "white",
+    "5": "white",
+    "button4": "white",
+    "button_4": "white",
+    "button5": "white",
+    "button_5": "white",
+    "r": "white",
+    "rb": "white",
+    "right_bumper": "white",
+}
 
 
-def _portal_color(now: float) -> Tuple[int, int, int]:
-    idx = int(now * 3) % 3
-    return _PORTAL_COLORS[idx]
+class AscendState(str, Enum):
+    WAITING = "waiting"
+    RUNNING = "running"
+    WARP_EXPAND = "warp_expand"
+    WARP_COLLAPSE = "warp_collapse"
+    LEG4_WALL = "leg4_wall"
+    FINAL_ASCEND = "final_ascend"
+    COMPLETE = "complete"
 
 
-# ---------------------------------------------------------------------------
-# Session
-# ---------------------------------------------------------------------------
+@dataclass
+class DangerBand:
+    y: float
+    height: int
+    speed: float
+    color_name: str
+    cleared_by_player: Dict[int, bool] = field(default_factory=dict)
+
+    @property
+    def top(self) -> float:
+        return self.y + self.height - 1
+
+
+@dataclass
+class WallBlock:
+    y: int
+    height: int
+    color_name: str
+    hp: int = 1
+
+
+@dataclass
+class AscendPlayerState:
+    player_id: int
+    y: float = 5.0
+    score: int = 0
+    lives: int = 3
+    airborne: bool = False
+    jump_hold_time: float = 0.0
+    held_up: bool = False
+    held_down: bool = False
+    ready: bool = False
+    trail: List[Tuple[float, float]] = field(default_factory=list)  # (y, brightness 0..1)
+    last_ground_y: float = 5.0
+    hits: int = 0
+    bands_cleared: int = 0
+    wrong_shots: int = 0
+    wall_hits: int = 0
+    reached_final: bool = False
+    last_fire_time: float = 0.0
+    hit_grace: float = 0.0
+
+    def add_score(self, points: int) -> None:
+        self.score = max(0, self.score + int(points))
+
 
 class AscendSession(GameSession):
-    """A single game session of Ascend."""
-
-    def __init__(
-        self,
-        host: HostAPI,
-        players: List[PlayerConfig],
-        settings: Optional[Dict[str, Any]] = None,
-    ) -> None:
+    def __init__(self, host: HostAPI, players: List[PlayerConfig], settings: Optional[Dict[str, Any]] = None) -> None:
         super().__init__(host, players, settings)
-        self.host.log("[ASCEND] Initializing session")
-
         self.config = self._load_config()
+        if settings:
+            self._deep_update(self.config, settings)
+        self.lane_length = self._resolve_lane_length()
+        self.state = AscendState.WAITING
+        self.phase = BaseGamePhase.SETUP
+        self.last_tick = 0.0
+        self.game_complete = False
+        self.current_leg = 1
+        self.bands: List[DangerBand] = []
+        self.wall: List[WallBlock] = []
+        self.warp_t = 0.0
+        self.final_t = 0.0
+        self.round_start = 0.0
+        self._last_position_log = 0.0
+        self.players_state: Dict[int, AscendPlayerState] = {
+            pc.player_id: AscendPlayerState(player_id=pc.player_id, y=float(self.cfg("player", "start_y", 5)))
+            for pc in players
+        }
+        self.host.log(f"[ASCEND] Loaded {VERSION_LABEL} foundation; lane_length={self.lane_length}")
 
-        # Round parameters
-        round_cfg = self.config.get("round", {})
-        self.round_duration_sec: float = float(round_cfg.get("duration_sec", 120))
+    # ------------------------------------------------------------------
+    # Config helpers
+    # ------------------------------------------------------------------
 
-        phase1_cfg = self.config.get("phase1", {})
-        self.p1_field_length: float = float(phase1_cfg.get("field_length_px", 300))
-        self.p1_speed_start_ms: float = float(phase1_cfg.get("scroll_speed_start_ms", 80))
-        self.p1_speed_end_ms: float   = float(phase1_cfg.get("scroll_speed_end_ms", 25))
-        self.p1_milestone_every: float = float(phase1_cfg.get("altitude_milestone_every_px", 75))
-        self.p1_boost_mult: float     = float(phase1_cfg.get("boost_multiplier", 0.5))
-        self.p1_boost_ms: float       = float(phase1_cfg.get("boost_duration_ms", 800))
-        self.p1_brake_mult: float     = float(phase1_cfg.get("brake_multiplier", 2.5))
-        self.p1_brake_ms: float       = float(phase1_cfg.get("brake_duration_ms", 600))
-
-        phase2_cfg = self.config.get("phase2", {})
-        self.p2_move_speed_ms: float      = float(phase2_cfg.get("player_move_speed_ms", 80))
-        self.p2_portal_start: int         = int(phase2_cfg.get("portal_start_px", 97))
-        self.p2_chaser_spawn_ms: float    = float(phase2_cfg.get("chaser_spawn_interval_ms", 5000))
-
-        obs_cfg = self.config.get("obstacles", {})
-        self.obs_spawn_start_ms: float = float(obs_cfg.get("spawn_interval_start_ms", 2500))
-        self.obs_spawn_end_ms: float   = float(obs_cfg.get("spawn_interval_end_ms", 800))
-        self.obs_max: int              = int(obs_cfg.get("max_obstacles", 12))
-        chaser_cfg = obs_cfg.get("chaser", {})
-        self.chaser_speed_mult: float  = float(chaser_cfg.get("speed_multiplier", 1.8))
-
-        player_cfg = self.config.get("player", {})
-        self.marker_px: int   = int(player_cfg.get("marker_pixel", 5))
-        self.marker_size: int = int(player_cfg.get("marker_size", 3))
-        marker_color_raw      = player_cfg.get("marker_color", [255, 255, 255])
-        self.marker_color: Tuple[int, int, int] = tuple(marker_color_raw[:3])  # type: ignore
-        self.start_lives: int = int(player_cfg.get("lives", 3))
-        self.brake_uses: int  = int(player_cfg.get("brake_uses", 3))
-        self.invu_ms: int     = int(player_cfg.get("invulnerability_ms", 1500))
-        self.invu_blink: int  = int(player_cfg.get("invulnerability_blink_rate_ms", 100))
-        self.start_lane: str  = player_cfg.get("start_lane", "left")
-
-        scoring_cfg = self.config.get("scoring", {})
-        self.score_p1 = scoring_cfg.get("phase1", {})
-        self.score_p2 = scoring_cfg.get("phase2", {})
-        self.score_end = scoring_cfg.get("end_bonus", {})
-
-        anim_cfg = self.config.get("animations", {})
-        self.anim_milestone_ms: float    = float(anim_cfg.get("milestone_wave_ms", 400))
-        self.anim_transition_ms: float   = float(anim_cfg.get("phase_transition_ms", 1200))
-
-        # Phase state
-        self.ascend_phase: AscendPhase = AscendPhase.WAITING
-
-        # Timing
-        self.round_start_time: float = 0.0
-        self.round_end_time: float   = 0.0
-        self.last_tick_time: float   = 0.0
-
-        # Shared scroll state (all players share the same scroll in Phase 1)
-        self.scroll_offset: float          = 0.0
-        self.current_scroll_speed_ms: float = self.p1_speed_start_ms
-
-        # Per-player objects
-        self.ascend_players: Dict[int, AscendPlayer]         = {}
-        self.obstacles_phase1: Dict[int, List[Obstacle]]     = {}
-        self.obstacles_phase2: Dict[int, List[Obstacle]]     = {}
-        self.last_spawn_time: Dict[int, float]               = {}
-        self.milestone_animations: Dict[int, Optional[MilestoneWaveAnimation]] = {}
-        self.portal_animations: Dict[int, Optional[PortalAnimation]]           = {}
-        self.phase2_chaser_last_spawn: Dict[int, float]      = {}
-        self._last_milestone: Dict[int, int]                 = {}
-
-        for pc in players:
-            pid = pc.player_id
-            ap = AscendPlayer(player_id=pid)
-            ap.current_lane            = self.start_lane
-            ap.physical_position       = self.marker_px
-            ap.lives                   = self.start_lives
-            ap.brake_uses_remaining    = self.brake_uses
-            ap.invulnerability_ms      = self.invu_ms
-            ap.invulnerability_blink_rate_ms = self.invu_blink
-            ap.phase2_move_speed_ms    = self.p2_move_speed_ms
-            self.ascend_players[pid]   = ap
-            self.obstacles_phase1[pid] = []
-            self.obstacles_phase2[pid] = generate_phase2_field(self.config, seed=pid * 31 + 7)
-            self.last_spawn_time[pid]  = 0.0
-            self.milestone_animations[pid]     = None
-            self.portal_animations[pid]        = None
-            self.phase2_chaser_last_spawn[pid] = 0.0
-            self._last_milestone[pid]          = 0
-
-        self.phase_transition_anim: Optional[PhaseTransitionAnimation] = None
-        self.timer_expiry_anim: Optional[TimerExpiredAnimation]        = None
-
-        self._setup_complete_signaled: bool = False
-        self.game_complete: bool            = False
-
-    # -------------------------------------------------------------------------
-    # Config loading
-    # -------------------------------------------------------------------------
-
-    def _load_config(self) -> dict:
-        module_dir = os.path.dirname(os.path.abspath(__file__))
-        config_path = os.path.join(module_dir, "config.json")
-        with open(config_path, "r", encoding="utf-8") as fh:
+    def _load_config(self) -> Dict[str, Any]:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+        with open(path, "r", encoding="utf-8") as fh:
             return json.load(fh)
 
-    # -------------------------------------------------------------------------
+    def _deep_update(self, base: Dict[str, Any], updates: Dict[str, Any]) -> None:
+        for key, value in updates.items():
+            if isinstance(value, dict) and isinstance(base.get(key), dict):
+                self._deep_update(base[key], value)
+            else:
+                base[key] = value
+
+    def cfg(self, section: str, key: str, default: Any) -> Any:
+        return self.config.get(section, {}).get(key, default)
+
+    def _resolve_lane_length(self) -> int:
+        """Use the console/global setup pixel count, not a game-local lane length.
+
+        The console already owns pixels_per_lane from game setup.  Ascend should
+        follow that value so one hardware setup change affects every game.
+        """
+        candidates = []
+        for attr in ("get_pixels_per_lane",):
+            fn = getattr(self.host, attr, None)
+            if callable(fn):
+                try:
+                    candidates.append(int(fn()))
+                except Exception:
+                    pass
+        for attr in ("pixels_per_lane", "lane_length", "lane_pixel_count"):
+            try:
+                candidates.append(int(getattr(self.host, attr)))
+            except Exception:
+                pass
+        try:
+            falcon = getattr(self.host, "falcon", None)
+            if falcon is not None:
+                candidates.append(int(getattr(falcon, "pixels_per_lane")))
+        except Exception:
+            pass
+        for value in candidates:
+            if value > 0:
+                return max(1, min(512, value))
+        return LANE_LENGTH
+
+    def leg_cfg(self, leg: Optional[int] = None) -> Dict[str, Any]:
+        leg = self.current_leg if leg is None else leg
+        return self.config.get("legs", {}).get(str(leg), {})
+
+    # ------------------------------------------------------------------
     # GameSession interface
-    # -------------------------------------------------------------------------
+    # ------------------------------------------------------------------
 
     def on_enter(self) -> None:
         self.host.clear_all_pixels()
-        self.last_tick_time = self.host.now()
-        self.ascend_phase = AscendPhase.WAITING
+        self.last_tick = self.host.now()
+        self.state = AscendState.WAITING
         self.phase = BaseGamePhase.SETUP
-        self.host.log("[ASCEND] Session entering - waiting for player input")
+        self._render_all(self.last_tick)
+        self.host.log("[ASCEND] Waiting for ready input")
+
+    def signal_start(self) -> None:
+        now = self.host.now()
+        self.round_start = now
+        self.last_tick = now
+        self.state = AscendState.RUNNING
+        self.phase = BaseGamePhase.RUNNING
+        self.current_leg = 1
+        self.bands.clear()
+        self._reset_players_for_leg()
+        self._safe_sound("ascend_music")
+        self._safe_sound("ascend_leg_start")
+        self.host.log("[ASCEND] GO - Leg 1 started")
 
     def on_input(self, player_id: int, action: str, value: Any = None) -> None:
-        now = self.host.now()
-        self.host.log(f"[ASCEND] Input: P{player_id} action={action} value={value} phase={self.ascend_phase.value}")
-
-        # Normalize action
-        norm = action
-        if norm.startswith(f"P{player_id}_"):
-            norm = norm[len(f"P{player_id}_"):]
-        elif norm.startswith("P") and "_" in norm:
-            norm = norm.split("_", 1)[1]
-        norm = norm.lower()
-
-        self.host.log(f"[ASCEND] Normalized: {norm}")
-
-        ap = self.ascend_players.get(player_id)
-
-        # ---- WAITING phase: any input triggers setup complete ----
-        if self.ascend_phase == AscendPhase.WAITING:
-            pressed = value if isinstance(value, bool) else True
-            if pressed and not self._setup_complete_signaled:
-                self._setup_complete_signaled = True
-                self.ascend_phase = AscendPhase.COUNTDOWN
-                self.phase = BaseGamePhase.READY
-                self.host.log(f"[ASCEND] P{player_id} ready - signaling console to start countdown")
-                if hasattr(self.host, "on_game_setup_complete"):
-                    self.host.on_game_setup_complete()
+        ps = self.players_state.get(player_id)
+        if ps is None:
             return
 
-        if ap is None:
+        pressed = value if isinstance(value, bool) else True
+        norm = self._normalize_action(action)
+        if self.config.get("debug", {}).get("log_inputs", True) and pressed:
+            self.host.log(f"[ASCEND INPUT] P{player_id} action={action!r} norm={norm!r} value={value!r} state={self.state.value}")
+
+        if self.state == AscendState.WAITING:
+            if pressed and not ps.ready:
+                ps.ready = True
+                self.host.log(f"[ASCEND] P{player_id} ready")
+                if all(p.ready for p in self.players_state.values()):
+                    self.phase = BaseGamePhase.READY
+                    if hasattr(self.host, "on_game_setup_complete"):
+                        self.host.on_game_setup_complete()
             return
 
-        # ---- RUNNING phases ----
-        running = self.ascend_phase in (
-            AscendPhase.RUNNING_PHASE1, AscendPhase.RUNNING_PHASE2
-        )
+        if self.phase != BaseGamePhase.RUNNING:
+            return
 
-        if norm == "joystick" and isinstance(value, dict):
-            x = float(value.get("x", 0.0))
-            y = float(value.get("y", 0.0))
-            if x < -0.5:
-                self._try_lane_switch(ap, now)
-            elif x > 0.5:
-                self._try_lane_switch(ap, now)
-            if y > 0.5:
-                ap.held_up = True
-                ap.held_down = False
-                if self.ascend_phase == AscendPhase.RUNNING_PHASE1:
-                    self._activate_boost(ap, now)
-            elif y < -0.5:
-                ap.held_up = False
-                ap.held_down = True
-                if self.ascend_phase == AscendPhase.RUNNING_PHASE1:
-                    self._activate_brake(ap, now)
-            else:
-                ap.held_up = False
-                ap.held_down = False
-
-        elif norm == "left":
-            self._try_lane_switch(ap, now)
-
-        elif norm == "right":
-            self._try_lane_switch(ap, now)
-
-        elif norm == "up":
-            pressed = value if isinstance(value, bool) else True
+        if norm in ("up", "forward", "north", "joyup", "joystick_up", "dpad_up"):
+            ps.held_up = bool(pressed)
             if pressed:
-                ap.held_up = True
-                ap.held_down = False
-                if self.ascend_phase == AscendPhase.RUNNING_PHASE1:
-                    self._activate_boost(ap, now)
-            else:
-                ap.held_up = False
-
-        elif norm == "down":
-            pressed = value if isinstance(value, bool) else True
+                ps.held_down = False
+            return
+        if norm in ("down", "back", "backward", "south", "joydown", "joystick_down", "dpad_down"):
+            ps.held_down = bool(pressed)
             if pressed:
-                ap.held_down = True
-                ap.held_up = False
-                if self.ascend_phase == AscendPhase.RUNNING_PHASE1:
-                    self._activate_brake(ap, now)
+                ps.held_up = False
+            return
+        if norm in ("ystop", "neutral", "center", "stop", "release_up", "release_down"):
+            ps.held_up = False
+            ps.held_down = False
+            return
+        if norm in ("joystick", "stick", "axis", "axis_y") and isinstance(value, dict):
+            y = float(value.get("y", value.get("axis_y", value.get("hat_y", 0.0))))
+            # Different controllers report forward as either +Y or -Y. Config chooses the sign.
+            invert = bool(self.config.get("controls", {}).get("invert_joystick_y", False))
+            if invert:
+                y = -y
+            deadzone = float(self.config.get("controls", {}).get("deadzone", 0.35))
+            ps.held_up = y > deadzone
+            ps.held_down = y < -deadzone
+            if ps.held_up:
+                ps.held_down = False
+            return
+
+        color = self._color_from_action(norm)
+        if self.state == AscendState.LEG4_WALL:
+            if color and pressed:
+                self._fire_at_wall(ps, color)
+            return
+
+        if color == "white":
+            if pressed:
+                if not ps.airborne:
+                    ps.airborne = True
+                    ps.jump_hold_time = 0.0
+                    # No new footprint while airborne; existing trail fades naturally.
+                    self.host.log(f"[ASCEND] P{player_id} JUMP hold started")
+                    self._safe_sound("ascend_jump")
             else:
-                ap.held_down = False
-
-        elif norm == "ystop":
-            ap.held_up = False
-            ap.held_down = False
-
-        elif norm in COLOR_MAP:
-            pressed = value if isinstance(value, bool) else True
-            if pressed and running:
-                self._handle_color_button(ap, norm, now)
-
-    # -------------------------------------------------------------------------
-    # Tick
-    # -------------------------------------------------------------------------
+                if ps.airborne:
+                    ps.airborne = False
+                    ps.jump_hold_time = 0.0
+                    self.host.log(f"[ASCEND] P{player_id} JUMP released")
+                    self._safe_sound("ascend_land")
+            return
 
     def tick(self, now_monotonic: float) -> None:
         now = now_monotonic
-        try:
-            if self.ascend_phase == AscendPhase.WAITING:
-                self.last_tick_time = now
-                self._render_all(now)
-                return
+        dt = max(0.0, min(now - self.last_tick, 0.10))
+        self.last_tick = now
 
-            if self.ascend_phase == AscendPhase.COUNTDOWN:
-                self.last_tick_time = now
-                self._render_all(now)
-                return
+        if self.state == AscendState.RUNNING:
+            self._tick_running(dt, now)
+        elif self.state in (AscendState.WARP_EXPAND, AscendState.WARP_COLLAPSE):
+            self._tick_warp(dt, now)
+        elif self.state == AscendState.LEG4_WALL:
+            self._tick_leg4(dt, now)
+        elif self.state == AscendState.FINAL_ASCEND:
+            self._tick_final_ascend(dt, now)
+        elif self.state == AscendState.COMPLETE:
+            self.game_complete = True
 
-            delta_ms = (now - self.last_tick_time) * 1000.0
-            self.last_tick_time = now
-            delta_ms = min(delta_ms, 100.0)
-            if delta_ms <= 0:
-                return
-
-            if self.ascend_phase == AscendPhase.RUNNING_PHASE1:
-                self._tick_phase1(delta_ms, now)
-
-            elif self.ascend_phase == AscendPhase.PHASE_TRANSITION:
-                self._tick_transition(delta_ms, now)
-
-            elif self.ascend_phase == AscendPhase.RUNNING_PHASE2:
-                self._tick_phase2(delta_ms, now)
-
-            elif self.ascend_phase == AscendPhase.PORTAL_SEQUENCE:
-                self._tick_portal(delta_ms, now)
-
-            elif self.ascend_phase == AscendPhase.TIMER_EXPIRY:
-                self._tick_timer_expiry(delta_ms, now)
-
-            elif self.ascend_phase == AscendPhase.COMPLETE:
-                if not self.game_complete:
-                    self.game_complete = True
-                return
-
-            self._render_all(now)
-
-        except Exception as exc:
-            self.host.log(f"[ASCEND] ERROR in tick: {type(exc).__name__}: {exc}")
-            self.host.log(f"[ASCEND] {traceback.format_exc()}")
+        self._maybe_log_positions(now)
+        self._render_all(now)
 
     def get_viewer_state(self) -> Dict[str, Any]:
-        now = self.host.now()
-        time_left = max(0.0, self.round_end_time - now) if self.round_end_time else 0.0
-        player_states = {}
-        for pid, ap in self.ascend_players.items():
-            player_states[pid] = {
-                "score":       ap.score,
-                "lives":       ap.lives,
-                "altitude":    ap.get_total_altitude(),
-                "lane":        ap.current_lane,
-                "phase":       self.ascend_phase.value,
-            }
         return {
-            "phase":        self.ascend_phase.value,
-            "time_remaining": round(time_left, 1),
-            "scroll_offset":  round(self.scroll_offset, 1),
-            "players":      player_states,
+            "phase": self.state.value,
+            "leg": self.current_leg,
+            "players": {
+                pid: {
+                    "score": ps.score,
+                    "lives": ps.lives,
+                    "y": round(ps.y, 1),
+                    "airborne": ps.airborne,
+                    "bands_cleared": ps.bands_cleared,
+                    "wall_hits": ps.wall_hits,
+                }
+                for pid, ps in self.players_state.items()
+            },
         }
 
     def is_complete(self) -> bool:
         return self.game_complete
 
     def get_result(self) -> GameResult:
-        self._apply_end_bonuses()
-        winner_id: Optional[int] = None
-        best_score = -1
-        player_results: Dict[int, Dict[str, Any]] = {}
-
-        for pid, ap in self.ascend_players.items():
-            if ap.score > best_score:
-                best_score = ap.score
-                winner_id = pid
-            player_results[pid] = {
-                "score":          ap.score,
-                "lives":          ap.lives,
-                "altitude":       ap.get_total_altitude(),
-                "reached_summit": ap.reached_summit,
-                "wrong_presses":  ap.wrong_presses,
+        winner = None
+        best = -1
+        results: Dict[int, Dict[str, Any]] = {}
+        for pid, ps in self.players_state.items():
+            if ps.score > best:
+                winner = pid
+                best = ps.score
+            results[pid] = {
+                "score": ps.score,
+                "lives": ps.lives,
+                "bands_cleared": ps.bands_cleared,
+                "hits": ps.hits,
+                "wrong_shots": ps.wrong_shots,
+                "wall_hits": ps.wall_hits,
+                "completed": ps.reached_final,
             }
-
-        return GameResult(
-            game_key="ascend",
-            completed=True,
-            winner_player_id=winner_id,
-            player_results=player_results,
-        )
+        return GameResult("ascend", True, winner, results)
 
     def on_exit(self) -> None:
-        try:
-            self.host.play_sound("stop_music")
-        except Exception:
-            pass
+        self._safe_sound("stop_music")
         self.host.clear_all_pixels()
         self.host.log("[ASCEND] Session exiting")
 
-    # -------------------------------------------------------------------------
-    # signal_start — called by console after countdown completes
-    # -------------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Ticking: legs 1-3
+    # ------------------------------------------------------------------
 
-    def signal_start(self) -> None:
-        now = self.host.now()
-        self.host.log("[ASCEND] Console signaled GO - starting round")
-        self._start_game(now)
+    def _tick_running(self, dt: float, now: float) -> None:
+        self._update_bands(dt)
+        self._maintain_min_bands()
+        self._maybe_spawn_band(dt)
 
-    # -------------------------------------------------------------------------
-    # Internal phase management
-    # -------------------------------------------------------------------------
+        summit_cfg = self.config.get("summit", {})
+        default_summit_y = max(0, self.lane_length - int(summit_cfg.get("top_offset_px", 6)))
+        summit_y = max(0, min(self.lane_length - 1, int(self.leg_cfg().get("summit_y", default_summit_y))))
+        all_at_summit = True
+        for ps in self.players_state.values():
+            self._tick_player_movement(ps, dt)
+            self._check_band_collisions(ps)
+            if ps.y < summit_y:
+                all_at_summit = False
 
-    def _start_game(self, now: float) -> None:
-        self.ascend_phase = AscendPhase.RUNNING_PHASE1
-        self.phase = BaseGamePhase.RUNNING
-        self.round_start_time = now
-        self.round_end_time   = now + self.round_duration_sec
-        self.last_tick_time   = now
-        self.scroll_offset    = 0.0
-        self.current_scroll_speed_ms = self.p1_speed_start_ms
+        if all_at_summit:
+            self._start_warp()
 
-        for pid in self.ascend_players:
-            self.last_spawn_time[pid] = now
+    def _tick_player_movement(self, ps: AscendPlayerState, dt: float) -> None:
+        player_cfg = self.config.get("player", {})
+        up_speed = float(player_cfg.get("move_up_px_per_sec", 18))
+        down_speed = float(player_cfg.get("move_down_px_per_sec", 14))
+        start_y = float(player_cfg.get("start_y", 5))
+        max_y = float(self.leg_cfg().get("summit_y", 90))
+        old_y = ps.y
 
-        try:
-            self.host.play_sound("as_round_start")
-            self.host.play_sound("as_music_gameplay")
-        except Exception:
-            pass
-        self.host.log("[ASCEND] Phase 1 started — GO!")
+        # v2.0.7: keep this getattr-safe so older/stale player objects
+        # cannot break the tick loop right after countdown.
+        ps.hit_grace = max(0.0, float(getattr(ps, "hit_grace", 0.0)) - dt)
 
-    # -------------------------------------------------------------------------
-    # Phase 1 tick
-    # -------------------------------------------------------------------------
+        if ps.airborne:
+            ps.jump_hold_time += dt
 
-    def _tick_phase1(self, delta_ms: float, now: float) -> None:
-        # Timer check
-        if now >= self.round_end_time:
-            self._enter_timer_expiry(now)
+        if ps.held_up:
+            ps.y = min(max_y, ps.y + up_speed * dt)
+        elif ps.held_down:
+            ps.y = max(start_y, ps.y - down_speed * dt)
+
+        moved_up = ps.y > old_y + 0.001
+        if not ps.airborne and moved_up:
+            ps.add_score(float(self.config.get("scoring", {}).get("ground_move_points_per_px", 2)) * (ps.y - old_y))
+            self._add_trail(ps, old_y)
+        self._fade_trail(ps, dt)
+
+    def _add_trail(self, ps: AscendPlayerState, y: float) -> None:
+        trail_cfg = self.config.get("trail", {})
+        if not trail_cfg.get("enabled", True):
             return
+        # Only create a footprint every little bit of travel so it does not become solid noise.
+        spacing = float(trail_cfg.get("footprint_spacing_px", 2.0))
+        if abs(y - ps.last_ground_y) >= spacing:
+            ps.trail.append((y, 1.0))
+            ps.last_ground_y = y
+        max_len = int(trail_cfg.get("max_length", 8))
+        ps.trail = ps.trail[-max_len:]
 
-        # Interpolate scroll speed based on how much of the field has been covered
-        progress = min(1.0, self.scroll_offset / self.p1_field_length)
-        speed_ms = self.p1_speed_start_ms + (self.p1_speed_end_ms - self.p1_speed_start_ms) * progress
+    def _fade_trail(self, ps: AscendPlayerState, dt: float) -> None:
+        fade = float(self.config.get("trail", {}).get("fade_per_sec", 0.9))
+        ps.trail = [(y, max(0.0, b - fade * dt)) for y, b in ps.trail if b - fade * dt > 0.03]
 
-        # Apply boost / brake modifiers (per player — we use the first alive player for speed)
-        # Speed is shared; we apply the most aggressive modifier among all players
-        for ap in self.ascend_players.values():
-            self._update_boost_brake(ap, now)
+    def _update_bands(self, dt: float) -> None:
+        # Move bands downward, then clamp spacing so a faster top band cannot run into a lower band.
+        min_gap = float(self.config.get("bands", {}).get("min_spacing_px", 10))
+        for band in self.bands:
+            band.y -= band.speed * dt
 
-        # Use first alive player's state for global speed
-        active_players = [a for a in self.ascend_players.values() if a.is_alive()]
-        effective_speed_ms = speed_ms
-        if active_players:
-            ap0 = active_players[0]
-            if ap0.boost_active:
-                effective_speed_ms = speed_ms * self.p1_boost_mult
-            elif ap0.brake_active:
-                effective_speed_ms = speed_ms * self.p1_brake_mult
+        self.bands.sort(key=lambda b: b.y)  # bottom to top
+        for i in range(1, len(self.bands)):
+            lower = self.bands[i - 1]
+            upper = self.bands[i]
+            min_upper_y = lower.top + min_gap + 1
+            if upper.y < min_upper_y:
+                upper.y = min_upper_y
 
-        self.current_scroll_speed_ms = effective_speed_ms
-        pixels_per_sec = 1000.0 / max(effective_speed_ms, 1.0)
-        scroll_delta = pixels_per_sec * (delta_ms / 1000.0)
-        self.scroll_offset += scroll_delta
+        self.bands = [b for b in self.bands if b.top >= 0]
 
-        # Update each player's altitude
-        for ap in self.ascend_players.values():
-            ap.scroll_altitude = self.scroll_offset
-            ap.max_altitude    = ap.scroll_altitude
-
-        # Per-player obstacle management
-        for pc in self.players:
-            pid = pc.player_id
-            ap  = self.ascend_players[pid]
-
-            if not ap.is_alive():
-                continue
-
-            # Update invulnerability
-            ap.update_invulnerability(now)
-
-            # Spawn obstacles
-            self._maybe_spawn_p1_obstacle(pid, now)
-
-            # Update obstacles
-            scroll_speed_pps = pixels_per_sec
-            for obs in self.obstacles_phase1[pid]:
-                if obs.active:
-                    if isinstance(obs, Chaser):
-                        extra = scroll_speed_pps * (obs.chaser_speed_multiplier - 1.0)
-                        obs._extra_pps = extra
-                    obs.update(delta_ms, self.scroll_offset, ap.current_lane, ap.physical_position)
-
-            # Collision detection
-            self._check_collisions_p1(pid, ap, now)
-
-            # Remove off-screen obstacles
-            self.obstacles_phase1[pid] = [
-                o for o in self.obstacles_phase1[pid]
-                if o.active and not o.is_off_screen(self.scroll_offset)
-            ]
-
-            # Milestone check
-            self._check_milestone(pid, ap, now)
-
-            # Milestone animation update
-            ma = self.milestone_animations[pid]
-            if ma is not None:
-                ma.update(delta_ms)
-                if ma.is_complete():
-                    self.milestone_animations[pid] = None
-
-        # Check Phase 1 complete
-        if self.scroll_offset >= self.p1_field_length:
-            self._start_phase_transition(now)
-
-    # -------------------------------------------------------------------------
-    # Phase transition tick
-    # -------------------------------------------------------------------------
-
-    def _tick_transition(self, delta_ms: float, now: float) -> None:
-        if self.phase_transition_anim:
-            self.phase_transition_anim.update(delta_ms)
-            if self.phase_transition_anim.is_complete():
-                self._enter_phase2(now)
-
-    def _start_phase_transition(self, now: float) -> None:
-        self.ascend_phase = AscendPhase.PHASE_TRANSITION
-        self.phase_transition_anim = PhaseTransitionAnimation(self.anim_transition_ms)
-        self.host.log("[ASCEND] Phase 1 complete — entering transition")
-        try:
-            self.host.play_sound("as_phase_transition")
-        except Exception:
-            pass
-
-    def _enter_phase2(self, now: float) -> None:
-        self.ascend_phase = AscendPhase.RUNNING_PHASE2
-        self.host.log("[ASCEND] Phase 2 started")
-
-        for pid, ap in self.ascend_players.items():
-            ap.physical_position = self.marker_px
-            ap.manual_altitude   = self.marker_px
-            ap.last_move_time    = now
-            self.phase2_chaser_last_spawn[pid] = now
-
-        try:
-            self.host.play_sound("as_phase2_start")
-        except Exception:
-            pass
-
-    # -------------------------------------------------------------------------
-    # Phase 2 tick
-    # -------------------------------------------------------------------------
-
-    def _tick_phase2(self, delta_ms: float, now: float) -> None:
-        if now >= self.round_end_time:
-            self._enter_timer_expiry(now)
-            return
-
-        for pc in self.players:
-            pid = pc.player_id
-            ap  = self.ascend_players[pid]
-
-            if not ap.is_alive():
-                continue
-
-            ap.update_invulnerability(now)
-
-            # Player movement
-            self._handle_p2_movement(ap, now)
-
-            # Update altitude
-            if ap.physical_position > ap.manual_altitude:
-                gained = ap.physical_position - ap.manual_altitude
-                ap.manual_altitude = ap.physical_position
-                ap.add_score(int(gained * self.score_p2.get("altitude_per_pixel", 5)))
-            ap.max_altitude = ap.scroll_altitude + float(ap.manual_altitude)
-
-            # Spawn chasers
-            if now - self.phase2_chaser_last_spawn[pid] >= self.p2_chaser_spawn_ms / 1000.0:
-                self._spawn_p2_chaser(pid, now)
-                self.phase2_chaser_last_spawn[pid] = now
-
-            # Update Phase-2 chasers (only Chaser instances move in P2)
-            for obs in self.obstacles_phase2[pid]:
-                if obs.active and isinstance(obs, Chaser):
-                    obs._extra_pps = getattr(obs, '_extra_pps', 20.0)
-                    obs.p2_pos -= int(obs._extra_pps * (delta_ms / 1000.0))
-                    if obs.p2_pos < 0:
-                        obs.active = False
-
-            # Collision detection in Phase 2
-            self._check_collisions_p2(pid, ap, now)
-
-            # Clean up inactive obstacles
-            self.obstacles_phase2[pid] = [
-                o for o in self.obstacles_phase2[pid] if o.active
-            ]
-
-            # Portal check
-            if ap.physical_position >= self.p2_portal_start and not ap.portal_entered:
-                ap.portal_entered = True
-                ap.reached_summit = True
-                ap.summit_time    = now
-                ap.add_score(self.score_p2.get("portal_reached", 1000))
-                self.portal_animations[pid] = PortalAnimation(self.config, self.marker_color)
-                self.ascend_phase = AscendPhase.PORTAL_SEQUENCE
-                self.host.log(f"[ASCEND] P{pid} reached the portal!")
-                try:
-                    self.host.play_sound("as_portal_enter")
-                except Exception:
-                    pass
-                return
-
-            # Milestone animation update
-            ma = self.milestone_animations[pid]
-            if ma is not None:
-                ma.update(delta_ms)
-                if ma.is_complete():
-                    self.milestone_animations[pid] = None
-
-    def _handle_p2_movement(self, ap: AscendPlayer, now: float) -> None:
-        """Move player up or down in Phase 2 based on held directions."""
-        elapsed_ms = (now - ap.last_move_time) * 1000.0
-        if elapsed_ms < ap.phase2_move_speed_ms:
-            return
-
-        moved = False
-        if ap.held_up:
-            new_pos = min(ap.physical_position + 1, self.p2_portal_start)
-            if new_pos != ap.physical_position:
-                ap.physical_position = new_pos
-                moved = True
-        elif ap.held_down:
-            new_pos = max(ap.physical_position - 1, 0)
-            if new_pos != ap.physical_position:
-                ap.physical_position = new_pos
-                ap.used_retreat = True
-                moved = True
-
-        if moved:
-            ap.last_move_time = now
-
-    def _spawn_p2_chaser(self, pid: int, now: float) -> None:
-        color_name = random.choice(list(COLOR_MAP.keys()))
-        lane = random.choice(["left", "right"])
-        c = Chaser(virtual_pos=0.0, lane=lane, color_name=color_name, chaser_speed_multiplier=self.chaser_speed_mult)
-        c.p2_pos = 99
-        c._extra_pps = 15.0
-        self.obstacles_phase2[pid].append(c)
-
-    # -------------------------------------------------------------------------
-    # Portal sequence tick
-    # -------------------------------------------------------------------------
-
-    def _tick_portal(self, delta_ms: float, now: float) -> None:
-        all_done = True
-        for pid, anim in self.portal_animations.items():
-            if anim is not None:
-                anim.update(delta_ms)
-                if not anim.is_complete():
-                    all_done = False
-        if all_done:
-            self.ascend_phase = AscendPhase.COMPLETE
-            self.game_complete = True
-            self.host.log("[ASCEND] Portal sequence complete — game over")
-
-    # -------------------------------------------------------------------------
-    # Timer expiry tick
-    # -------------------------------------------------------------------------
-
-    def _enter_timer_expiry(self, now: float) -> None:
-        self.ascend_phase = AscendPhase.TIMER_EXPIRY
-        max_alt = int(max((a.get_total_altitude() for a in self.ascend_players.values()), default=0))
-        self.timer_expiry_anim = TimerExpiredAnimation(self.config, min(max_alt, 99))
-        self.host.log("[ASCEND] Timer expired — entering expiry animation")
-        try:
-            self.host.play_sound("as_timer_expired")
-        except Exception:
-            pass
-
-    def _tick_timer_expiry(self, delta_ms: float, now: float) -> None:
-        if self.timer_expiry_anim:
-            self.timer_expiry_anim.update(delta_ms)
-            if self.timer_expiry_anim.is_complete():
-                self.ascend_phase = AscendPhase.COMPLETE
-                self.game_complete = True
-
-    # -------------------------------------------------------------------------
-    # Obstacle spawning — Phase 1
-    # -------------------------------------------------------------------------
-
-    def _get_p1_spawn_interval(self, now: float) -> float:
-        """Linearly interpolate spawn interval from start to end."""
-        progress = min(1.0, self.scroll_offset / self.p1_field_length)
-        return self.obs_spawn_start_ms + (self.obs_spawn_end_ms - self.obs_spawn_start_ms) * progress
-
-    def _maybe_spawn_p1_obstacle(self, pid: int, now: float) -> None:
-        obs_list = self.obstacles_phase1[pid]
-        if len(obs_list) >= self.obs_max:
-            return
-
-        interval_ms = self._get_p1_spawn_interval(now)
-        elapsed_ms  = (now - self.last_spawn_time[pid]) * 1000.0
-        if elapsed_ms < interval_ms:
-            return
-
-        self.last_spawn_time[pid] = now
-        self._spawn_p1_obstacle(pid, now)
-
-    def _spawn_p1_obstacle(self, pid: int, now: float) -> None:
-        obs_cfg = self.config.get("obstacles", {})
-        gate_cfg    = obs_cfg.get("color_gate",   {})
-        blocker_cfg = obs_cfg.get("blocker",      {})
-        chaser_cfg  = obs_cfg.get("chaser",       {})
-        swapper_cfg = obs_cfg.get("swapper",      {})
-        bonus_cfg   = obs_cfg.get("bonus_pickup", {})
-
-        weights = [
-            gate_cfg.get("spawn_weight", 35),
-            blocker_cfg.get("spawn_weight", 25),
-            chaser_cfg.get("spawn_weight", 20),
-            swapper_cfg.get("spawn_weight", 10),
-            bonus_cfg.get("spawn_weight", 10),
-        ]
-        total = sum(weights)
-        roll  = random.uniform(0, total)
-        idx   = 0
-        cumul = 0
-        for i, w in enumerate(weights):
-            cumul += w
-            if roll <= cumul:
-                idx = i
+    def _maintain_min_bands(self) -> None:
+        cfg = self.config.get("bands", {})
+        min_bands = int(self.leg_cfg().get("min_simultaneous", cfg.get("min_simultaneous", 2)))
+        max_bands = int(cfg.get("max_simultaneous", 6))
+        guard = 0
+        while len(self.bands) < min(min_bands, max_bands) and guard < 8:
+            if not self._spawn_band(force=True):
                 break
+            guard += 1
 
-        lane       = random.choice(["left", "right"])
-        virtual_pos = self.scroll_offset + LANE_LENGTH - 1  # spawn at top of viewport
-
-        obs: Optional[Obstacle] = None
-
-        if idx == 0:  # ColorGate
-            size = random.randint(
-                gate_cfg.get("size_min", 2),
-                gate_cfg.get("size_max", 3),
-            )
-            color_name = random.choice(list(COLOR_MAP.keys()))
-            obs = ColorGate(virtual_pos=virtual_pos, lane=lane, size=size, color_name=color_name)
-
-        elif idx == 1:  # Blocker
-            size = random.randint(
-                blocker_cfg.get("size_min", 2),
-                blocker_cfg.get("size_max", 3),
-            )
-            obs = Blocker(virtual_pos=virtual_pos, lane=lane, size=size)
-
-        elif idx == 2:  # Chaser
-            color_name = random.choice(list(COLOR_MAP.keys()))
-            speed_mult = chaser_cfg.get("speed_multiplier", 1.8)
-            obs = Chaser(virtual_pos=virtual_pos, lane=lane, color_name=color_name, chaser_speed_multiplier=speed_mult)
-            scroll_pps = 1000.0 / max(self.current_scroll_speed_ms, 1.0)
-            obs._extra_pps = scroll_pps * (speed_mult - 1.0)
-
-        elif idx == 3:  # Swapper
-            cycle_ms = swapper_cfg.get("cycle_ms", 600)
-            obs = Swapper(virtual_pos=virtual_pos, lane=lane, cycle_ms=cycle_ms, start_time=0.0)
-
-        else:  # BonusPickup
-            color_name = random.choice(list(COLOR_MAP.keys()))
-            pulse_rate  = bonus_cfg.get("pulse_rate_ms", 300)
-            obs = BonusPickup(virtual_pos=virtual_pos, lane=lane, color_name=color_name, pulse_rate_ms=pulse_rate)
-
-        if obs:
-            self.obstacles_phase1[pid].append(obs)
-
-    # -------------------------------------------------------------------------
-    # Collision detection — Phase 1
-    # -------------------------------------------------------------------------
-
-    def _check_collisions_p1(self, pid: int, ap: AscendPlayer, now: float) -> None:
-        if ap.is_invulnerable:
+    def _maybe_spawn_band(self, dt: float) -> None:
+        cfg = self.config.get("bands", {})
+        if len(self.bands) >= int(cfg.get("max_simultaneous", 6)):
             return
+        spawn_chance_per_sec = float(self.leg_cfg().get("spawn_chance_per_sec", 0.55))
+        if random.random() <= spawn_chance_per_sec * dt:
+            self._spawn_band(force=False)
 
-        player_phys = ap.physical_position
-        player_lane = ap.current_lane
+    def _spawn_band(self, force: bool = False) -> bool:
+        cfg = self.config.get("bands", {})
+        max_bands = int(cfg.get("max_simultaneous", 6))
+        if len(self.bands) >= max_bands:
+            return False
 
-        for obs in self.obstacles_phase1[pid]:
-            if not obs.active:
+        min_gap = float(cfg.get("min_spacing_px", 10))
+        h_min = int(cfg.get("height_min", 2))
+        h_max = int(cfg.get("height_max", 7))
+        colors = self.leg_cfg().get("band_colors", ["red", "blue", "orange", "purple"])
+        speed_min = float(self.leg_cfg().get("band_speed_min", 10))
+        speed_max = float(self.leg_cfg().get("band_speed_max", 18))
+
+        height = random.randint(h_min, h_max)
+        if not self.bands:
+            # Place the first guaranteed band already visible enough that the
+            # opening field never feels empty.
+            y = float(self.lane_length - height - random.randint(6, 16)) if force else float(self.lane_length + 2)
+        else:
+            highest = max(self.bands, key=lambda b: b.y)
+            y = float(highest.top + min_gap + 1)
+            if not force and y < self.lane_length - min_gap:
+                return False
+            # If forced bands cannot fit above the field, distribute them lower
+            # while still honoring spacing from the previous highest band.
+            if force and y >= self.lane_length + min_gap:
+                return False
+
+        self.bands.append(DangerBand(
+            y=y,
+            height=height,
+            speed=random.uniform(speed_min, speed_max),
+            color_name=random.choice(colors),
+        ))
+        self.bands.sort(key=lambda b: b.y)
+        return True
+
+    def _check_band_collisions(self, ps: AscendPlayerState) -> None:
+        # Brief grace after respawn prevents instant repeat collisions at the bottom.
+        if getattr(ps, "hit_grace", 0.0) > 0.0:
+            return
+        player_half = max(0, int(self.config.get("player", {}).get("ground_size", 2)) // 2)
+        p_min = int(ps.y) - player_half
+        p_max = int(ps.y) + player_half
+        for band in self.bands:
+            b_min = int(band.y)
+            b_max = int(band.top)
+            overlaps = p_max >= b_min and p_min <= b_max
+            if not overlaps:
+                # Award a small jump-clear bonus after a band has passed below the player.
+                if band.top < ps.y - 2 and not band.cleared_by_player.get(ps.player_id, False):
+                    if ps.airborne:
+                        ps.add_score(self.config.get("scoring", {}).get("jump_clear_bonus", 25))
+                        ps.bands_cleared += 1
+                    band.cleared_by_player[ps.player_id] = True
                 continue
-
-            obs_phys = obs.get_physical_pos(self.scroll_offset)
-            # Contact range: obstacle occupies [obs_phys, obs_phys + size - 1]
-            obs_min = int(math.floor(obs_phys))
-            obs_max = obs_min + obs.size - 1
-
-            in_range = (obs_min - 1) <= player_phys <= (obs_max + 1)
-            same_lane = (obs.lane == player_lane)
-
-            if not (in_range and same_lane):
+            if ps.airborne:
                 continue
+            # Grounded contact hurts.
+            if not band.cleared_by_player.get(ps.player_id, False):
+                ps.hits += 1
+                if bool(self.config.get("player", {}).get("collisions_reduce_lives", False)):
+                    ps.lives = max(0, ps.lives - 1)
+                ps.add_score(self.config.get("scoring", {}).get("collision_penalty", -100))
+                band.cleared_by_player[ps.player_id] = True
+                self._safe_sound("ascend_hit")
+                self._safe_rumble(ps.player_id)
+                if bool(self.config.get("player", {}).get("respawn_after_collision", True)):
+                    self._respawn_player_after_hit(ps)
 
-            # Obstacle-specific logic
-            if isinstance(obs, ColorGate):
-                if not obs.cleared:
-                    # Damage — the player must clear this by pressing the correct button
-                    self._apply_collision_damage(ap, now, "color_gate")
-                    obs.active = False
 
-            elif isinstance(obs, Blocker):
-                if not obs.dodged:
-                    self._apply_collision_damage(ap, now, "blocker")
-                    obs.active = False
+    def _respawn_player_after_hit(self, ps: AscendPlayerState) -> None:
+        """Put a hit player back at the bottom without freezing the game."""
+        start_y = float(self.config.get("player", {}).get("start_y", 5))
+        ps.y = start_y
+        ps.airborne = False
+        ps.jump_hold_time = 0.0
+        ps.held_up = False
+        ps.held_down = False
+        ps.trail.clear()
+        ps.last_ground_y = start_y
+        ps.hit_grace = float(self.config.get("player", {}).get("hit_grace_sec", 1.25))
+        # Clear bands near the bottom so the player is visible and gets a fair restart.
+        safe_zone = float(self.config.get("player", {}).get("respawn_clear_zone_px", 14))
+        self.bands = [b for b in self.bands if b.top < start_y - 1 or b.y > start_y + safe_zone]
+        self.host.log(f"[ASCEND] P{ps.player_id} collision {ps.hits}; respawned y={ps.y:.1f} mirror_y={self.lane_length-1-int(round(ps.y))} lane_length={self.lane_length}")
 
-            elif isinstance(obs, Chaser):
-                if not obs.destroyed:
-                    self._apply_collision_damage(ap, now, "chaser")
-                    obs.active = False
+    # ------------------------------------------------------------------
+    # Warp and leg changes
+    # ------------------------------------------------------------------
 
-            elif isinstance(obs, Swapper):
-                self._apply_collision_damage(ap, now, "swapper")
-                obs.active = False
+    def _start_warp(self) -> None:
+        self.state = AscendState.WARP_EXPAND
+        self.warp_t = 0.0
+        self.bands.clear()
+        self._safe_sound("ascend_leg_complete")
+        self.host.log(f"[ASCEND] Leg {self.current_leg} complete - warp transition")
 
-            elif isinstance(obs, BonusPickup):
-                if not obs.collected:
-                    ap.add_score(self.score_p1.get("bonus_collect", 100))
-                    obs.collected = True
-                    obs.active    = False
-                    try:
-                        self.host.play_sound("as_bonus_collect")
-                    except Exception:
-                        pass
+    def _tick_warp(self, dt: float, now: float) -> None:
+        self.warp_t += dt
+        expand_sec = float(self.config.get("warp", {}).get("expand_sec", 0.55))
+        collapse_sec = float(self.config.get("warp", {}).get("collapse_sec", 0.75))
 
-    def _apply_collision_damage(self, ap: AscendPlayer, now: float, source: str) -> None:
-        penalty = self.score_p1.get("collision", -50)
-        ap.add_score(penalty)
-        survived = ap.take_damage(now)
-        self.host.log(f"[ASCEND] P{ap.player_id} hit by {source}, lives={ap.lives}")
-        try:
-            self.host.play_sound("as_player_hit")
-        except Exception:
-            pass
-        if not survived:
-            self.host.log(f"[ASCEND] P{ap.player_id} is out of lives")
+        if self.state == AscendState.WARP_EXPAND and self.warp_t >= expand_sec:
+            self.state = AscendState.WARP_COLLAPSE
+            self.warp_t = 0.0
+            self._safe_sound("ascend_warp_collapse")
+        elif self.state == AscendState.WARP_COLLAPSE and self.warp_t >= collapse_sec:
+            if self.current_leg < 3:
+                self.current_leg += 1
+                self.state = AscendState.RUNNING
+                self.bands.clear()
+                self._reset_players_for_leg()
+                self._safe_sound("ascend_leg_start")
+                self.host.log(f"[ASCEND] Leg {self.current_leg} started")
+            else:
+                self.current_leg = 4
+                self.state = AscendState.LEG4_WALL
+                self._reset_players_for_leg()
+                self._build_wall()
+                self._safe_sound("ascend_wall_start")
+                self.host.log("[ASCEND] Leg 4 wall started")
 
-    # -------------------------------------------------------------------------
-    # Collision detection — Phase 2
-    # -------------------------------------------------------------------------
+    def _reset_players_for_leg(self) -> None:
+        start_y = float(self.config.get("player", {}).get("start_y", 5))
+        for ps in self.players_state.values():
+            ps.y = start_y
+            ps.airborne = False
+            ps.jump_hold_time = 0.0
+            ps.held_up = False
+            ps.held_down = False
+            ps.trail.clear()
+            ps.last_ground_y = start_y
+            ps.hit_grace = float(self.config.get("player", {}).get("start_grace_sec", 1.0))
 
-    def _check_collisions_p2(self, pid: int, ap: AscendPlayer, now: float) -> None:
-        if ap.is_invulnerable:
+    # ------------------------------------------------------------------
+    # Leg 4 wall
+    # ------------------------------------------------------------------
+
+    def _build_wall(self) -> None:
+        wall_cfg = self.config.get("wall", {})
+        self.wall.clear()
+        wall_start = int(wall_cfg.get("start_y", 78))
+        wall_height = int(wall_cfg.get("height_px", 18))
+        block_h = int(wall_cfg.get("block_height_px", 2))
+        colors = wall_cfg.get("colors", ["red", "green", "blue"])
+        hp = int(wall_cfg.get("block_hp", 1))
+        y = wall_start
+        while y < min(self.lane_length, wall_start + wall_height):
+            self.wall.append(WallBlock(y=y, height=block_h, color_name=random.choice(colors), hp=hp))
+            y += block_h
+
+    def _tick_leg4(self, dt: float, now: float) -> None:
+        start_y = float(self.config.get("player", {}).get("start_y", 5))
+        for ps in self.players_state.values():
+            ps.y = start_y
+            ps.airborne = False
+            ps.jump_hold_time = 0.0
+            self._fade_trail(ps, dt)
+        if not self.wall:
+            self.state = AscendState.FINAL_ASCEND
+            self.final_t = 0.0
+            self._safe_sound("ascend_wall_explode")
+            self._safe_sound("ascend_victory_music")
+            self.host.log("[ASCEND] Wall cleared - final ascension")
+
+    def _fire_at_wall(self, ps: AscendPlayerState, color: str) -> None:
+        now = self.host.now()
+        fire_rate = float(self.config.get("wall", {}).get("fire_cooldown_sec", 0.18))
+        if now - ps.last_fire_time < fire_rate:
             return
+        ps.last_fire_time = now
+        self._safe_sound("ascend_fire")
 
-        player_px   = ap.physical_position
-        player_lane = ap.current_lane
+        # Break the lowest matching block first, making the wall peel upward layer by layer.
+        for block in sorted(self.wall, key=lambda b: b.y):
+            if block.color_name == color:
+                block.hp -= 1
+                ps.wall_hits += 1
+                ps.add_score(self.config.get("scoring", {}).get("wall_hit", 50))
+                self._safe_sound("ascend_wall_hit")
+                if block.hp <= 0:
+                    self.wall.remove(block)
+                    ps.add_score(self.config.get("scoring", {}).get("wall_break", 100))
+                    self._safe_sound("ascend_wall_break")
+                return
+        ps.wrong_shots += 1
+        ps.add_score(self.config.get("scoring", {}).get("wrong_color_penalty", -10))
+        self._safe_sound("ascend_wrong_color")
 
-        for obs in self.obstacles_phase2[pid]:
-            if not obs.active:
-                continue
+    # ------------------------------------------------------------------
+    # Final ascension
+    # ------------------------------------------------------------------
 
-            obs_min = obs.p2_pos
-            obs_max = obs_min + obs.size - 1
-            in_range  = obs_min <= player_px <= obs_max
-            same_lane = obs.lane == player_lane
+    def _tick_final_ascend(self, dt: float, now: float) -> None:
+        self.final_t += dt
+        speed = float(self.config.get("final", {}).get("auto_ascend_px_per_sec", 28))
+        done = True
+        for ps in self.players_state.values():
+            ps.y = min(self.lane_length - 2, ps.y + speed * dt)
+            if ps.y < self.lane_length - 3:
+                done = False
+            else:
+                ps.reached_final = True
+        if done and self.final_t >= float(self.config.get("final", {}).get("min_duration_sec", 2.5)):
+            for ps in self.players_state.values():
+                if ps.reached_final:
+                    ps.add_score(self.config.get("scoring", {}).get("final_completion_bonus", 1000))
+            self.state = AscendState.COMPLETE
+            self.phase = BaseGamePhase.COMPLETE
+            self.game_complete = True
+            self._safe_sound("ascend_complete")
+            self.host.log("[ASCEND] Complete")
 
-            if not (in_range and same_lane):
-                continue
-
-            if isinstance(obs, ColorGate):
-                if not obs.cleared:
-                    self._apply_p2_collision(ap, now, "color_gate")
-                    obs.active = False
-
-            elif isinstance(obs, Blocker):
-                # Push the player back one pixel
-                if player_px > 0:
-                    ap.physical_position -= 1
-                self._apply_p2_collision(ap, now, "blocker")
-                # Keep blocker active (static)
-
-            elif isinstance(obs, Chaser):
-                if not obs.destroyed:
-                    self._apply_p2_collision(ap, now, "chaser")
-                    obs.active = False
-
-            elif isinstance(obs, BonusPickup):
-                if not obs.collected:
-                    # bonus_collect is a Phase 1 mechanic; fall back to Phase 1 score if not in Phase 2 config
-                    ap.add_score(self.score_p2.get("bonus_collect", self.score_p1.get("bonus_collect", 100)))
-                    obs.collected = True
-                    obs.active    = False
-                    try:
-                        self.host.play_sound("as_bonus_collect")
-                    except Exception:
-                        pass
-
-    def _apply_p2_collision(self, ap: AscendPlayer, now: float, source: str) -> None:
-        ap.add_score(self.score_p2.get("collision", self.score_p1.get("collision", -50)))
-        survived = ap.take_damage(now)
-        self.host.log(f"[ASCEND] P{ap.player_id} hit by {source} in Phase 2, lives={ap.lives}")
-        try:
-            self.host.play_sound("as_player_hit")
-        except Exception:
-            pass
-        if not survived:
-            self.host.log(f"[ASCEND] P{ap.player_id} eliminated in Phase 2")
-
-    # -------------------------------------------------------------------------
-    # Colour button handler
-    # -------------------------------------------------------------------------
-
-    def _handle_color_button(self, ap: AscendPlayer, color: str, now: float) -> None:
-        player_px   = ap.physical_position
-        player_lane = ap.current_lane
-        pid         = ap.player_id
-        hit_any     = False
-
-        if self.ascend_phase == AscendPhase.RUNNING_PHASE1:
-            obs_list = self.obstacles_phase1[pid]
-            for obs in obs_list:
-                if not obs.active:
-                    continue
-                obs_phys = obs.get_physical_pos(self.scroll_offset)
-                obs_min  = int(math.floor(obs_phys))
-                obs_max  = obs_min + obs.size - 1
-                in_range  = (obs_min - 2) <= player_px <= (obs_max + 2)
-                same_lane = obs.lane == player_lane
-                if not (in_range and same_lane):
-                    continue
-
-                if isinstance(obs, ColorGate):
-                    if obs.try_clear(color):
-                        obs.cleared = True
-                        obs.active  = False
-                        ap.add_score(self.score_p1.get("gate_clear", 50))
-                        hit_any = True
-                        try:
-                            self.host.play_sound("as_gate_clear")
-                        except Exception:
-                            pass
-                    else:
-                        ap.wrong_presses += 1
-                        ap.add_score(self.score_p1.get("wrong_press", -15))
-                        hit_any = True
-
-                elif isinstance(obs, Chaser):
-                    if obs.try_color_match(color):
-                        obs.destroyed = True
-                        obs.active    = False
-                        ap.add_score(self.score_p1.get("chaser_destroy", 100))
-                        hit_any = True
-                        try:
-                            self.host.play_sound("as_chaser_destroy")
-                        except Exception:
-                            pass
-                    else:
-                        ap.wrong_presses += 1
-                        ap.add_score(self.score_p1.get("wrong_press", -15))
-                        hit_any = True
-
-                elif isinstance(obs, Swapper):
-                    if obs.try_clear(color, now):
-                        obs.active = False
-                        ap.add_score(self.score_p1.get("swapper_clear", 75))
-                        hit_any = True
-                        try:
-                            self.host.play_sound("as_gate_clear")
-                        except Exception:
-                            pass
-                    else:
-                        ap.wrong_presses += 1
-                        ap.add_score(self.score_p1.get("wrong_press", -15))
-                        hit_any = True
-
-                elif isinstance(obs, BonusPickup):
-                    if obs.try_collect(color):
-                        obs.collected = True
-                        obs.active    = False
-                        ap.add_score(self.score_p1.get("bonus_collect", 100))
-                        hit_any = True
-                        try:
-                            self.host.play_sound("as_bonus_collect")
-                        except Exception:
-                            pass
-
-        elif self.ascend_phase == AscendPhase.RUNNING_PHASE2:
-            obs_list = self.obstacles_phase2[pid]
-            for obs in obs_list:
-                if not obs.active:
-                    continue
-                in_range  = obs.p2_pos <= player_px <= obs.p2_pos + obs.size - 1
-                same_lane = obs.lane == player_lane
-                if not (in_range and same_lane):
-                    continue
-
-                if isinstance(obs, ColorGate):
-                    if obs.try_clear(color):
-                        obs.cleared = True
-                        obs.active  = False
-                        ap.add_score(self.score_p2.get("gate_clear", 75))
-                        hit_any = True
-                        try:
-                            self.host.play_sound("as_gate_clear")
-                        except Exception:
-                            pass
-                    else:
-                        ap.wrong_presses += 1
-                        ap.add_score(self.score_p2.get("wrong_press", self.score_p1.get("wrong_press", -15)))
-                        hit_any = True
-
-                elif isinstance(obs, Chaser):
-                    if obs.try_color_match(color):
-                        obs.destroyed = True
-                        obs.active    = False
-                        ap.add_score(self.score_p2.get("chaser_destroy", 125))
-                        hit_any = True
-                        try:
-                            self.host.play_sound("as_chaser_destroy")
-                        except Exception:
-                            pass
-                    else:
-                        ap.wrong_presses += 1
-                        ap.add_score(self.score_p2.get("wrong_press", self.score_p1.get("wrong_press", -15)))
-                        hit_any = True
-
-                elif isinstance(obs, BonusPickup):
-                    if obs.try_collect(color):
-                        obs.collected = True
-                        obs.active    = False
-                        # bonus_collect is a Phase 1 mechanic; fall back to Phase 1 score if not in Phase 2 config
-                        ap.add_score(self.score_p2.get("bonus_collect", self.score_p1.get("bonus_collect", 100)))
-                        hit_any = True
-                        try:
-                            self.host.play_sound("as_bonus_collect")
-                        except Exception:
-                            pass
-
-        if not hit_any:
-            # Pressed without a nearby matching obstacle
-            self.host.log(f"[ASCEND] P{ap.player_id} pressed {color} with nothing to hit")
-
-    # -------------------------------------------------------------------------
-    # Boost / brake
-    # -------------------------------------------------------------------------
-
-    def _activate_boost(self, ap: AscendPlayer, now: float) -> None:
-        if self.ascend_phase != AscendPhase.RUNNING_PHASE1:
-            return
-        ap.boost_active  = True
-        ap.boost_end_time = now + self.p1_boost_ms / 1000.0
-        ap.brake_active  = False
-        self.host.log(f"[ASCEND] P{ap.player_id} boost activated")
-
-    def _activate_brake(self, ap: AscendPlayer, now: float) -> None:
-        if self.ascend_phase != AscendPhase.RUNNING_PHASE1:
-            return
-        if ap.brake_uses_remaining <= 0:
-            return
-        ap.brake_active      = True
-        ap.brake_end_time    = now + self.p1_brake_ms / 1000.0
-        ap.brake_uses_remaining -= 1
-        ap.boost_active      = False
-        self.host.log(f"[ASCEND] P{ap.player_id} brake activated (uses left: {ap.brake_uses_remaining})")
-
-    def _update_boost_brake(self, ap: AscendPlayer, now: float) -> None:
-        if ap.boost_active and now >= ap.boost_end_time:
-            ap.boost_active = False
-        if ap.brake_active and now >= ap.brake_end_time:
-            ap.brake_active = False
-
-    # -------------------------------------------------------------------------
-    # Lane switch
-    # -------------------------------------------------------------------------
-
-    def _try_lane_switch(self, ap: AscendPlayer, now: float) -> None:
-        switched = ap.switch_lane(now)
-        if switched:
-            self.host.log(f"[ASCEND] P{ap.player_id} switched to {ap.current_lane}")
-            # Award blocker-dodge score in Phase 1 if we dodged a blocker
-            if self.ascend_phase == AscendPhase.RUNNING_PHASE1:
-                pid = ap.player_id
-                for obs in self.obstacles_phase1[pid]:
-                    if isinstance(obs, Blocker) and not obs.dodged:
-                        obs_phys = obs.get_physical_pos(self.scroll_offset)
-                        obs_min  = int(math.floor(obs_phys))
-                        obs_max  = obs_min + obs.size - 1
-                        if (obs_min - 3) <= ap.physical_position <= (obs_max + 3):
-                            if obs.lane != ap.current_lane:
-                                obs.dodged = True
-                                ap.add_score(self.score_p1.get("blocker_dodge", 25))
-
-    # -------------------------------------------------------------------------
-    # Milestone check
-    # -------------------------------------------------------------------------
-
-    def _check_milestone(self, pid: int, ap: AscendPlayer, now: float) -> None:
-        milestone_count = int(ap.scroll_altitude / self.p1_milestone_every)
-        if milestone_count > self._last_milestone[pid]:
-            self._last_milestone[pid] = milestone_count
-            ap.add_score(self.score_p1.get("altitude_milestone", 200))
-            self.milestone_animations[pid] = MilestoneWaveAnimation(
-                self.anim_milestone_ms, self.marker_color
-            )
-            self.host.log(f"[ASCEND] P{pid} milestone {milestone_count}! altitude={ap.scroll_altitude:.0f}")
-            try:
-                self.host.play_sound("as_milestone")
-            except Exception:
-                pass
-
-    # -------------------------------------------------------------------------
-    # End bonuses
-    # -------------------------------------------------------------------------
-
-    def _apply_end_bonuses(self) -> None:
-        for ap in self.ascend_players.values():
-            if ap.reached_summit:
-                ap.add_score(self.score_end.get("summit", 1000))
-            if ap.lives > 0:
-                ap.add_score(self.score_end.get("survivor", 300))
-            if not ap.used_retreat:
-                ap.add_score(self.score_end.get("no_retreat", 150))
-            if ap.summit_time and ap.summit_time > 0:
-                elapsed = ap.summit_time - self.round_start_time
-                speed_bonus = int(
-                    max(0, self.round_duration_sec - elapsed)
-                    * self.score_end.get("speed_per_sec", 100)
-                )
-                ap.add_score(speed_bonus)
-
-    # -------------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Rendering
-    # -------------------------------------------------------------------------
+    # ------------------------------------------------------------------
 
     def _render_all(self, now: float) -> None:
-        try:
-            for pc in self.players:
-                pid = pc.player_id
-                pixels = self._build_pixels(pid, now)
-                self.host.set_player_lane_pixels(pid, "left",  pixels["left"])
-                self.host.set_player_lane_pixels(pid, "right", pixels["right"])
-        except Exception as exc:
-            self.host.log(f"[ASCEND] ERROR in _render_all: {exc}")
+        for pc in self.players:
+            frame = self._build_frame(pc.player_id, now)
+            self.host.set_player_lane_pixels(pc.player_id, "left", frame["left"])
+            self.host.set_player_lane_pixels(pc.player_id, "right", frame["right"])
 
-    def _build_pixels(self, pid: int, now: float) -> Dict[str, List[Tuple[int, int, int]]]:
-        black: List[Tuple[int, int, int]] = [(0, 0, 0)] * LANE_LENGTH
-        left:  List[Tuple[int, int, int]] = list(black)
-        right: List[Tuple[int, int, int]] = list(black)
+    def _build_frame(self, player_id: int, now: float) -> Dict[str, List[RGB]]:
+        bg = self._background_color()
+        left: List[RGB] = [bg] * self.lane_length
+        right: List[RGB] = [bg] * self.lane_length
 
-        # Phase transition animation overrides everything
-        if self.ascend_phase == AscendPhase.PHASE_TRANSITION and self.phase_transition_anim:
-            frame = self.phase_transition_anim.get_pixels(LANE_LENGTH)
-            return {"left": frame["left"], "right": frame["right"]}
+        if self.state in (AscendState.WARP_EXPAND, AscendState.WARP_COLLAPSE):
+            self._draw_warp(left, right)
+            return {"left": left, "right": right}
 
-        # Portal animation for this player
-        pa = self.portal_animations.get(pid)
-        if pa is not None and self.ascend_phase == AscendPhase.PORTAL_SEQUENCE:
-            frame = pa.get_pixels(LANE_LENGTH)
-            return {"left": frame["left"], "right": frame["right"]}
+        if self.state == AscendState.FINAL_ASCEND:
+            self._draw_victory_background(left, right, now)
 
-        # Timer expiry animation
-        if self.ascend_phase == AscendPhase.TIMER_EXPIRY and self.timer_expiry_anim:
-            if self.timer_expiry_anim._stage > TimerExpiredAnimation.STAGE_FREEZE:
-                frame = self.timer_expiry_anim.get_pixels(LANE_LENGTH)
-                return {"left": frame["left"], "right": frame["right"]}
-            # FREEZE stage: fall through to normal rendering
+        if self.state == AscendState.RUNNING:
+            for band in self.bands:
+                self._draw_span(left, right, int(band.y), band.height, self._dim(COLORS.get(band.color_name, COLORS["red"]), float(self.config.get("visual", {}).get("band_brightness", 0.50))))
+            # Draw summit last so danger bands can never cover it.
+            self._draw_summit(left, right, now)
 
-        # Draw Phase 1 obstacles
-        if self.ascend_phase in (AscendPhase.RUNNING_PHASE1, AscendPhase.TIMER_EXPIRY):
-            for obs in self.obstacles_phase1.get(pid, []):
-                if obs.active:
-                    for px_idx, color in obs.get_render_pixels(self.scroll_offset, now):
-                        if 0 <= px_idx < LANE_LENGTH:
-                            if obs.lane == "left":
-                                left[px_idx] = color
-                            else:
-                                right[px_idx] = color
+        if self.state == AscendState.LEG4_WALL:
+            for block in self.wall:
+                self._draw_span(left, right, block.y, block.height, COLORS.get(block.color_name, COLORS["red"]))
 
-        # Draw Phase 2 obstacles + portal
-        if self.ascend_phase in (AscendPhase.RUNNING_PHASE2, AscendPhase.TIMER_EXPIRY):
-            for obs in self.obstacles_phase2.get(pid, []):
-                if obs.active:
-                    for px_idx, color in obs.get_p2_render_pixels(now):
-                        if 0 <= px_idx < LANE_LENGTH:
-                            if obs.lane == "left":
-                                left[px_idx] = color
-                            else:
-                                right[px_idx] = color
-
-            # Draw portal pixels 97-99 on both lanes
-            portal_col = _portal_color(now)
-            for px in range(self.p2_portal_start, LANE_LENGTH):
-                left[px]  = portal_col
-                right[px] = portal_col
-
-        # Draw player marker
-        ap = self.ascend_players.get(pid)
-        if ap and ap.is_alive() and ap.should_render_visible(now):
-            lane_pixels = left if ap.current_lane == "left" else right
-            half = self.marker_size // 2
-            for offset in range(-half, half + 1):
-                px = ap.physical_position + offset
-                if 0 <= px < LANE_LENGTH:
-                    lane_pixels[px] = self.marker_color
-
-        # Milestone animation overlay
-        ma = self.milestone_animations.get(pid)
-        if ma is not None and not ma.is_complete():
-            frame = ma.get_pixels(LANE_LENGTH)
-            # Blend: take max of each channel
-            for px in range(LANE_LENGTH):
-                l = left[px]
-                ml = frame["left"][px]
-                left[px] = (max(l[0], ml[0]), max(l[1], ml[1]), max(l[2], ml[2]))
-                r = right[px]
-                mr = frame["right"][px]
-                right[px] = (max(r[0], mr[0]), max(r[1], mr[1]), max(r[2], mr[2]))
+        ps = self.players_state.get(player_id)
+        if ps:
+            self._draw_trail(left, right, ps)
+            self._draw_player(left, right, ps, now)
 
         return {"left": left, "right": right}
 
+    def _draw_summit(self, left: List[RGB], right: List[RGB], now: float) -> None:
+        leg_colors = {1: "red", 2: "orange", 3: "green"}
+        color = COLORS.get(leg_colors.get(self.current_leg, "green"), COLORS["green"])
+        pulse = 0.65 + 0.35 * (0.5 + 0.5 * __import__("math").sin(now * 6.0))
+        summit_cfg = self.config.get("summit", {})
+        # Keep the summit slightly below the absolute end LEDs; edge pixels can be
+        # easy to miss depending on physical mounting/inversion.
+        default_y = max(0, self.lane_length - int(summit_cfg.get("top_offset_px", 6)))
+        y = int(self.leg_cfg().get("summit_y", default_y))
+        y = max(0, min(self.lane_length - 1, y))
+        thickness = max(1, int(summit_cfg.get("thickness_px", 1)))
+        self._draw_span(left, right, y, thickness, self._dim(color, pulse))
 
-# ---------------------------------------------------------------------------
-# Module
-# ---------------------------------------------------------------------------
+    def _draw_trail(self, left: List[RGB], right: List[RGB], ps: AscendPlayerState) -> None:
+        trail_color = COLORS.get(self.config.get("trail", {}).get("color", "white"), COLORS["white"])
+        for y, b in ps.trail:
+            c = self._dim(trail_color, b * float(self.config.get("trail", {}).get("brightness", 0.35)))
+            self._draw_span(left, right, int(y), 1, c)
+
+    def _draw_player(self, left: List[RGB], right: List[RGB], ps: AscendPlayerState, now: float) -> None:
+        """Draw the player as the final/highest priority object.
+
+        v2.0.5 fixed the white-field washout, but the grounded marker was only
+        20% white. With the console gameplay dimmer also applied, that could
+        become nearly black on the real pixels. Keep the visual progression, but
+        enforce a configurable visible floor so the 1x1 grounded marker cannot
+        disappear.
+        """
+        base = COLORS["white"]
+        player_cfg = self.config.get("player", {})
+        if ps.airborne:
+            stage2 = float(player_cfg.get("jump_stage2_sec", 0.18))
+            if ps.jump_hold_time >= stage2:
+                size = int(player_cfg.get("air_size_full", 3))
+                brightness = float(player_cfg.get("air_brightness_full", 1.0))
+            else:
+                size = int(player_cfg.get("air_size_mid", 2))
+                brightness = float(player_cfg.get("air_brightness_mid", 0.75))
+        else:
+            size = int(player_cfg.get("ground_size", 1))
+            brightness = float(player_cfg.get("ground_brightness", 0.35))
+            brightness = max(brightness, float(player_cfg.get("ground_visible_floor", 0.35)))
+        y = max(0, min(self.lane_length - 1, int(round(ps.y))))
+        size = max(1, int(size))
+
+        # Visibility rescue: draw the real marker at full-enough brightness, and
+        # optionally draw its mirrored coordinate too.  This makes coordinate
+        # inversion / off-by-end issues obvious on the physical lanes.
+        actual_color = self._dim(base, max(brightness, 0.80 if not ps.airborne else brightness))
+        self._draw_centered_marker(left, right, y, size, actual_color)
+
+        debug_cfg = self.config.get("debug", {})
+        if bool(debug_cfg.get("draw_mirrored_player_locator", True)):
+            mirror_y = max(0, min(self.lane_length - 1, self.lane_length - 1 - y))
+            # Use cyan for the mirrored locator so it is clearly diagnostic and
+            # not confused with the real white marker. Keep it 1 pixel per lane.
+            if abs(mirror_y - y) > 2:
+                self._draw_centered_marker(left, right, mirror_y, 1, COLORS["cyan"])
+
+        if bool(debug_cfg.get("draw_bottom_home_locator", True)) and self.state in (AscendState.RUNNING, AscendState.LEG4_WALL):
+            # A tiny blue/white launch-pad locator at both possible bottoms.
+            # This tells us immediately whether the physical lane is inverted.
+            self._draw_span(left, right, 0, 1, COLORS["blue"])
+            self._draw_span(left, right, self.lane_length - 1, 1, COLORS["blue"])
+
+    def _draw_warp(self, left: List[RGB], right: List[RGB]) -> None:
+        cfg = self.config.get("warp", {})
+        colors = cfg.get("colors", ["cyan", "purple", "white"])
+        expand_sec = float(cfg.get("expand_sec", 0.55))
+        collapse_sec = float(cfg.get("collapse_sec", 0.75))
+        center_a = self.lane_length // 2 - 1
+        center_b = self.lane_length // 2
+        max_radius = self.lane_length // 2 + 2
+
+        if self.state == AscendState.WARP_EXPAND:
+            progress = min(1.0, self.warp_t / max(0.001, expand_sec))
+            radius = int(max_radius * progress)
+            brightness = 1.0
+        else:
+            progress = min(1.0, self.warp_t / max(0.001, collapse_sec))
+            radius = int(max_radius * (1.0 - progress))
+            brightness = max(0.0, 1.0 - progress)
+
+        for px in range(center_a - radius, center_b + radius + 1):
+            if 0 <= px < self.lane_length:
+                cname = colors[px % len(colors)]
+                col = self._dim(COLORS.get(cname, COLORS["cyan"]), brightness)
+                left[px] = col
+                right[px] = col
+
+    def _draw_victory_background(self, left: List[RGB], right: List[RGB], now: float) -> None:
+        # Soft sparse celebratory sparkles behind final auto-ascent.
+        for px in range(0, self.lane_length, 7):
+            cname = ["red", "orange", "green", "cyan", "purple"][(px + int(now * 10)) % 5]
+            col = self._dim(COLORS[cname], 0.18)
+            left[px] = col
+            right[px] = col
+
+    def _draw_centered_marker(self, left: List[RGB], right: List[RGB], center_y: int, size: int, color: RGB) -> None:
+        size = max(1, int(size))
+        start = int(center_y) - (size // 2)
+        self._draw_span(left, right, start, size, color)
+
+    def _maybe_log_positions(self, now: float) -> None:
+        debug_cfg = self.config.get("debug", {})
+        if not bool(debug_cfg.get("log_player_positions", True)):
+            return
+        interval = float(debug_cfg.get("position_log_interval_sec", 2.0))
+        if now - getattr(self, "_last_position_log", 0.0) < interval:
+            return
+        self._last_position_log = now
+        for pid, ps in self.players_state.items():
+            y = max(0, min(self.lane_length - 1, int(round(ps.y))))
+            mirror_y = self.lane_length - 1 - y
+            self.host.log(f"[ASCEND POS] P{pid} state={self.state.value} y={ps.y:.1f} draw_y={y} mirror_y={mirror_y} lane_length={self.lane_length} airborne={ps.airborne} bands={len(self.bands)}")
+
+    def _draw_span(self, left: List[RGB], right: List[RGB], y: int, height: int, color: RGB) -> None:
+        for px in range(y, y + height):
+            if 0 <= px < self.lane_length:
+                left[px] = color
+                right[px] = color
+
+    # ------------------------------------------------------------------
+    # Utility
+    # ------------------------------------------------------------------
+
+    def _background_color(self) -> RGB:
+        visual = self.config.get("visual", {})
+        # Important: this is a literal background fill. If enabled, every unused
+        # pixel in both lanes is lit. Keep it OFF by default so the game does
+        # not turn into a full white light bar. Use player/band brightness
+        # settings for gameplay brightness tuning instead.
+        if not bool(visual.get("field_background_enabled", False)):
+            return (0, 0, 0)
+        color_name = str(visual.get("field_color", "white")).lower()
+        brightness = float(visual.get("field_brightness", 0.0))
+        if brightness <= 0:
+            return (0, 0, 0)
+        return self._dim(COLORS.get(color_name, COLORS["white"]), brightness)
+
+    def _normalize_action(self, action: str) -> str:
+        s = (action or "").strip().lower().replace("-", "_").replace(" ", "_")
+        # Strip common player prefixes: P1_RED -> RED, p2_button_white -> button_white
+        if s.startswith("p") and "_" in s and s[1:s.index("_")].isdigit():
+            s = s.split("_", 1)[1]
+        for prefix in ("button_", "btn_", "key_"):
+            if s.startswith(prefix):
+                s = s[len(prefix):]
+        return s
+
+    def _color_from_action(self, action: str) -> Optional[str]:
+        a = BUTTON_ALIASES.get(action, action)
+        for color in COLORS:
+            if color in a:
+                return color
+        return None
+
+    def _dim(self, color: RGB, amount: float) -> RGB:
+        amount = max(0.0, min(1.0, amount))
+        return (int(color[0] * amount), int(color[1] * amount), int(color[2] * amount))
+
+    def _safe_sound(self, sound_name: str) -> None:
+        try:
+            self.host.play_sound(sound_name)
+        except Exception:
+            pass
+
+    def _safe_rumble(self, player_id: int) -> None:
+        try:
+            if hasattr(self.host, "rumble_player"):
+                self.host.rumble_player(player_id, reason="ascend_hit", duration_ms=220)
+        except Exception:
+            pass
+
 
 class AscendModule(GameModule):
-    """Game module for Ascend."""
-
     META = GameMeta(
         key="ascend",
         title="Ascend",
         min_players=1,
         max_players=4,
-        version="v1.0.0",
+        version=VERSION_LABEL,
         requires_color_selection=False,
         supports_sla=False,
-        description="Vertical-climbing, lane-switching, color-reaction game",
+        description="Four-leg LED climbing game with jumps, warp transitions, and final color wall.",
     )
 
-    def create_session(
-        self,
-        host: HostAPI,
-        players: List[PlayerConfig],
-        settings: Optional[Dict[str, Any]] = None,
-    ) -> AscendSession:
+    def create_session(self, host: HostAPI, players: List[PlayerConfig], settings: Optional[Dict[str, Any]] = None) -> AscendSession:
         return AscendSession(host, players, settings)

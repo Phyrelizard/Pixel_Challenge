@@ -115,8 +115,18 @@
       "layout_id": "small_rig_8_fixture",
       "assignments": {
         "Gameplay": {
-          "effect": "Lava Pulse",
-          "apply_to": "All Fixtures"
+          "layers": [
+            {
+              "effect": "Lava Pulse",
+              "apply_to": "All Fixtures",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 500
+            }
+          ],
+          "active_target": "All Fixtures",
+          "sync_timing": false
         },
         "Bonus": {
           "effect": "Gold Victory (Copy)",
@@ -201,7 +211,7 @@
               "cycle_speed": 260
             }
           ],
-          "active_target": "Big Dipper Cans",
+          "active_target": "ThinTri Heads",
           "sync_timing": false
         },
         "Bonus": {
@@ -591,9 +601,17 @@
               "fade_in_ms": 250,
               "fade_out_ms": 250,
               "cycle_speed": 500
+            },
+            {
+              "effect": "Ember Glow",
+              "apply_to": "ThinTri Heads",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 260
             }
           ],
-          "active_target": "All Fixtures",
+          "active_target": "ThinTri Heads",
           "sync_timing": false
         },
         "Check-In Open": {
