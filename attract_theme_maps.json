@@ -1,5 +1,5 @@
 {
-  "auto_enabled": false,
+  "auto_enabled": true,
   "cycle_enabled": true,
   "cycle_seconds": 20,
   "per_theme_speed": {
@@ -15,7 +15,6 @@
     "Lane Chase RL": 3
   },
   "selected_themes": [
-    "Candle Flame",
     "Ember Glow"
   ],
   "flame_theme_tuning": {
@@ -56,12 +55,12 @@
   "sash_bottom_log": 516,
   "sash_center_mixer": 576,
   "sash_mixer_height": null,
-  "falcon_brightness": 100,
+  "falcon_brightness": 20,
   "gameplay_brightness": 40,
-  "music_volume": 13,
+  "music_volume": 9,
   "sfx_volume": 35,
   "voice_volume": 39,
-  "master_volume": 0,
+  "master_volume": 63,
   "falcon_ip": "192.168.2.26",
   "pixels_per_lane": 50,
   "wifi_dhcp": true,

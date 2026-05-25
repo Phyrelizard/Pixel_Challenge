@@ -834,7 +834,7 @@
               "apply_to": "No Fixtures"
             },
             {
-              "effect": "Dimmer 100%",
+              "effect": "Dimmer Up/Down",
               "apply_to": "DMX Dimmers",
               "fade_enabled": false,
               "fade_in_ms": 250,
@@ -866,14 +866,23 @@
               "cycle_speed": 100
             },
             {
-              "effect": "Dimmer 100%",
-              "apply_to": "F11",
+              "effect": "Ember Glow",
+              "apply_to": "Betopper Cans",
               "fade_enabled": false,
               "fade_in_ms": 250,
-              "fade_out_ms": 250
+              "fade_out_ms": 250,
+              "cycle_speed": 180
+            },
+            {
+              "effect": "Ember Glow",
+              "apply_to": "ThinTri Heads",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 260
             }
           ],
-          "active_target": "Betopper Cans",
+          "active_target": "DMX Dimmers",
           "sync_timing": false
         },
         "Bonus": {
