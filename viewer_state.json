@@ -6,8 +6,8 @@
   "players": [
     {
       "player_id": 1,
-      "score": 690,
-      "selected_lane": "right",
+      "score": 315,
+      "selected_lane": "left",
       "is_active": true,
       "lives": null
     }

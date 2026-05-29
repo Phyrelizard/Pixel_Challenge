@@ -4,7 +4,19 @@ sleep 3
 # Portable launcher: resolve the project folder from this script location.
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOCK_FILE="/tmp/pixel_challenge_console.lock"
-APP_SCRIPT="$APP_DIR/pixel_challenge_console_v28.14.0.py"
+
+LATEST_CONSOLE="$(find "$APP_DIR" -maxdepth 1 -type f -name 'pixel_challenge_console_v*.py' \
+  | grep -E 'pixel_challenge_console_v[0-9]+(\.[0-9]+){2}\.py$' \
+  | sort -V \
+  | tail -n 1)"
+
+if [ -z "$LATEST_CONSOLE" ]; then
+  echo "ERROR: No pixel_challenge_console_v*.py file found in $APP_DIR"
+  exit 1
+fi
+
+APP_SCRIPT="$LATEST_CONSOLE"
+echo "Launching console: $(basename "$APP_SCRIPT")"
 
 warn_already_running() {
     MSG="$1"

@@ -1,0 +1,23 @@
+ Volume in drive O is PixelChallenge
+ Volume Serial Number is A0AE-22A7
+
+ Directory of O:\assets\audio\ascend
+
+05/28/2026  08:53 PM    <DIR>          .
+05/25/2026  02:32 AM    <DIR>          ..
+05/25/2026  02:32 AM                 0 as_bonus_end.ogg
+05/25/2026  02:32 AM                 0 as_bonus_start.ogg
+05/25/2026  02:32 AM                 0 as_lane_clear.wav
+05/25/2026  02:32 AM                 0 as_lane_switch.wav
+05/28/2026  08:44 PM         1,974,115 as_music_gameplay.ogg
+05/25/2026  02:32 AM                 0 as_round_end.ogg
+05/25/2026  02:32 AM                 0 as_round_start.ogg
+05/25/2026  02:32 AM           163,898 as_shot_fire.wav
+05/25/2026  02:32 AM                 0 as_shot_hit_correct.wav
+05/25/2026  02:32 AM                 0 as_shot_hit_wrong.wav
+05/25/2026  02:32 AM                 0 as_snake_grow.wav
+05/25/2026  02:32 AM                 0 as_snake_reached_end.wav
+05/25/2026  02:32 AM                 0 as_snake_warning.wav
+05/28/2026  08:53 PM               116 sound_list.txt
+              14 File(s)      2,138,129 bytes
+               2 Dir(s)  170,391,064,576 bytes free

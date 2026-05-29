@@ -13,7 +13,7 @@
   },
   "player": {
     "start_lane": "left",
-    "start_row": 49,
+    "start_row": 71,
     "marker_pixels": 3,
     "move_speed_pixels": 1,
     "lives_enabled": false,

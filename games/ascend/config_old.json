@@ -1,8 +1,8 @@
 {
   "game_info": {
     "name": "Ascend",
-    "version": "2.1.5-audio-map-build-ticks",
-    "description": "v2.1.4 build tick behavior plus console-compatible Ascend sound keys and debug-friendly audio_build tick controls."
+    "version": "2.1.3-wall-build-audio-pause",
+    "description": "Stationary blockade builds 1x1 from lead block upward, final auto-ascend marker size is configurable, extended glass-ceiling break waits for falling shards, and Ascend audio event names use as_* keys."
   },
   "debug": {
     "log_inputs": true,
@@ -313,38 +313,27 @@
     "movement_sound_cooldown_sec": 0.35,
     "events": {
       "music_gameplay": "as_music_gameplay",
-      "leg_start": "as_band_build_start",
+      "leg_start": "as_round_start",
       "leg_complete": "as_leg_complete",
-      "intro_build": "as_band_build_start",
-      "move_forward": "as_move_forward",
-      "move_backward": "as_move_backward",
+      "intro_build": "as_band_build",
+      "move_forward": "as_player_forward",
+      "move_backward": "as_player_backward",
       "jump": "as_jump",
       "land": "as_land",
       "hit": "as_player_hit",
       "warp": "as_warp",
-      "wall_build": "as_wall_build_start",
+      "wall_build": "as_wall_build",
       "wall_build_complete": "as_wall_build_complete",
       "fire": "as_laser_fire",
-      "wall_hit": "as_wall_hit",
-      "wall_break": "as_wall_break",
-      "wall_miss": "as_wall_miss",
+      "wall_hit": "as_block_hit",
+      "wall_break": "as_block_break",
+      "wall_miss": "as_block_miss",
       "launch": "as_launch",
-      "victory_music": "as_music_victory",
+      "victory_music": "as_victory_music",
       "glass_break": "as_glass_break",
       "game_over": "as_game_over",
       "winner": "as_winner"
     }
-  },
-  "audio_build": {
-    "pixel_tick_enabled": true,
-    "pixel_tick_every_n": 1,
-    "pixel_tick_min_interval_sec": 0.015,
-    "band_tick_sound": "as_band_build_tick",
-    "wall_tick_sound": "as_wall_build_tick",
-    "play_band_build_start_sound": false,
-    "play_wall_build_start_sound": false,
-    "note": "Tick plays when a 1x1 build fragment locks into place. Start sounds are off by default so the old one-shot build sound does not masquerade as the tick.",
-    "log_tick_debug": true
   },
   "game_over": {
     "mode": "after_glass_complete",

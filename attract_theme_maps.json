@@ -6,7 +6,7 @@
     "Fire Burst": 6,
     "Bounce Chase": 7,
     "Rainbow Pulse": 9,
-    "Calm Mode": 8,
+    "Calm Mode": 10,
     "Team Colors": 6,
     "Color Wash": 7,
     "Lane Chase LR": 4,
@@ -15,7 +15,7 @@
     "Lane Chase RL": 3
   },
   "selected_themes": [
-    "Ember Glow"
+    "Color Wash"
   ],
   "flame_theme_tuning": {
     "Candle Flame": {
@@ -55,14 +55,14 @@
   "sash_bottom_log": 516,
   "sash_center_mixer": 576,
   "sash_mixer_height": null,
-  "falcon_brightness": 20,
-  "gameplay_brightness": 40,
-  "music_volume": 9,
-  "sfx_volume": 35,
-  "voice_volume": 39,
-  "master_volume": 63,
-  "falcon_ip": "192.168.2.26",
-  "pixels_per_lane": 50,
+  "falcon_brightness": 10,
+  "gameplay_brightness": 20,
+  "music_volume": 0,
+  "sfx_volume": 21,
+  "voice_volume": 50,
+  "master_volume": 28,
+  "falcon_ip": "192.168.2.25",
+  "pixels_per_lane": 143,
   "wifi_dhcp": true,
   "wifi_ssid": "skynet",
   "wifi_psk": "",

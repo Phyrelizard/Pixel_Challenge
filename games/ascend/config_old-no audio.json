@@ -1,8 +1,8 @@
 {
   "game_info": {
     "name": "Ascend",
-    "version": "2.1.5-audio-map-build-ticks",
-    "description": "v2.1.4 build tick behavior plus console-compatible Ascend sound keys and debug-friendly audio_build tick controls."
+    "version": "2.1.2-ordered-wall-final-effects",
+    "description": "Ordered wall hits, replayable band collision penalties after respawn, final ascent clearing field, glass-ceiling shard celebration, and progressive leg difficulty from Leg 1 baseline."
   },
   "debug": {
     "log_inputs": true,
@@ -185,12 +185,7 @@
     "fire_cooldown_sec": 0.14,
     "start_after_climb_leg": 6,
     "ordered_hits_only": true,
-    "note": "Only the lowest/lead wall block can be damaged. Wrong colors pass through the wall cluster without damaging higher matching colors.",
-    "build_enabled": true,
-    "build_fragment_speed_px_per_sec": 500,
-    "build_fragment_interval_sec": 0.015,
-    "build_order": "bottom_to_top",
-    "build_note": "The final stationary blockade builds like intro bands: the lowest/lead band is assembled first by 1x1 fragments, then each higher band builds in sequence."
+    "note": "Only the lowest/lead wall block can be damaged. Wrong colors pass through the wall cluster without damaging higher matching colors."
   },
   "final": {
     "auto_ascend_px_per_sec": 28,
@@ -207,7 +202,7 @@
       "purple",
       "cyan"
     ],
-    "ceiling_break_duration_sec": 6.75,
+    "ceiling_break_duration_sec": 2.25,
     "ceiling_shard_count": 44,
     "ceiling_shard_speed_min": 18.0,
     "ceiling_shard_speed_max": 58.0,
@@ -221,10 +216,7 @@
       "purple",
       "cyan"
     ],
-    "note": "Final ascent marker is configurable; glass-ceiling shards rain down for at least this duration and the game does not complete until the last shard has fallen below the bottom.",
-    "marker_size_px": 3,
-    "marker_brightness": 1.0,
-    "wait_for_shards_to_fall": true
+    "note": "Final ascent draws a color-changing 1x1 glass field, clears dots below the ascending marker, then plays a falling shard ceiling-break effect."
   },
   "scoring": {
     "ground_move_points_per_px": 2,
@@ -308,62 +300,11 @@
     "lock_player_until_complete": true,
     "note": "At the beginning of each climb leg, the player is locked at bottom while starting bands are assembled one at a time by 1-pixel fragments falling from the top."
   },
-  "audio": {
-    "enabled": true,
-    "movement_sound_cooldown_sec": 0.35,
-    "events": {
-      "music_gameplay": "as_music_gameplay",
-      "leg_start": "as_band_build_start",
-      "leg_complete": "as_leg_complete",
-      "intro_build": "as_band_build_start",
-      "move_forward": "as_move_forward",
-      "move_backward": "as_move_backward",
-      "jump": "as_jump",
-      "land": "as_land",
-      "hit": "as_player_hit",
-      "warp": "as_warp",
-      "wall_build": "as_wall_build_start",
-      "wall_build_complete": "as_wall_build_complete",
-      "fire": "as_laser_fire",
-      "wall_hit": "as_wall_hit",
-      "wall_break": "as_wall_break",
-      "wall_miss": "as_wall_miss",
-      "launch": "as_launch",
-      "victory_music": "as_music_victory",
-      "glass_break": "as_glass_break",
-      "game_over": "as_game_over",
-      "winner": "as_winner"
-    }
-  },
   "audio_build": {
     "pixel_tick_enabled": true,
-    "pixel_tick_every_n": 1,
-    "pixel_tick_min_interval_sec": 0.015,
+    "pixel_tick_every_n": 2,
+    "pixel_tick_min_interval_sec": 0.035,
     "band_tick_sound": "as_band_build_tick",
-    "wall_tick_sound": "as_wall_build_tick",
-    "play_band_build_start_sound": false,
-    "play_wall_build_start_sound": false,
-    "note": "Tick plays when a 1x1 build fragment locks into place. Start sounds are off by default so the old one-shot build sound does not masquerade as the tick.",
-    "log_tick_debug": true
-  },
-  "game_over": {
-    "mode": "after_glass_complete",
-    "options": [
-      "after_glass_complete",
-      "timeout",
-      "first_place_finish",
-      "all_players_finish"
-    ],
-    "timeout_sec": 30.0,
-    "note": "Current Ascend shared-ending behavior completes after glass break. The mode field is reserved/configurable for multiplayer finish policy tuning."
-  },
-  "winner_sound": {
-    "enabled": false,
-    "play_when": "first_place_finish",
-    "options": [
-      "first_place_finish",
-      "last_player_finish"
-    ],
-    "note": "If enabled, plays the configured special winner sound at the selected finish event."
+    "wall_tick_sound": "as_wall_build_tick"
   }
 }

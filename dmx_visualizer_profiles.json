@@ -117,15 +117,15 @@
         "Gameplay": {
           "layers": [
             {
-              "effect": "Lava Pulse",
-              "apply_to": "All Fixtures",
+              "effect": "Rainbow Wave (Copy)",
+              "apply_to": "ThinTri Heads",
               "fade_enabled": false,
               "fade_in_ms": 250,
               "fade_out_ms": 250,
               "cycle_speed": 500
             }
           ],
-          "active_target": "All Fixtures",
+          "active_target": "ThinTri Heads",
           "sync_timing": false
         },
         "Bonus": {
@@ -133,8 +133,17 @@
           "apply_to": "Top Fixtures"
         },
         "Danger": {
-          "effect": "Crimson Storm",
-          "apply_to": "All Fixtures"
+          "layers": [
+            {
+              "effect": "Crimson Storm",
+              "apply_to": "All Fixtures",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250
+            }
+          ],
+          "active_target": "ThinTri Heads",
+          "sync_timing": false
         },
         "Special": {
           "effect": "Aurora Ribbon",
@@ -1229,7 +1238,7 @@
     "dot_dash": "Default Copy",
     "pixel_pop": "Default Copy",
     "surround": "Default Copy",
-    "ascend": "Default Small Rig",
+    "ascend": "Default",
     "global": "Default Small Rig",
     "console": "Default",
     "splash": "Default"
