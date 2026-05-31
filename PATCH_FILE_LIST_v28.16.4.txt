@@ -1,0 +1,5 @@
+tools/pixel_controller_simulator_windows.py
+tools/pixel_simulator_layout_home_lab.json
+README_v28.16.4_simulator_project_folder_sync_patch.txt
+PATCH_FILE_LIST_v28.16.4.txt
+CHANGELOG.md

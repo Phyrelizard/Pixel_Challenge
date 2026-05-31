@@ -11,3 +11,6 @@ sacn==1.11.0
 setuptools==82.0.1
 urllib3==2.7.0
 wheel==0.47.0
+
+# Optional: live microphone input for Sound Visualizer
+sounddevice>=0.5.1

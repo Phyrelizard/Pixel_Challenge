@@ -52,12 +52,12 @@
     "thickness_px": 1,
     "top_offset_px": 6,
     "leg_colors": {
-      "1": "red",
-      "2": "orange",
-      "3": "green",
-      "4": "blue",
-      "5": "purple",
-      "6": "cyan"
+      "1": "orange",
+      "2": "green",
+      "3": "purple",
+      "4": "red",
+      "5": "white",
+      "6": "blue"
     }
   },
   "legs": {
@@ -188,7 +188,7 @@
     "note": "Only the lowest/lead wall block can be damaged. Wrong colors pass through the wall cluster without damaging higher matching colors.",
     "build_enabled": true,
     "build_fragment_speed_px_per_sec": 500,
-    "build_fragment_interval_sec": 0.015,
+    "build_fragment_interval_sec": 0.01,
     "build_order": "bottom_to_top",
     "build_note": "The final stationary blockade builds like intro bands: the lowest/lead band is assembled first by 1x1 fragments, then each higher band builds in sequence."
   },
@@ -227,13 +227,13 @@
     "wait_for_shards_to_fall": true
   },
   "scoring": {
-    "ground_move_points_per_px": 2,
+    "ground_move_points_per_px": 5,
     "jump_clear_bonus": 25,
-    "collision_penalty": -100,
+    "collision_penalty": -200,
     "wall_hit": 50,
     "wall_break": 100,
-    "wrong_color_penalty": -10,
-    "final_completion_bonus": 1000
+    "wrong_color_penalty": -50,
+    "final_completion_bonus": 500
   },
   "visual": {
     "field_brightness": 0.0,
@@ -301,8 +301,8 @@
   "intro_build": {
     "enabled": true,
     "starting_bands": 3,
-    "fragment_speed_px_per_sec": 500,
-    "fragment_interval_sec": 0.015,
+    "fragment_speed_px_per_sec": 500.0,
+    "fragment_interval_sec": 0.01,
     "target_top_fraction_from_bottom": 0.74,
     "target_bottom_fraction_from_bottom": 0.34,
     "lock_player_until_complete": true,
@@ -338,7 +338,7 @@
   "audio_build": {
     "pixel_tick_enabled": true,
     "pixel_tick_every_n": 1,
-    "pixel_tick_min_interval_sec": 0.015,
+    "pixel_tick_min_interval_sec": 0.01,
     "band_tick_sound": "as_band_build_tick",
     "wall_tick_sound": "as_wall_build_tick",
     "play_band_build_start_sound": false,

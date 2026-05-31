@@ -3,7 +3,26 @@
   "show_scoreboard": true,
   "sound_pack": "default",
   "invert_playfield": true,
-  "notes": "auto-created by console v17.3.0; adjust as needed",
+  "sla": {
+    "enabled": true,
+    "mode": "adaptive",
+    "assist_strength": 1.0,
+    "allow_game_reassessment": true,
+    "show_debug": false,
+    "min_games_for_valid_sla": 1,
+    "accuracy_weight": 0.6,
+    "reaction_weight": 0.4,
+    "reset_on_new_checkin": true,
+    "save_to_history": true,
+    "calibration": {
+      "enabled": true,
+      "min_samples_for_calibration": 20,
+      "percentile_expert": 10,
+      "percentile_beginner": 90,
+      "recalibrate_interval": 10,
+      "max_samples_stored": 500
+    }
+  },
   "controller_rumble": {
     "enabled": true,
     "hit_low_frequency": 0.85,
@@ -46,5 +65,6 @@
         7
       ]
     }
-  }
+  },
+  "notes": "Splash CONFIG writes these global environment settings. Values are self-corrected by console v28.15.0."
 }

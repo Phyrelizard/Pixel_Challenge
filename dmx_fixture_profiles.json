@@ -159,6 +159,40 @@
       },
       "notes": "Betopper LPC 7CH: CH1 master dimmer, CH2 red, CH3 green, CH4 blue, CH5 strobe, CH6 mode kept at 0 for DMX dimming, CH7 sound-active kept at 0.",
       "id": "betopper_lpc-019-h_7-ch"
+    },
+    {
+      "manufacturer": "Venue by Proline",
+      "model": "ThinTri 38 Copy",
+      "channels": 8,
+      "channel_map": {
+        "red": 1,
+        "green": 2,
+        "blue": 3,
+        "color_macros": 4,
+        "strobe": 5,
+        "mode": 6,
+        "dimmer": 7,
+        "dimmer_speed": 8
+      },
+      "runtime_config": {
+        "dmx_universe": 9,
+        "dmx_num_fixtures": 4,
+        "dmx_channels_per_fixture": 8,
+        "dmx_start_address": 33
+      },
+      "intensity_scale": 1.0,
+      "intensity_cap_percent": 100,
+      "strobe_range": {
+        "off_max": 15,
+        "min": 16,
+        "max": 255
+      },
+      "dimmer_range": {
+        "off": 0,
+        "full": 255
+      },
+      "notes": "ThinTri 38 8CH profile. Current rig uses A033, A041, A049, A057.",
+      "id": "venue_by_proline_thintri_38_copy"
     }
   ]
 }

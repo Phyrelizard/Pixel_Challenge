@@ -117,7 +117,7 @@
         "Gameplay": {
           "layers": [
             {
-              "effect": "Rainbow Wave (Copy)",
+              "effect": "Bounce Hero Orange",
               "apply_to": "ThinTri Heads",
               "fade_enabled": false,
               "fade_in_ms": 250,
@@ -204,7 +204,7 @@
               "cycle_speed": 500
             },
             {
-              "effect": "Dimmer Up/Down",
+              "effect": "Dimmer Sequence LR",
               "apply_to": "DMX Dimmers",
               "fade_enabled": false,
               "fade_in_ms": 0,
@@ -212,15 +212,22 @@
               "cycle_speed": 500
             },
             {
-              "effect": "Ember Glow",
+              "effect": "Static Red",
               "apply_to": "ThinTri Heads",
               "fade_enabled": false,
               "fade_in_ms": 250,
               "fade_out_ms": 250,
               "cycle_speed": 260
+            },
+            {
+              "effect": "Static Blue",
+              "apply_to": "Big Dipper Cans",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250
             }
           ],
-          "active_target": "ThinTri Heads",
+          "active_target": "DMX Dimmers",
           "sync_timing": false
         },
         "Bonus": {
@@ -618,9 +625,17 @@
               "fade_in_ms": 250,
               "fade_out_ms": 250,
               "cycle_speed": 260
+            },
+            {
+              "effect": "Rainbow Wave (Copy)",
+              "apply_to": "Big Dipper Cans",
+              "fade_enabled": false,
+              "fade_in_ms": 250,
+              "fade_out_ms": 250,
+              "cycle_speed": 500
             }
           ],
-          "active_target": "ThinTri Heads",
+          "active_target": "Big Dipper Cans",
           "sync_timing": false
         },
         "Check-In Open": {
@@ -883,7 +898,7 @@
               "cycle_speed": 180
             },
             {
-              "effect": "Ember Glow",
+              "effect": "Static Magenta",
               "apply_to": "ThinTri Heads",
               "fade_enabled": false,
               "fade_in_ms": 250,
@@ -891,7 +906,7 @@
               "cycle_speed": 260
             }
           ],
-          "active_target": "DMX Dimmers",
+          "active_target": "Big Dipper Cans",
           "sync_timing": false
         },
         "Bonus": {

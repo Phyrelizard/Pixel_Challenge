@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v28.14.0
+Pixel Challenge Host Console v28.18.0
 
 """
 
@@ -34,7 +34,7 @@ from games.base import PlayerConfig
 from sla import SLAStore, SLACalibration
 from dmx_editor import DMXLightingEditor
 
-VERSION_LABEL = "v28.14.0"
+VERSION_LABEL = "v28.18.0"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 # Project root is resolved from this file so the repo can live in one clean
@@ -48,6 +48,7 @@ def project_path(*parts):
 
 
 DEFAULT_FALCON_IP = "192.168.2.113"
+DEFAULT_PIXEL_SIMULATOR_IP = ""
 FALCON_DISCOVERY_HOST_HINTS = ("Falcon_Player_F16V5_EA7F", "Falcon_Player", "F16V5", "Falcon")
 # Prefix is intentionally weak-scored because Falcon Player uses a locally administered MAC.
 FALCON_DISCOVERY_MAC_PREFIXES = ("02:fe",)
@@ -79,6 +80,38 @@ DEFAULT_FLAME_TUNING = {
     "Ember Glow": {"height": 30, "rate": 35, "bite": 16, "smooth": 72},
 }
 FLAME_TUNING_KEYS = ("height", "rate", "bite", "smooth")
+
+SOUND_VISUALIZER_THEME_NAME = "Sound Visualizer"
+SOUND_VISUALIZER_PROFILES = ("Internal Mic", "External Mic")
+SOUND_VISUALIZER_DIRECTIONS = ("Center Out", "Top/Bottom In", "Bottom", "Top")
+SOUND_VISUALIZER_INPUT_MODES = ("Auto", "Mono", "Stereo")
+SOUND_VISUALIZER_MAPPINGS = (
+    "All Lanes Mirror",
+    "Players 1-2 Left / Players 3-4 Right",
+    "Odd Lanes Left / Even Lanes Right",
+    "Player Pair Stereo",
+)
+SOUND_VISUALIZER_LAB_MIRROR_MODES = ("Off", "Mirror Player 1 to All")
+SOUND_VISUALIZER_PEAK_MODES = ("Off", "Floating", "Absolute")
+DEFAULT_SOUND_VISUALIZER_TUNING = {
+    "direction": "Center Out",
+    "input_mode": "Auto",
+    "stereo_mapping": "Player Pair Stereo",
+    "lab_mirror": "Mirror Player 1 to All",
+    "peak_mode": "Floating",
+    "sensitivity": 55,
+    "noise_gate": 12,
+    "smoothing": 45,
+    "peak_hold": 65,
+}
+DEFAULT_SOUND_VISUALIZER_PROFILES = {
+    "Internal Mic": dict(DEFAULT_SOUND_VISUALIZER_TUNING),
+    "External Mic": dict(DEFAULT_SOUND_VISUALIZER_TUNING, input_mode="Stereo",
+                         stereo_mapping="Players 1-2 Left / Players 3-4 Right",
+                         lab_mirror="Off", sensitivity=42, noise_gate=6),
+}
+SOUND_VISUALIZER_SELECT_KEYS = ("direction", "input_mode", "stereo_mapping", "lab_mirror", "peak_mode")
+SOUND_VISUALIZER_NUMERIC_KEYS = ("sensitivity", "noise_gate", "smoothing", "peak_hold")
 
 DEFAULT_CONTROLLER_RUMBLE = {
     "enabled": True,
@@ -124,6 +157,27 @@ DEFAULT_CONTROLLER_ACTIONS = {
         # and gameplay, L goes back to WHITE so the color game still works.
         "ready_buttons": [4, 7]
     }
+}
+
+DEFAULT_SLA_GLOBAL = {
+    "enabled": True,
+    "mode": "adaptive",
+    "assist_strength": 1.0,
+    "allow_game_reassessment": True,
+    "show_debug": False,
+    "min_games_for_valid_sla": 1,
+    "accuracy_weight": 0.60,
+    "reaction_weight": 0.40,
+    "reset_on_new_checkin": True,
+    "save_to_history": True,
+    "calibration": {
+        "enabled": True,
+        "min_samples_for_calibration": 20,
+        "percentile_expert": 10,
+        "percentile_beginner": 90,
+        "recalibrate_interval": 10,
+        "max_samples_stored": 500,
+    },
 }
 CONTROLLER_HELP_CARD_PROFILES = {
     "voyee_s08": {
@@ -294,16 +348,227 @@ class ViewerService:
         self._write(f"SHOW_IMAGE|{image_path}")
 
 
+class SoundVisualizerEngine:
+    """Optional microphone input and level smoothing for the Sound Visualizer attract theme.
+
+    The console can run without sounddevice installed.  In that case the theme
+    draws a slow test pulse so the Falcon/simulator path can still be verified.
+    Install sounddevice + PortAudio to make it react to the live microphone.
+    """
+
+    def __init__(self):
+        self.config = json.loads(json.dumps(DEFAULT_SOUND_VISUALIZER_TUNING))
+        self.active = False
+        self.stream = None
+        self.channel_count = 0
+        self._sd = None
+        self._np = None
+        self._lock = threading.Lock()
+        self._raw_left = 0.0
+        self._raw_right = 0.0
+        self._smooth_left = 0.0
+        self._smooth_right = 0.0
+        self._peak_left = 0.0
+        self._peak_right = 0.0
+        self._peak_hold_left = 0
+        self._peak_hold_right = 0
+        self._open_failed = False
+        self.status = "Mic idle"
+
+    def set_tuning(self, tuning: dict):
+        merged = json.loads(json.dumps(DEFAULT_SOUND_VISUALIZER_TUNING))
+        if isinstance(tuning, dict):
+            for key in SOUND_VISUALIZER_SELECT_KEYS:
+                if key in tuning:
+                    merged[key] = str(tuning.get(key) or merged[key])
+            for key in SOUND_VISUALIZER_NUMERIC_KEYS:
+                merged[key] = max(0, min(100, _safe_int(tuning.get(key, merged[key]), merged[key])))
+        if merged["direction"] not in SOUND_VISUALIZER_DIRECTIONS:
+            merged["direction"] = DEFAULT_SOUND_VISUALIZER_TUNING["direction"]
+        if merged["input_mode"] not in SOUND_VISUALIZER_INPUT_MODES:
+            merged["input_mode"] = DEFAULT_SOUND_VISUALIZER_TUNING["input_mode"]
+        if merged["stereo_mapping"] not in SOUND_VISUALIZER_MAPPINGS:
+            merged["stereo_mapping"] = DEFAULT_SOUND_VISUALIZER_TUNING["stereo_mapping"]
+        if merged["lab_mirror"] not in SOUND_VISUALIZER_LAB_MIRROR_MODES:
+            merged["lab_mirror"] = DEFAULT_SOUND_VISUALIZER_TUNING["lab_mirror"]
+        if merged["peak_mode"] not in SOUND_VISUALIZER_PEAK_MODES:
+            merged["peak_mode"] = DEFAULT_SOUND_VISUALIZER_TUNING["peak_mode"]
+        self.config = merged
+
+    def start(self):
+        self.active = True
+        if self.stream is not None or self._open_failed:
+            return
+        self._open_stream()
+
+    def restart(self):
+        self.stop()
+        self._open_failed = False
+        self.active = True
+        self._open_stream()
+
+    def stop(self):
+        self.active = False
+        stream = self.stream
+        self.stream = None
+        if stream is not None:
+            try:
+                stream.stop()
+            except Exception:
+                pass
+            try:
+                stream.close()
+            except Exception:
+                pass
+        self.channel_count = 0
+        self.status = "Mic idle"
+
+    def _open_stream(self):
+        try:
+            import sounddevice as sd
+            import numpy as np
+            self._sd = sd
+            self._np = np
+            requested = self.config.get("input_mode", "Auto")
+            channel_tries = [1] if requested == "Mono" else [2, 1]
+            last_error = None
+            for channels in channel_tries:
+                stream = None
+                try:
+                    stream = sd.RawInputStream(
+                        samplerate=44100,
+                        channels=channels,
+                        dtype="int16",
+                        blocksize=1024,
+                        callback=self._audio_callback,
+                    )
+                    stream.start()
+                    self.stream = stream
+                    self.channel_count = channels
+                    self._open_failed = False
+                    self.status = f"Mic live ({channels} channel{'s' if channels != 1 else ''})"
+                    return
+                except Exception as exc:
+                    last_error = exc
+                    try:
+                        if stream is not None:
+                            stream.close()
+                    except Exception:
+                        pass
+            self._open_failed = True
+            self.status = f"Mic unavailable: {last_error}"
+        except Exception as exc:
+            self._open_failed = True
+            self.status = f"Mic support missing: {exc}"
+
+    def _audio_callback(self, indata, frames, time_info, status):
+        try:
+            np = self._np
+            if np is None:
+                return
+            arr = np.frombuffer(indata, dtype=np.int16)
+            if arr.size <= 0:
+                return
+            if self.channel_count >= 2 and arr.size >= 2:
+                arr = arr.reshape(-1, self.channel_count)
+                left = arr[:, 0].astype(np.float32) / 32768.0
+                right = arr[:, 1].astype(np.float32) / 32768.0
+                l_rms = float(np.sqrt(np.mean(left * left)))
+                r_rms = float(np.sqrt(np.mean(right * right)))
+            else:
+                mono = arr.astype(np.float32) / 32768.0
+                l_rms = r_rms = float(np.sqrt(np.mean(mono * mono)))
+            with self._lock:
+                self._raw_left = max(0.0, min(1.0, l_rms))
+                self._raw_right = max(0.0, min(1.0, r_rms))
+        except Exception:
+            pass
+
+    def _apply_level_processing(self, raw: float) -> float:
+        sensitivity = max(1, min(100, _safe_int(self.config.get("sensitivity", 55), 55)))
+        noise_gate = max(0, min(100, _safe_int(self.config.get("noise_gate", 12), 12)))
+        gate = noise_gate / 1000.0  # 0.000 to 0.100 RMS gate
+        gain = 1.0 + (sensitivity / 100.0) * 9.0
+        value = max(0.0, raw - gate) * gain
+        return max(0.0, min(1.0, value))
+
+    def _update_peak(self, level: float, peak: float, hold: int):
+        peak_mode = self.config.get("peak_mode", "Floating")
+        if peak_mode == "Off":
+            return 0.0, 0
+
+        hold_ticks = 2 + int(max(0, min(100, _safe_int(self.config.get("peak_hold", 65), 65))) / 4)
+        if level >= peak:
+            return level, hold_ticks
+        if hold > 0:
+            return peak, hold - 1
+
+        if peak_mode == "Absolute":
+            # Sample-and-hold behavior: once the hold expires, jump straight to
+            # the current level instead of floating/falling down one step at a time.
+            return level, hold_ticks
+
+        # Floating mode: classic VU peak marker that gently falls after the hold.
+        fall = 0.025
+        return max(level, peak - fall), 0
+
+    def levels(self, step: int):
+        # If there is no real microphone stream, keep the theme visibly alive
+        # for simulator/output testing instead of showing a dead-black wall.
+        if self.stream is None:
+            left_raw = 0.040 + 0.055 * (0.5 + 0.5 * math.sin(step * 0.19))
+            right_raw = 0.040 + 0.055 * (0.5 + 0.5 * math.sin(step * 0.23 + 1.2))
+            channels = 0
+        else:
+            with self._lock:
+                left_raw = self._raw_left
+                right_raw = self._raw_right
+            channels = self.channel_count
+
+        input_mode = self.config.get("input_mode", "Auto")
+        if input_mode == "Mono" or channels < 2:
+            mono = (left_raw + right_raw) * 0.5
+            left_raw = right_raw = mono
+
+        left_target = self._apply_level_processing(left_raw)
+        right_target = self._apply_level_processing(right_raw)
+        smoothing = max(0, min(100, _safe_int(self.config.get("smoothing", 45), 45)))
+        alpha = 0.65 - (smoothing * 0.0055)  # 0.65 snappy to 0.10 very smooth
+        alpha = max(0.08, min(0.70, alpha))
+        self._smooth_left += (left_target - self._smooth_left) * alpha
+        self._smooth_right += (right_target - self._smooth_right) * alpha
+        self._peak_left, self._peak_hold_left = self._update_peak(self._smooth_left, self._peak_left, self._peak_hold_left)
+        self._peak_right, self._peak_hold_right = self._update_peak(self._smooth_right, self._peak_right, self._peak_hold_right)
+        return {
+            "left": max(0.0, min(1.0, self._smooth_left)),
+            "right": max(0.0, min(1.0, self._smooth_right)),
+            "peak_left": max(0.0, min(1.0, self._peak_left)),
+            "peak_right": max(0.0, min(1.0, self._peak_right)),
+            "channels": channels,
+            "status": self.status,
+        }
+
+    def status_summary(self) -> str:
+        return self.status
+
+
 class FalconService:
-    def __init__(self, falcon_ip: str, pixels_per_lane: int = 100, dmx_universe: int = None, playfield_inverted: bool = False):
+    def __init__(self, falcon_ip: str, pixels_per_lane: int = 100, dmx_universe: int = None, playfield_inverted: bool = False,
+                 simulator_enabled: bool = False, simulator_ip: str = "", simulator_include_dmx: bool = False):
         self.falcon_ip = falcon_ip
         self.pixels_per_lane = pixels_per_lane
         self.dmx_universe = dmx_universe
         self.sender = None
+        self.sim_sender = None
         self.started = False
+        self.sim_started = False
         self.brightness_scale = 1.0
         self.playfield_inverted = bool(playfield_inverted)
+        self.simulator_enabled = bool(simulator_enabled)
+        self.simulator_ip = (simulator_ip or "").strip()
+        self.simulator_include_dmx = bool(simulator_include_dmx)
         self.flame_theme_tuning = json.loads(json.dumps(DEFAULT_FLAME_TUNING))
+        self.sound_visualizer = SoundVisualizerEngine()
         self.lane_map = {
             1: {"left": 1, "right": 2},
             2: {"left": 3, "right": 4},
@@ -331,6 +596,16 @@ class FalconService:
                     merged[theme][key] = max(0, min(100, _safe_int(incoming.get(key, defaults[key]), defaults[key])))
         self.flame_theme_tuning = merged
 
+    def set_sound_visualizer_tuning(self, tuning):
+        """Load Sound Visualizer tuning from the console settings."""
+        self.sound_visualizer.set_tuning(tuning)
+
+    def start_sound_visualizer(self):
+        self.sound_visualizer.start()
+
+    def stop_sound_visualizer(self):
+        self.sound_visualizer.stop()
+
     def _flame_tuning_for(self, theme_name: str):
         name_l = (theme_name or "").strip().lower()
         for theme, tuning in self.flame_theme_tuning.items():
@@ -338,38 +613,58 @@ class FalconService:
                 return tuning
         return DEFAULT_FLAME_TUNING["Candle Flame"]
 
+    def _activate_outputs(self, sender, destination: str, include_dmx: bool):
+        """Activate the Pixel Challenge universes on one sACN sender."""
+        for universe in range(1, 9):
+            sender.activate_output(universe)
+            sender[universe].destination = destination
+            sender[universe].dmx_data = bytes(512)
+        if include_dmx and self.dmx_universe:
+            sender.activate_output(self.dmx_universe)
+            sender[self.dmx_universe].destination = destination
+            sender[self.dmx_universe].dmx_data = bytes(512)
+
     def start(self):
         if self.started:
             return
         try:
             self.sender = sacn.sACNsender(source_name="PixelChallengeHost")
             self.sender.start()
-            # Activate pixel universes 1-8
-            for universe in range(1, 9):
-                self.sender.activate_output(universe)
-                self.sender[universe].destination = self.falcon_ip
-                self.sender[universe].dmx_data = bytes(512)
-            # Activate DMX universe (e.g. universe 9 for DMX serial output)
-            if self.dmx_universe:
-                self.sender.activate_output(self.dmx_universe)
-                self.sender[self.dmx_universe].destination = self.falcon_ip
-                self.sender[self.dmx_universe].dmx_data = bytes(512)
+            # Activate pixel universes 1-8 plus the physical DMX universe.
+            self._activate_outputs(self.sender, self.falcon_ip, include_dmx=bool(self.dmx_universe))
             self.started = True
         except Exception as e:
             print(f"FalconService start error: {e}")
 
-    def stop(self):
-        if self.sender is not None:
+        # Optional second unicast target for a portable Windows visualizer.
+        # This intentionally does not replace the Falcon path; it mirrors it.
+        if self.simulator_enabled and self.simulator_ip:
             try:
-                for universe in range(1, 9):
-                    self.sender[universe].dmx_data = bytes(512)
-                # Clear DMX universe too
-                if self.dmx_universe:
-                    self.sender[self.dmx_universe].dmx_data = bytes(512)
-                self.sender.stop()
-            except Exception:
-                pass
+                self.sim_sender = sacn.sACNsender(source_name="PixelChallengeSimulatorMirror")
+                self.sim_sender.start()
+                self._activate_outputs(self.sim_sender, self.simulator_ip, include_dmx=self.simulator_include_dmx)
+                self.sim_started = True
+            except Exception as e:
+                self.sim_sender = None
+                self.sim_started = False
+                print(f"Pixel simulator mirror start error: {e}")
+
+    def stop(self):
+        for sender, is_started in ((self.sender, self.started), (self.sim_sender, self.sim_started)):
+            if sender is not None and is_started:
+                try:
+                    for universe in range(1, 9):
+                        sender[universe].dmx_data = bytes(512)
+                    if self.dmx_universe:
+                        try:
+                            sender[self.dmx_universe].dmx_data = bytes(512)
+                        except Exception:
+                            pass
+                    sender.stop()
+                except Exception:
+                    pass
         self.started = False
+        self.sim_started = False
 
     def _build_frame(self, pixels):
         buf = bytearray(512)
@@ -383,12 +678,32 @@ class FalconService:
             buf[base + 2] = clamp8(b * scale)
         return bytes(buf)
 
-    def _send_pixels(self, universe: int, pixels):
+    def send_universe_frame(self, universe: int, frame):
+        """Send one 512-byte DMX/E1.31 frame to the Falcon and optional simulator."""
+        if frame is None:
+            return
+        if not isinstance(frame, (bytes, bytearray)):
+            frame = bytes(frame)
+        if len(frame) < 512:
+            frame = bytes(frame) + bytes(512 - len(frame))
+        elif len(frame) > 512:
+            frame = bytes(frame[:512])
+        else:
+            frame = bytes(frame)
+
         if self.sender and self.started:
             try:
-                self.sender[universe].dmx_data = self._build_frame(pixels)
+                self.sender[universe].dmx_data = frame
             except Exception:
                 pass
+        if self.sim_sender and self.sim_started:
+            try:
+                self.sim_sender[universe].dmx_data = frame
+            except Exception:
+                pass
+
+    def _send_pixels(self, universe: int, pixels):
+        self.send_universe_frame(universe, self._build_frame(pixels))
 
     def blank_pixels(self):
         return [(0, 0, 0)] * self.pixels_per_lane
@@ -429,6 +744,109 @@ class FalconService:
             clamp8(a[1] + (b[1] - a[1]) * t),
             clamp8(a[2] + (b[2] - a[2]) * t),
         )
+
+    def _sound_visualizer_color(self, frac: float, level: float):
+        """VU-style blue/green/yellow/orange/red color ramp."""
+        frac = max(0.0, min(1.0, float(frac)))
+        if frac < 0.45:
+            color = self._mix_rgb(COLOR_MAP["blue"], COLOR_MAP["green"], frac / 0.45)
+        elif frac < 0.72:
+            color = self._mix_rgb(COLOR_MAP["green"], COLOR_MAP["yellow"], (frac - 0.45) / 0.27)
+        elif frac < 0.90:
+            color = self._mix_rgb(COLOR_MAP["yellow"], COLOR_MAP["orange"], (frac - 0.72) / 0.18)
+        else:
+            color = self._mix_rgb(COLOR_MAP["orange"], COLOR_MAP["red"], (frac - 0.90) / 0.10)
+        return scale_color(color, 0.35 + 0.65 * max(0.0, min(1.0, level)))
+
+    def _sound_visualizer_lane_pixels(self, level: float, peak: float, direction: str):
+        n = max(1, int(self.pixels_per_lane))
+        direction = direction if direction in SOUND_VISUALIZER_DIRECTIONS else "Center Out"
+        level = max(0.0, min(1.0, float(level)))
+        peak = max(0.0, min(1.0, float(peak)))
+        pixels = [COLOR_MAP["off"]] * n
+        if n <= 1:
+            return [self._sound_visualizer_color(1.0, level) if level > 0 else COLOR_MAP["off"]]
+
+        fill_count = max(0, min(n, int(round(level * n))))
+        peak_count = max(0, min(n, int(round(peak * n))))
+        center = (n - 1) / 2.0
+
+        def set_pixel(idx, frac, factor=1.0):
+            if 0 <= idx < n:
+                pixels[idx] = scale_color(self._sound_visualizer_color(frac, level), factor)
+
+        if direction == "Bottom":
+            for i in range(fill_count):
+                set_pixel(i, i / (n - 1))
+            if peak_count > 0:
+                set_pixel(peak_count - 1, peak, 1.25)
+
+        elif direction == "Top":
+            for i in range(n - fill_count, n):
+                frac = (n - 1 - i) / (n - 1)
+                set_pixel(i, 1.0 - frac)
+            if peak_count > 0:
+                set_pixel(n - peak_count, peak, 1.25)
+
+        elif direction == "Top/Bottom In":
+            half_fill = max(0, min(n // 2 + 1, int(round(level * n / 2.0))))
+            half_peak = max(0, min(n // 2 + 1, int(round(peak * n / 2.0))))
+            for i in range(half_fill):
+                frac = i / max(1, (n / 2.0))
+                set_pixel(i, frac)
+                set_pixel(n - 1 - i, frac)
+            if half_peak > 0:
+                set_pixel(half_peak - 1, peak, 1.25)
+                set_pixel(n - half_peak, peak, 1.25)
+
+        else:  # Center Out
+            half_fill = max(0, min(n // 2 + 1, int(round(level * n / 2.0))))
+            half_peak = max(0, min(n // 2 + 1, int(round(peak * n / 2.0))))
+            for i in range(n):
+                dist = abs(i - center)
+                if dist <= half_fill:
+                    frac = min(1.0, dist / max(1.0, n / 2.0))
+                    set_pixel(i, frac)
+            if half_peak > 0:
+                left_idx = int(round(center - half_peak))
+                right_idx = int(round(center + half_peak))
+                set_pixel(left_idx, peak, 1.25)
+                set_pixel(right_idx, peak, 1.25)
+        return pixels
+
+    def _render_sound_visualizer_frame(self, step: int, lane_slots):
+        self.start_sound_visualizer()
+        data = self.sound_visualizer.levels(step)
+        left = data["left"]
+        right = data["right"]
+        peak_left = data["peak_left"]
+        peak_right = data["peak_right"]
+        channels = data.get("channels", 0)
+        cfg = self.sound_visualizer.config
+        direction = cfg.get("direction", "Center Out")
+        input_mode = cfg.get("input_mode", "Auto")
+        mapping = cfg.get("stereo_mapping", "Player Pair Stereo")
+        force_mono = input_mode == "Mono" or channels < 2 or mapping == "All Lanes Mirror"
+        mono = (left + right) * 0.5
+        mono_peak = max(peak_left, peak_right)
+
+        frames = []
+        for slot_index, (player_id, lane) in enumerate(lane_slots):
+            if force_mono:
+                level, peak = mono, mono_peak
+            elif mapping == "Players 1-2 Left / Players 3-4 Right":
+                level, peak = (left, peak_left) if slot_index < 4 else (right, peak_right)
+            elif mapping == "Odd Lanes Left / Even Lanes Right":
+                level, peak = (left, peak_left) if ((slot_index + 1) % 2 == 1) else (right, peak_right)
+            else:  # Player Pair Stereo
+                level, peak = (left, peak_left) if (slot_index % 2 == 0) else (right, peak_right)
+            frames.append(self._sound_visualizer_lane_pixels(level, peak, direction))
+
+        if cfg.get("lab_mirror") == "Mirror Player 1 to All" and len(frames) >= 2:
+            frames = [list(frames[i % 2]) for i in range(len(frames))]
+
+        for pixels, (player_id, lane) in zip(frames, lane_slots):
+            self.send_lane_pixels(player_id, lane, pixels)
 
     def _smooth_wave(self, phase: float, seed: float) -> float:
         """Deterministic pseudo-noise in the 0.0-1.0 range.
@@ -571,9 +989,14 @@ class FalconService:
             (1, "left"), (1, "right"), (2, "left"), (2, "right"),
             (3, "left"), (3, "right"), (4, "left"), (4, "right"),
         ]
-        theme_name = theme_name.lower()
+        theme_key = (theme_name or "").strip().lower()
+        if theme_key == SOUND_VISUALIZER_THEME_NAME.lower():
+            self._render_sound_visualizer_frame(step, lane_slots)
+            return
+        if self.sound_visualizer.active:
+            self.stop_sound_visualizer()
         for slot_index, (player_id, lane) in enumerate(lane_slots):
-            pixels = self._theme_pixels(theme_name, slot_index, step)
+            pixels = self._theme_pixels(theme_key, slot_index, step)
             self.send_lane_pixels(player_id, lane, pixels)
 
     def flash_all_lanes(self, color_name: str):
@@ -2085,7 +2508,7 @@ class DMXService:
                 if "dimmer_speed" in p:
                     _safe_set_many(p["dimmer_speed"], 0)
 
-            self.falcon.sender[self.universe].dmx_data = bytes(buf)
+            self.falcon.send_universe_frame(self.universe, bytes(buf))
         except Exception as e:
             print(f"DMXService send error: {e}")
 
@@ -2207,6 +2630,10 @@ class AttractService:
         self.active = False
         self.current_theme = None
         self.step = 0
+        try:
+            self.falcon.stop_sound_visualizer()
+        except Exception:
+            pass
         self.falcon.clear_all_lanes(None)
         if host:
             host.log("AttractService: stopped.")
@@ -2319,7 +2746,11 @@ class PixelChallengeConsole:
         self.per_theme_speed = {}
         self.selected_themes = set()
         self.flame_theme_tuning = json.loads(json.dumps(DEFAULT_FLAME_TUNING))
+        self.sound_visualizer_active_profile = "Internal Mic"
+        self.sound_visualizer_profiles = json.loads(json.dumps(DEFAULT_SOUND_VISUALIZER_PROFILES))
+        self.sound_visualizer_tuning = json.loads(json.dumps(DEFAULT_SOUND_VISUALIZER_PROFILES[self.sound_visualizer_active_profile]))
         self.flame_tune_window = None
+        self.sound_visualizer_tune_window = None
         self.last_cycle_switch = time.time()
         self.final_results_active = False
 
@@ -2409,22 +2840,7 @@ class PixelChallengeConsole:
         self.sla_store.set_log_callback(self.log)
         
         # SLA Configuration (can be modified via config file later)
-        self.sla_store.update_config({
-            "enabled": True,
-            "min_games_for_valid_sla": 1,  # Configurable 1-3
-            "accuracy_weight": 0.60,
-            "reaction_weight": 0.40,
-            "reset_on_new_checkin": True,
-            "save_to_history": True,
-            "calibration": {
-                "enabled": True,
-                "min_samples_for_calibration": 20,
-                "percentile_expert": 10,
-                "percentile_beginner": 90,
-                "recalibrate_interval": 10,
-                "max_samples_stored": 500,
-            }
-        })
+        self.sla_store.update_config(copy.deepcopy(DEFAULT_SLA_GLOBAL))
 
         self.controller_status = {
             1: {"enabled": False, "locked": False, "selected": False, "status": "MISSING", "name": "", "signature": ""},
@@ -2438,6 +2854,7 @@ class PixelChallengeConsole:
             "Rainbow Pulse", "Fire Burst", "Ice Burst", "Galaxy Wave", "Team Colors",
             "Candle Flame", "Blue Flame", "Red Flame", "Green Flame", "Ember Glow",
             "Calm Mode", "Lane Chase LR", "Lane Chase RL", "Bounce Chase", "Color Wash",
+            SOUND_VISUALIZER_THEME_NAME,
         ]
         self.theme_vars = {}
         self.theme_speed_vars = {}
@@ -2447,6 +2864,9 @@ class PixelChallengeConsole:
         self.falcon_ip = DEFAULT_FALCON_IP
         self.pixels_per_lane = DEFAULT_PIXELS_PER_LANE
         self.pixels_per_lane_var = tk.IntVar(value=DEFAULT_PIXELS_PER_LANE)
+        self.pixel_sim_enabled = tk.BooleanVar(value=False)
+        self.pixel_sim_ip = tk.StringVar(value=DEFAULT_PIXEL_SIMULATOR_IP)
+        self.pixel_sim_include_dmx = tk.BooleanVar(value=False)
         self.wifi_dhcp = tk.BooleanVar(value=True)
         self.wifi_ssid = tk.StringVar(value="")
         self.wifi_psk = tk.StringVar(value="")
@@ -2467,6 +2887,8 @@ class PixelChallengeConsole:
         self.setup_window = None
         self.config_window = None
         self.config_text = None
+        self.splash_config_window = None
+        self.game_config_window = None
         self.falcon_console_proc = None
 
         self.log_file = project_path(f"log_{time.strftime('%Y%m%d')}.log")
@@ -2500,8 +2922,12 @@ class PixelChallengeConsole:
             self.get_pixels_per_lane(),
             dmx_universe=self.dmx_universe_num.get(),
             playfield_inverted=_safe_bool(self.global_game_config.get("invert_playfield", False), False),
+            simulator_enabled=bool(self.pixel_sim_enabled.get()),
+            simulator_ip=self.pixel_sim_ip.get(),
+            simulator_include_dmx=bool(self.pixel_sim_include_dmx.get()),
         )
         self.falcon.set_flame_theme_tuning(self.flame_theme_tuning)
+        self.falcon.set_sound_visualizer_tuning(self.sound_visualizer_tuning)
         self.attract = AttractService(self.falcon)
         self.games = GameRegistry()
 
@@ -2545,6 +2971,7 @@ class PixelChallengeConsole:
         # --- End apply loaded settings ---
         self.update_flame_tune_button_state()
         self._push_flame_tuning_to_falcon()
+        self._push_sound_visualizer_tuning_to_falcon()
 
         self.refresh_player_status_panel()
         self.refresh_controller_panel()
@@ -2650,42 +3077,148 @@ class PixelChallengeConsole:
         except Exception as e:
             self.log(f"Failed to save score history: {e}")
 
-    def load_global_game_config(self) -> dict:
-        """Load settings shared by all games from the Splash config file."""
-        defaults = {
+    def _global_config_path(self) -> str:
+        return os.path.join(GAMES_ROOT, "global.config.json")
+
+    def _default_global_game_config(self) -> dict:
+        return {
             "difficulty": "normal",
             "show_scoreboard": True,
             "sound_pack": "default",
             "invert_playfield": True,
+            "sla": copy.deepcopy(DEFAULT_SLA_GLOBAL),
             "controller_rumble": dict(DEFAULT_CONTROLLER_RUMBLE),
             "controller_actions": copy.deepcopy(DEFAULT_CONTROLLER_ACTIONS),
-            "notes": "auto-created by console; adjust as needed",
+            "notes": "auto-created by console; Splash CONFIG edits global environment settings",
         }
-        path = os.path.join(GAMES_ROOT, "global.config.json")
+
+    def _normalize_sla_config(self, raw=None) -> dict:
+        """Return safe global SLA / adaptive-assistance config."""
+        cfg = copy.deepcopy(DEFAULT_SLA_GLOBAL)
+        if isinstance(raw, bool):
+            cfg["enabled"] = raw
+        elif isinstance(raw, dict):
+            for key, value in raw.items():
+                if key == "calibration" and isinstance(value, dict):
+                    cfg["calibration"].update(value)
+                else:
+                    cfg[key] = value
+        elif raw is not None:
+            cfg["enabled"] = _safe_bool(raw, cfg["enabled"])
+
+        cfg["enabled"] = _safe_bool(cfg.get("enabled"), DEFAULT_SLA_GLOBAL["enabled"])
+        cfg["mode"] = str(cfg.get("mode") or "adaptive").strip().lower()
+        if cfg["mode"] not in {"adaptive", "fixed", "off"}:
+            cfg["mode"] = "adaptive"
+        if cfg["mode"] == "off":
+            cfg["enabled"] = False
+        cfg["assist_strength"] = max(0.0, min(2.0, _safe_float(
+            cfg.get("assist_strength"), DEFAULT_SLA_GLOBAL["assist_strength"]
+        )))
+        cfg["allow_game_reassessment"] = _safe_bool(
+            cfg.get("allow_game_reassessment"), DEFAULT_SLA_GLOBAL["allow_game_reassessment"]
+        )
+        cfg["show_debug"] = _safe_bool(cfg.get("show_debug"), DEFAULT_SLA_GLOBAL["show_debug"])
+        cfg["min_games_for_valid_sla"] = max(1, min(10, _safe_int(
+            cfg.get("min_games_for_valid_sla"), DEFAULT_SLA_GLOBAL["min_games_for_valid_sla"]
+        )))
+        cfg["accuracy_weight"] = max(0.0, min(1.0, _safe_float(
+            cfg.get("accuracy_weight"), DEFAULT_SLA_GLOBAL["accuracy_weight"]
+        )))
+        cfg["reaction_weight"] = max(0.0, min(1.0, _safe_float(
+            cfg.get("reaction_weight"), DEFAULT_SLA_GLOBAL["reaction_weight"]
+        )))
+        cfg["reset_on_new_checkin"] = _safe_bool(
+            cfg.get("reset_on_new_checkin"), DEFAULT_SLA_GLOBAL["reset_on_new_checkin"]
+        )
+        cfg["save_to_history"] = _safe_bool(
+            cfg.get("save_to_history"), DEFAULT_SLA_GLOBAL["save_to_history"]
+        )
+        cal = cfg.get("calibration")
+        if not isinstance(cal, dict):
+            cal = copy.deepcopy(DEFAULT_SLA_GLOBAL["calibration"])
+        default_cal = DEFAULT_SLA_GLOBAL["calibration"]
+        cal["enabled"] = _safe_bool(cal.get("enabled"), default_cal["enabled"])
+        cal["min_samples_for_calibration"] = max(1, min(10000, _safe_int(
+            cal.get("min_samples_for_calibration"), default_cal["min_samples_for_calibration"]
+        )))
+        cal["percentile_expert"] = max(1, min(49, _safe_int(
+            cal.get("percentile_expert"), default_cal["percentile_expert"]
+        )))
+        cal["percentile_beginner"] = max(51, min(99, _safe_int(
+            cal.get("percentile_beginner"), default_cal["percentile_beginner"]
+        )))
+        cal["recalibrate_interval"] = max(1, min(1000, _safe_int(
+            cal.get("recalibrate_interval"), default_cal["recalibrate_interval"]
+        )))
+        cal["max_samples_stored"] = max(20, min(100000, _safe_int(
+            cal.get("max_samples_stored"), default_cal["max_samples_stored"]
+        )))
+        cfg["calibration"] = cal
+        return cfg
+
+    def _validate_global_game_config(self, config: dict) -> tuple[dict, list[str]]:
+        """Normalize global config and return user-facing corrections/warnings."""
+        warnings = []
+        defaults = self._default_global_game_config()
+        if not isinstance(config, dict):
+            config = {}
+            warnings.append("Config was not a JSON object; restored safe defaults.")
+        merged = copy.deepcopy(defaults)
+        merged.update(config)
+
+        difficulty = str(merged.get("difficulty") or "normal").strip().lower()
+        valid_difficulties = {"casual", "normal", "challenge", "tournament"}
+        if difficulty not in valid_difficulties:
+            warnings.append(f"Difficulty '{difficulty}' was not recognized; changed to normal.")
+            difficulty = "normal"
+        merged["difficulty"] = difficulty
+        merged["show_scoreboard"] = _safe_bool(merged.get("show_scoreboard"), defaults["show_scoreboard"])
+        merged["invert_playfield"] = _safe_bool(merged.get("invert_playfield"), defaults["invert_playfield"])
+        sound_pack = str(merged.get("sound_pack") or "default").strip() or "default"
+        merged["sound_pack"] = sound_pack
+        merged["sla"] = self._normalize_sla_config(merged.get("sla"))
+        merged["controller_rumble"] = self._normalize_controller_rumble_config(merged.get("controller_rumble"))
+        merged["controller_actions"] = self._normalize_controller_actions_config(merged.get("controller_actions"))
+        if "notes" not in merged:
+            merged["notes"] = defaults["notes"]
+        return merged, warnings
+
+    def _save_global_game_config(self, config: dict, log_change: bool = True) -> tuple[dict, list[str]]:
+        normalized, warnings = self._validate_global_game_config(config)
+        path = self._global_config_path()
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp_path = path + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(normalized, f, indent=2)
+            f.write("\n")
+        os.replace(tmp_path, path)
+        self.global_game_config = normalized
+        if log_change:
+            self.apply_global_game_config(log_change=True)
+        return normalized, warnings
+
+    def load_global_game_config(self) -> dict:
+        """Load settings shared by all games from the Splash config file."""
+        defaults = self._default_global_game_config()
+        path = self._global_config_path()
         try:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             if not os.path.exists(path):
-                with open(path, "w", encoding="utf-8") as f:
-                    json.dump(defaults, f, indent=2)
-                return dict(defaults)
+                normalized, _warnings = self._save_global_game_config(defaults, log_change=False)
+                return normalized
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            if not isinstance(data, dict):
-                data = {}
-            merged = dict(defaults)
-            merged.update(data)
-            merged["controller_rumble"] = self._normalize_controller_rumble_config(
-                merged.get("controller_rumble", defaults["controller_rumble"])
-            )
-            merged["controller_actions"] = self._normalize_controller_actions_config(
-                merged.get("controller_actions", defaults["controller_actions"])
-            )
-            return merged
+            normalized, warnings = self._validate_global_game_config(data)
+            # Self-correct missing/invalid values on disk so the next launch starts clean.
+            if normalized != data:
+                self._save_global_game_config(normalized, log_change=False)
+                if warnings:
+                    self.log("Global config self-corrected: " + "; ".join(warnings))
+            return normalized
         except Exception as e:
             self.log(f"Failed to load global game config: {e}")
-            defaults["controller_rumble"] = self._normalize_controller_rumble_config(defaults.get("controller_rumble"))
-            defaults["controller_actions"] = self._normalize_controller_actions_config(defaults.get("controller_actions"))
-            return dict(defaults)
+            return copy.deepcopy(defaults)
 
     def _normalize_controller_actions_config(self, raw=None) -> dict:
         """Return safe controller action/color mapping from global/Splash config."""
@@ -2770,21 +3303,33 @@ class PixelChallengeConsole:
         return cfg
 
     def apply_global_game_config(self, log_change: bool = False) -> dict:
-        """Apply global/Splash game config values that affect hardware output."""
+        """Apply global/Splash game config values that affect hardware/output/framework state."""
         config = self.load_global_game_config()
         self.global_game_config = config
         inverted = _safe_bool(config.get("invert_playfield", False), False)
         self.controller_rumble = self._normalize_controller_rumble_config(config.get("controller_rumble"))
         self.controller_actions = self._normalize_controller_actions_config(config.get("controller_actions"))
+        self.global_sla_config = self._normalize_sla_config(config.get("sla"))
         config["controller_rumble"] = self.controller_rumble
         config["controller_actions"] = self.controller_actions
+        config["sla"] = self.global_sla_config
+        try:
+            if hasattr(self, "sla_store") and self.sla_store:
+                self.sla_store.update_config(copy.deepcopy(self.global_sla_config))
+        except Exception as e:
+            self.log(f"Failed to apply SLA config: {e}")
         if hasattr(self, "falcon") and self.falcon:
             self.falcon.set_playfield_inverted(inverted)
         if log_change:
             rumble_state = "ON" if self.controller_rumble.get("enabled") else "OFF"
             actions_state = "ON" if self.controller_actions.get("enabled") else "OFF"
+            sla_state = "ON" if self.global_sla_config.get("enabled") else "OFF"
             active_games = ",".join(self.controller_actions.get("active_games", [])) or "none"
-            self.log(f"Global config: invert_playfield={'ON' if inverted else 'OFF'}, controller_rumble={rumble_state}, controller_actions={actions_state} [{active_games}]")
+            self.log(
+                f"Global config: invert_playfield={'ON' if inverted else 'OFF'}, "
+                f"controller_rumble={rumble_state}, controller_actions={actions_state} [{active_games}], "
+                f"SLA={sla_state} strength={self.global_sla_config.get('assist_strength', 1.0):.2f}"
+            )
         return config
 
     def get_pixels_per_lane(self) -> int:
@@ -2821,6 +3366,14 @@ class PixelChallengeConsole:
             saved_selected = data.get("selected_themes", [])
             self.selected_themes = set(saved_selected) if isinstance(saved_selected, list) else set()
             self.flame_theme_tuning = self._normalize_flame_tuning(data.get("flame_theme_tuning", {}))
+            self.sound_visualizer_active_profile = str(data.get("sound_visualizer_active_profile", self.sound_visualizer_active_profile))
+            if self.sound_visualizer_active_profile not in SOUND_VISUALIZER_PROFILES:
+                self.sound_visualizer_active_profile = "Internal Mic"
+            self.sound_visualizer_profiles = self._normalize_sound_visualizer_profiles(
+                data.get("sound_visualizer_profiles", {}),
+                legacy_tuning=data.get("sound_visualizer_tuning", {})
+            )
+            self.sound_visualizer_tuning = self._active_sound_visualizer_tuning()
             self.sash_left_attract_bottom = data.get("sash_left_attract_bottom")
             self.sash_center_ctrl = data.get("sash_center_ctrl")
             self.sash_main_info = data.get("sash_main_info")
@@ -2839,6 +3392,12 @@ class PixelChallengeConsole:
             self.pixels_per_lane = pixels
             if hasattr(self, "pixels_per_lane_var"):
                 self.pixels_per_lane_var.set(pixels)
+            if hasattr(self, "pixel_sim_enabled"):
+                self.pixel_sim_enabled.set(bool(data.get("pixel_sim_enabled", False)))
+            if hasattr(self, "pixel_sim_ip"):
+                self.pixel_sim_ip.set(data.get("pixel_sim_ip", DEFAULT_PIXEL_SIMULATOR_IP))
+            if hasattr(self, "pixel_sim_include_dmx"):
+                self.pixel_sim_include_dmx.set(bool(data.get("pixel_sim_include_dmx", False)))
             self.wifi_dhcp.set(bool(data.get("wifi_dhcp", True)))
             self.wifi_ssid.set(data.get("wifi_ssid", ""))
             self.wifi_psk.set(data.get("wifi_psk", ""))
@@ -2894,6 +3453,9 @@ class PixelChallengeConsole:
             "per_theme_speed": self.per_theme_speed,
             "selected_themes": list(self.selected_themes),
             "flame_theme_tuning": self.flame_theme_tuning,
+            "sound_visualizer_tuning": self.sound_visualizer_tuning,
+            "sound_visualizer_active_profile": self.sound_visualizer_active_profile,
+            "sound_visualizer_profiles": self.sound_visualizer_profiles,
             "sash_left_attract_bottom": self.sash_left_attract_bottom,
             "sash_center_ctrl": self.sash_center_ctrl,
             "sash_main_info": self.sash_main_info,
@@ -2908,6 +3470,9 @@ class PixelChallengeConsole:
             "master_volume": int(self.master_volume.get()),
             "falcon_ip": self.falcon_ip,
             "pixels_per_lane": int(self.get_pixels_per_lane()),
+            "pixel_sim_enabled": bool(self.pixel_sim_enabled.get()),
+            "pixel_sim_ip": self.pixel_sim_ip.get().strip(),
+            "pixel_sim_include_dmx": bool(self.pixel_sim_include_dmx.get()),
             "wifi_dhcp": bool(self.wifi_dhcp.get()),
             "wifi_ssid": self.wifi_ssid.get(),
             "wifi_psk": self.wifi_psk.get(),
@@ -5182,6 +5747,260 @@ class PixelChallengeConsole:
         except Exception:
             pass
 
+    def _normalize_sound_visualizer_tuning(self, tuning):
+        merged = json.loads(json.dumps(DEFAULT_SOUND_VISUALIZER_TUNING))
+        if isinstance(tuning, dict):
+            for key in SOUND_VISUALIZER_SELECT_KEYS:
+                if key in tuning:
+                    merged[key] = str(tuning.get(key) or merged[key])
+            for key in SOUND_VISUALIZER_NUMERIC_KEYS:
+                merged[key] = max(0, min(100, _safe_int(tuning.get(key, merged[key]), merged[key])))
+        if merged["direction"] not in SOUND_VISUALIZER_DIRECTIONS:
+            merged["direction"] = DEFAULT_SOUND_VISUALIZER_TUNING["direction"]
+        if merged["input_mode"] not in SOUND_VISUALIZER_INPUT_MODES:
+            merged["input_mode"] = DEFAULT_SOUND_VISUALIZER_TUNING["input_mode"]
+        if merged["stereo_mapping"] not in SOUND_VISUALIZER_MAPPINGS:
+            merged["stereo_mapping"] = DEFAULT_SOUND_VISUALIZER_TUNING["stereo_mapping"]
+        if merged["lab_mirror"] not in SOUND_VISUALIZER_LAB_MIRROR_MODES:
+            merged["lab_mirror"] = DEFAULT_SOUND_VISUALIZER_TUNING["lab_mirror"]
+        if merged["peak_mode"] not in SOUND_VISUALIZER_PEAK_MODES:
+            merged["peak_mode"] = DEFAULT_SOUND_VISUALIZER_TUNING["peak_mode"]
+        return merged
+
+    def _normalize_sound_visualizer_profiles(self, profiles, legacy_tuning=None):
+        normalized = json.loads(json.dumps(DEFAULT_SOUND_VISUALIZER_PROFILES))
+        if isinstance(legacy_tuning, dict) and legacy_tuning:
+            normalized["Internal Mic"] = self._normalize_sound_visualizer_tuning(legacy_tuning)
+        if isinstance(profiles, dict):
+            for profile in SOUND_VISUALIZER_PROFILES:
+                if isinstance(profiles.get(profile), dict):
+                    normalized[profile] = self._normalize_sound_visualizer_tuning(profiles[profile])
+        return normalized
+
+    def _active_sound_visualizer_tuning(self):
+        if self.sound_visualizer_active_profile not in SOUND_VISUALIZER_PROFILES:
+            self.sound_visualizer_active_profile = "Internal Mic"
+        self.sound_visualizer_profiles = self._normalize_sound_visualizer_profiles(self.sound_visualizer_profiles)
+        tuning = self.sound_visualizer_profiles.get(self.sound_visualizer_active_profile, DEFAULT_SOUND_VISUALIZER_PROFILES["Internal Mic"])
+        return self._normalize_sound_visualizer_tuning(tuning)
+
+    def _push_sound_visualizer_tuning_to_falcon(self):
+        self.sound_visualizer_tuning = self._normalize_sound_visualizer_tuning(self.sound_visualizer_tuning)
+        if self.sound_visualizer_active_profile in SOUND_VISUALIZER_PROFILES:
+            self.sound_visualizer_profiles[self.sound_visualizer_active_profile] = json.loads(json.dumps(self.sound_visualizer_tuning))
+        try:
+            self.falcon.set_sound_visualizer_tuning(self.sound_visualizer_tuning)
+        except Exception:
+            pass
+
+    def _is_sound_visualizer_theme(self, theme_name: str) -> bool:
+        return (theme_name or "").strip().lower() == SOUND_VISUALIZER_THEME_NAME.lower()
+
+    def _active_tunable_theme_for_tune(self) -> str:
+        current = self.attract.current_theme if hasattr(self, "attract") else None
+        if current and (self._is_sound_visualizer_theme(current) or self._is_flame_theme(current)):
+            return current
+        selection = self.theme_listbox_selection()
+        if selection and (self._is_sound_visualizer_theme(selection) or self._is_flame_theme(selection)):
+            return selection
+        checked = self.get_checked_theme_names()
+        for name in checked:
+            if self._is_sound_visualizer_theme(name):
+                return name
+        for name in checked:
+            if self._is_flame_theme(name):
+                return name
+        return current or selection or self.current_theme_name()
+
+    def open_theme_tune_popup(self):
+        theme = self._active_tunable_theme_for_tune()
+        if self._is_sound_visualizer_theme(theme):
+            self.open_sound_visualizer_tune_popup()
+        else:
+            self.open_flame_tune_popup()
+
+    def open_sound_visualizer_tune_popup(self):
+        """Compact touchscreen popup for Sound Visualizer mic/stereo tuning."""
+        if self.sound_visualizer_tune_window is not None:
+            try:
+                if self.sound_visualizer_tune_window.winfo_exists():
+                    self.sound_visualizer_tune_window.lift()
+                    return
+            except Exception:
+                pass
+        win = tk.Toplevel(self.root)
+        self.sound_visualizer_tune_window = win
+        win.title("Sound Visualizer Tune")
+        win.configure(bg="#081827")
+        win.geometry("660x700+220+120")
+        win.protocol("WM_DELETE_WINDOW", lambda: self._close_sound_visualizer_tune_popup(win))
+
+        tk.Label(win, text="SOUND VISUALIZER", bg="#081827", fg="#80d8ff",
+                 font=("Arial", 18, "bold")).pack(pady=(10, 3))
+        status_var = tk.StringVar(value=self.falcon.sound_visualizer.status_summary() if hasattr(self, "falcon") else "Mic idle")
+        tk.Label(win, textvariable=status_var, bg="#081827", fg="#cccccc",
+                 font=("Arial", 10, "bold"), wraplength=600).pack(pady=(0, 8))
+
+        self.sound_visualizer_profiles = self._normalize_sound_visualizer_profiles(self.sound_visualizer_profiles)
+        if self.sound_visualizer_active_profile not in SOUND_VISUALIZER_PROFILES:
+            self.sound_visualizer_active_profile = "Internal Mic"
+        self.sound_visualizer_tuning = self._active_sound_visualizer_tuning()
+
+        body = tk.Frame(win, bg="#081827")
+        body.pack(fill="both", expand=True, padx=14, pady=4)
+
+        profile_var = tk.StringVar(value=self.sound_visualizer_active_profile)
+        direction_var = tk.StringVar(value=self.sound_visualizer_tuning["direction"])
+        input_var = tk.StringVar(value=self.sound_visualizer_tuning["input_mode"])
+        mapping_var = tk.StringVar(value=self.sound_visualizer_tuning["stereo_mapping"])
+        mirror_var = tk.StringVar(value=self.sound_visualizer_tuning["lab_mirror"])
+        peak_mode_var = tk.StringVar(value=self.sound_visualizer_tuning["peak_mode"])
+
+        option_rows = [
+            ("PROFILE", profile_var, SOUND_VISUALIZER_PROFILES),
+            ("DIRECTION", direction_var, SOUND_VISUALIZER_DIRECTIONS),
+            ("INPUT", input_var, SOUND_VISUALIZER_INPUT_MODES),
+            ("STEREO MAP", mapping_var, SOUND_VISUALIZER_MAPPINGS),
+            ("LAB MIRROR", mirror_var, SOUND_VISUALIZER_LAB_MIRROR_MODES),
+            ("PEAK MODE", peak_mode_var, SOUND_VISUALIZER_PEAK_MODES),
+        ]
+
+        labels = {
+            "sensitivity": "SENSITIVITY",
+            "noise_gate": "NOISE GATE",
+            "smoothing": "SMOOTHING",
+            "peak_hold": "PEAK HOLD",
+        }
+        value_vars = {key: tk.IntVar(value=self.sound_visualizer_tuning[key]) for key in SOUND_VISUALIZER_NUMERIC_KEYS}
+        value_labels = {}
+        current_profile_name = {"value": self.sound_visualizer_active_profile}
+
+        def collect_tuning_from_widgets():
+            tuning = {
+                "direction": direction_var.get(),
+                "input_mode": input_var.get(),
+                "stereo_mapping": mapping_var.get(),
+                "lab_mirror": mirror_var.get(),
+                "peak_mode": peak_mode_var.get(),
+            }
+            for key, var in value_vars.items():
+                tuning[key] = max(0, min(100, int(var.get())))
+            return self._normalize_sound_visualizer_tuning(tuning)
+
+        def apply_tuning_to_widgets(tuning):
+            tuning = self._normalize_sound_visualizer_tuning(tuning)
+            direction_var.set(tuning["direction"])
+            input_var.set(tuning["input_mode"])
+            mapping_var.set(tuning["stereo_mapping"])
+            mirror_var.set(tuning["lab_mirror"])
+            peak_mode_var.set(tuning["peak_mode"])
+            for key in SOUND_VISUALIZER_NUMERIC_KEYS:
+                value_vars[key].set(tuning[key])
+                if key in value_labels:
+                    value_labels[key].configure(text=f"{value_vars[key].get():3d}%")
+
+        def store_values(*_, log_change=False):
+            active_profile = profile_var.get()
+            if active_profile not in SOUND_VISUALIZER_PROFILES:
+                active_profile = "Internal Mic"
+                profile_var.set(active_profile)
+            self.sound_visualizer_active_profile = active_profile
+            self.sound_visualizer_tuning = collect_tuning_from_widgets()
+            self.sound_visualizer_profiles[active_profile] = json.loads(json.dumps(self.sound_visualizer_tuning))
+            self._push_sound_visualizer_tuning_to_falcon()
+            self.save_settings()
+            if hasattr(self, "falcon"):
+                status_var.set(self.falcon.sound_visualizer.status_summary())
+            if log_change:
+                self.log(f"Sound Visualizer profile: {active_profile}")
+
+        def switch_profile(*_):
+            previous = current_profile_name.get("value", "Internal Mic")
+            if previous in SOUND_VISUALIZER_PROFILES:
+                self.sound_visualizer_profiles[previous] = collect_tuning_from_widgets()
+            selected = profile_var.get()
+            if selected not in SOUND_VISUALIZER_PROFILES:
+                selected = "Internal Mic"
+                profile_var.set(selected)
+            self.sound_visualizer_active_profile = selected
+            tuning = self.sound_visualizer_profiles.get(selected, DEFAULT_SOUND_VISUALIZER_PROFILES[selected])
+            apply_tuning_to_widgets(tuning)
+            current_profile_name["value"] = selected
+            store_values(log_change=True)
+
+        for row, (label, var, values) in enumerate(option_rows):
+            tk.Label(body, text=label, bg="#081827", fg="white",
+                     font=("Arial", 11, "bold"), width=14, anchor="w").grid(row=row, column=0, padx=4, pady=5, sticky="w")
+            combo = ttk.Combobox(body, textvariable=var, values=list(values), state="readonly",
+                                 font=("Arial", 10, "bold"), width=36, justify="center")
+            combo.grid(row=row, column=1, columnspan=3, sticky="ew", padx=4, pady=5)
+            if label == "PROFILE":
+                combo.bind("<<ComboboxSelected>>", switch_profile)
+            else:
+                combo.bind("<<ComboboxSelected>>", store_values)
+
+        def bump(key, delta):
+            value_vars[key].set(max(0, min(100, int(value_vars[key].get()) + delta)))
+            value_labels[key].configure(text=f"{value_vars[key].get():3d}%")
+            store_values()
+
+        start_row = len(option_rows)
+        for offset, key in enumerate(SOUND_VISUALIZER_NUMERIC_KEYS):
+            row = start_row + offset
+            tk.Label(body, text=labels[key], bg="#081827", fg="white",
+                     font=("Arial", 11, "bold"), width=14, anchor="w").grid(row=row, column=0, padx=4, pady=7, sticky="w")
+            tk.Button(body, text="−", command=lambda k=key: bump(k, -5),
+                      bg="#102a44", fg="white", activebackground="#1d456b", activeforeground="white",
+                      relief="raised", bd=2, font=("Arial", 14, "bold"), width=3).grid(row=row, column=1, padx=3, pady=5)
+            value_labels[key] = tk.Label(body, text=f"{value_vars[key].get():3d}%", bg="#081827", fg="#80d8ff",
+                                         font=("Arial", 13, "bold"), width=5)
+            value_labels[key].grid(row=row, column=2, padx=3, pady=5)
+            tk.Button(body, text="+", command=lambda k=key: bump(k, 5),
+                      bg="#102a44", fg="white", activebackground="#1d456b", activeforeground="white",
+                      relief="raised", bd=2, font=("Arial", 14, "bold"), width=3).grid(row=row, column=3, padx=3, pady=5)
+
+        tk.Label(win, text="Peak Mode: Floating gently falls back, Absolute jumps to the latest held position, Off hides the marker.",
+                 bg="#081827", fg="#b8dfff", font=("Arial", 9, "bold"), wraplength=600).pack(pady=(0, 2))
+        tk.Label(win, text="Tip: install sounddevice/PortAudio for live mic input; without it, this theme shows a test pulse.",
+                 bg="#081827", fg="#b8dfff", font=("Arial", 9, "bold"), wraplength=600).pack(pady=(0, 8))
+
+        def reset_values():
+            active_profile = profile_var.get() if profile_var.get() in SOUND_VISUALIZER_PROFILES else "Internal Mic"
+            self.sound_visualizer_tuning = json.loads(json.dumps(DEFAULT_SOUND_VISUALIZER_PROFILES[active_profile]))
+            self.sound_visualizer_profiles[active_profile] = json.loads(json.dumps(self.sound_visualizer_tuning))
+            apply_tuning_to_widgets(self.sound_visualizer_tuning)
+            store_values()
+            self.log(f"Sound Visualizer {active_profile} tune reset")
+
+        def restart_mic():
+            try:
+                self.falcon.sound_visualizer.restart()
+                status_var.set(self.falcon.sound_visualizer.status_summary())
+                self.log(f"Sound Visualizer mic restart: {status_var.get()}")
+            except Exception as exc:
+                status_var.set(f"Mic restart failed: {exc}")
+
+        btns = tk.Frame(win, bg="#081827")
+        btns.pack(fill="x", padx=14, pady=(2, 12))
+        tk.Button(btns, text="RESET", command=reset_values,
+                  bg="#194063", fg="white", activebackground="#245a8a", activeforeground="white",
+                  font=("Arial", 12, "bold"), width=10).pack(side="left", padx=6)
+        tk.Button(btns, text="RESTART MIC", command=restart_mic,
+                  bg="#1b5e20", fg="white", activebackground="#2e7d32", activeforeground="white",
+                  font=("Arial", 12, "bold"), width=12).pack(side="left", padx=6)
+        tk.Button(btns, text="CLOSE", command=lambda: self._close_sound_visualizer_tune_popup(win),
+                  bg="#1b3a6b", fg="white", activebackground="#24528f", activeforeground="white",
+                  font=("Arial", 12, "bold"), width=10).pack(side="right", padx=6)
+
+        store_values()
+
+    def _close_sound_visualizer_tune_popup(self, win=None):
+        try:
+            (win or self.sound_visualizer_tune_window).destroy()
+        except Exception:
+            pass
+        self.sound_visualizer_tune_window = None
+
     def open_flame_tune_popup(self):
         """Compact touchscreen popup for Flame theme height/rate/bite/smoothness."""
         if self.flame_tune_window is not None:
@@ -5618,13 +6437,16 @@ class PixelChallengeConsole:
     def update_flame_tune_button_state(self):
         if not hasattr(self, "flame_tune_button"):
             return
-        flame_checked = any(self._is_flame_theme(name) for name in self.get_checked_theme_names())
+        checked = self.get_checked_theme_names()
+        flame_checked = any(self._is_flame_theme(name) for name in checked)
+        sound_checked = any(self._is_sound_visualizer_theme(name) for name in checked)
         try:
-            if flame_checked:
+            if sound_checked:
+                self.flame_tune_button.configure(state="normal", bg="#194063", fg="white", activebackground="#245a8a")
+            elif flame_checked:
                 self.flame_tune_button.configure(state="normal", bg="#4b2a10", fg="white", activebackground="#6a3a14")
             else:
-                # Still available so a Flame theme can be tuned before selecting it,
-                # but dimmed to show it is Flame-specific.
+                # Still available so a tunable theme can be adjusted before selecting it.
                 self.flame_tune_button.configure(state="normal", bg="#2a1a10", fg="#cccccc", activebackground="#4b2a10")
         except Exception:
             pass
@@ -7191,7 +8013,7 @@ class PixelChallengeConsole:
                   bg="#1a0a2e", fg="white", activebackground="#2d1055", activeforeground="white",
                   relief="raised", bd=2, font=("Arial", 12, "bold"),
                   width=2, pady=4, cursor="hand2").pack(pady=(2, 4))
-        self.flame_tune_button = tk.Button(arrow_frame, text="TUNE", command=self.open_flame_tune_popup,
+        self.flame_tune_button = tk.Button(arrow_frame, text="TUNE", command=self.open_theme_tune_popup,
                   bg="#2a1a10", fg="#cccccc", activebackground="#4b2a10", activeforeground="white",
                   relief="raised", bd=2, font=("Arial", 9, "bold"),
                   width=5, pady=4, cursor="hand2")
@@ -7871,21 +8693,882 @@ class PixelChallengeConsole:
     # =========================================================================
     # CONFIG WINDOW
     # =========================================================================
-    def open_config_window(self):
+    def open_splash_config_window(self):
+        """Friendly global/Splash config editor. Raw JSON editor remains available for game configs."""
+        if self.splash_config_window and tk.Toplevel.winfo_exists(self.splash_config_window):
+            self.splash_config_window.focus_set()
+            return
+        config = self.load_global_game_config()
+        config, warnings = self._validate_global_game_config(config)
+
+        win = tk.Toplevel(self.root, bg="#0f0617")
+        self.splash_config_window = win
+        win.title("Splash / Global Config")
+        win.geometry("760x620")
+        win.minsize(700, 560)
+        win.transient(self.root)
+        win.grab_set()
+
+        header = tk.Frame(win, bg="#0f0617")
+        header.pack(fill="x", padx=14, pady=(12, 6))
+        tk.Label(header, text="Splash / Global Config", bg="#0f0617", fg="white",
+                 font=("Arial", 20, "bold")).pack(anchor="w")
+        tk.Label(header, text="Operator-friendly global settings. Values are validated and saved to games/global.config.json.",
+                 bg="#0f0617", fg="#cfd3ff", font=("Arial", 11)).pack(anchor="w", pady=(2, 0))
+
+        status_var = tk.StringVar(value="Ready. This editor self-corrects unsafe or missing values before saving.")
+        if warnings:
+            status_var.set("Loaded and corrected: " + "; ".join(warnings))
+
+        style = ttk.Style()
+        try:
+            style.configure("Splash.TNotebook", background="#0f0617", borderwidth=0)
+            style.configure("Splash.TNotebook.Tab", padding=(12, 6), font=("Arial", 10, "bold"))
+        except Exception:
+            pass
+        notebook = ttk.Notebook(win, style="Splash.TNotebook")
+        notebook.pack(fill="both", expand=True, padx=14, pady=6)
+
+        vars_ = {}
+        def bool_var(key, value):
+            v = tk.BooleanVar(value=_safe_bool(value, False))
+            vars_[key] = v
+            return v
+        def str_var(key, value):
+            v = tk.StringVar(value=str(value))
+            vars_[key] = v
+            return v
+        def double_var(key, value):
+            v = tk.DoubleVar(value=float(value))
+            vars_[key] = v
+            return v
+        def int_var(key, value):
+            v = tk.IntVar(value=int(value))
+            vars_[key] = v
+            return v
+
+        def make_tab(title):
+            outer = tk.Frame(notebook, bg="#12061f")
+            notebook.add(outer, text=title)
+            body = tk.Frame(outer, bg="#12061f")
+            body.pack(fill="both", expand=True, padx=18, pady=16)
+            body.grid_columnconfigure(1, weight=1)
+            return body
+
+        def label(parent, row, text, help_text=None):
+            tk.Label(parent, text=text, bg="#12061f", fg="white", font=("Arial", 12, "bold")).grid(row=row, column=0, sticky="w", padx=(0, 12), pady=8)
+            if help_text:
+                tk.Label(parent, text=help_text, bg="#12061f", fg="#aeb6ff", font=("Arial", 9), wraplength=380, justify="left").grid(row=row+1, column=1, sticky="w", pady=(0, 4))
+
+        def check(parent, row, text, var):
+            cb = tk.Checkbutton(parent, text=text, variable=var, bg="#12061f", fg="white",
+                                activebackground="#12061f", activeforeground="white",
+                                selectcolor="#261035", font=("Arial", 12, "bold"))
+            cb.grid(row=row, column=1, sticky="w", pady=8)
+            return cb
+
+        # General tab
+        gen = make_tab("General")
+        difficulty = str_var("difficulty", config.get("difficulty", "normal"))
+        show_scoreboard = bool_var("show_scoreboard", config.get("show_scoreboard", True))
+        invert_playfield = bool_var("invert_playfield", config.get("invert_playfield", True))
+        sound_pack = str_var("sound_pack", config.get("sound_pack", "default"))
+        label(gen, 0, "Game Baseline")
+        ttk.Combobox(gen, textvariable=difficulty, values=("casual", "normal", "challenge", "tournament"), state="readonly", width=18).grid(row=0, column=1, sticky="w", pady=8)
+        label(gen, 2, "Scoreboard")
+        check(gen, 2, "Show scoreboard/results when games finish", show_scoreboard)
+        label(gen, 3, "Invert Playfield", "Keep ON for the inverted physical lane orientation unless testing raw wiring.")
+        check(gen, 3, "Invert physical lane orientation", invert_playfield)
+        label(gen, 5, "Sound Pack")
+        ttk.Combobox(gen, textvariable=sound_pack, values=self._sound_pack_choices(), state="readonly", width=22).grid(row=5, column=1, sticky="w", pady=8)
+
+        # SLA tab
+        sla_cfg = config.get("sla", {})
+        sla = make_tab("Adaptive Assistance")
+        sla_enabled = bool_var("sla.enabled", sla_cfg.get("enabled", True))
+        sla_mode = str_var("sla.mode", sla_cfg.get("mode", "adaptive"))
+        sla_strength = double_var("sla.assist_strength", sla_cfg.get("assist_strength", 1.0))
+        sla_reassess = bool_var("sla.allow_game_reassessment", sla_cfg.get("allow_game_reassessment", True))
+        sla_debug = bool_var("sla.show_debug", sla_cfg.get("show_debug", False))
+        sla_min_games = int_var("sla.min_games_for_valid_sla", sla_cfg.get("min_games_for_valid_sla", 1))
+        sla_reset = bool_var("sla.reset_on_new_checkin", sla_cfg.get("reset_on_new_checkin", True))
+        sla_history = bool_var("sla.save_to_history", sla_cfg.get("save_to_history", True))
+        label(sla, 0, "Adaptive Assistance", "Global SLA master switch. Keep ON for public play; turn OFF for fixed/tournament testing.")
+        check(sla, 0, "Enable SLA / Adaptive Assistance", sla_enabled)
+        label(sla, 2, "Mode")
+        ttk.Combobox(sla, textvariable=sla_mode, values=("adaptive", "fixed", "off"), state="readonly", width=18).grid(row=2, column=1, sticky="w", pady=8)
+        label(sla, 3, "Assist Strength")
+        tk.Scale(sla, from_=0.0, to=2.0, resolution=0.05, orient="horizontal", variable=sla_strength,
+                 bg="#12061f", fg="white", troughcolor="#2a1340", highlightthickness=0, length=320).grid(row=3, column=1, sticky="ew", pady=8)
+        label(sla, 4, "Continued Assessment")
+        check(sla, 4, "Allow games to keep reassessing during play", sla_reassess)
+        label(sla, 5, "Minimum Games")
+        tk.Spinbox(sla, from_=1, to=10, textvariable=sla_min_games, width=6, bg="#1b0b28", fg="white", insertbackground="white").grid(row=5, column=1, sticky="w", pady=8)
+        label(sla, 6, "Session Behavior")
+        frame_sla = tk.Frame(sla, bg="#12061f")
+        frame_sla.grid(row=6, column=1, sticky="w", pady=8)
+        tk.Checkbutton(frame_sla, text="Reset on new check-in", variable=sla_reset, bg="#12061f", fg="white", activebackground="#12061f", activeforeground="white", selectcolor="#261035").pack(side="left", padx=(0, 16))
+        tk.Checkbutton(frame_sla, text="Save SLA history", variable=sla_history, bg="#12061f", fg="white", activebackground="#12061f", activeforeground="white", selectcolor="#261035").pack(side="left")
+        label(sla, 7, "Debug")
+        check(sla, 7, "Show SLA debug logging", sla_debug)
+
+        # Controller/Rumble tab
+        rumble_cfg = config.get("controller_rumble", {})
+        actions_cfg = config.get("controller_actions", {})
+        ctrl = make_tab("Controllers")
+        rumble_enabled = bool_var("controller_rumble.enabled", rumble_cfg.get("enabled", True))
+        rumble_dmx = bool_var("controller_rumble.dmx_enabled", rumble_cfg.get("dmx_enabled", True))
+        rumble_low = double_var("controller_rumble.hit_low_frequency", rumble_cfg.get("hit_low_frequency", 0.85))
+        rumble_high = double_var("controller_rumble.hit_high_frequency", rumble_cfg.get("hit_high_frequency", 0.35))
+        rumble_duration = int_var("controller_rumble.hit_duration_ms", rumble_cfg.get("hit_duration_ms", 450))
+        rumble_cooldown = int_var("controller_rumble.cooldown_ms", rumble_cfg.get("cooldown_ms", 250))
+        actions_enabled = bool_var("controller_actions.enabled", actions_cfg.get("enabled", True))
+        xbox_enabled = bool_var("controller_actions.xbox_profile_enabled", actions_cfg.get("xbox_profile_enabled", True))
+        label(ctrl, 0, "Controller Rumble")
+        check(ctrl, 0, "Enable controller rumble", rumble_enabled)
+        label(ctrl, 1, "DMX Rumble Mirror")
+        check(ctrl, 1, "Flash DMX/lighting when rumble events fire", rumble_dmx)
+        label(ctrl, 2, "Rumble Low / High")
+        rh = tk.Frame(ctrl, bg="#12061f")
+        rh.grid(row=2, column=1, sticky="ew", pady=8)
+        tk.Scale(rh, from_=0.0, to=1.0, resolution=0.05, orient="horizontal", variable=rumble_low,
+                 bg="#12061f", fg="white", troughcolor="#2a1340", highlightthickness=0, length=150).pack(side="left", padx=(0, 12))
+        tk.Scale(rh, from_=0.0, to=1.0, resolution=0.05, orient="horizontal", variable=rumble_high,
+                 bg="#12061f", fg="white", troughcolor="#2a1340", highlightthickness=0, length=150).pack(side="left")
+        label(ctrl, 3, "Rumble Timing")
+        rt = tk.Frame(ctrl, bg="#12061f")
+        rt.grid(row=3, column=1, sticky="w", pady=8)
+        tk.Label(rt, text="Duration ms", bg="#12061f", fg="#cfd3ff").pack(side="left")
+        tk.Spinbox(rt, from_=0, to=5000, increment=25, textvariable=rumble_duration, width=7, bg="#1b0b28", fg="white", insertbackground="white").pack(side="left", padx=(6, 16))
+        tk.Label(rt, text="Cooldown ms", bg="#12061f", fg="#cfd3ff").pack(side="left")
+        tk.Spinbox(rt, from_=0, to=5000, increment=25, textvariable=rumble_cooldown, width=7, bg="#1b0b28", fg="white", insertbackground="white").pack(side="left", padx=6)
+        label(ctrl, 4, "Controller Actions")
+        check(ctrl, 4, "Enable gamepad action/color forwarding", actions_enabled)
+        label(ctrl, 5, "Xbox Profile")
+        check(ctrl, 5, "Enable Xbox/Switch-style color profile", xbox_enabled)
+
+        # Active games tab
+        games_tab = make_tab("Active Games")
+        tk.Label(games_tab, text="Controller action/color forwarding applies to these games:", bg="#12061f", fg="#cfd3ff", font=("Arial", 11)).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
+        active_games = set((actions_cfg.get("active_games") or []))
+        game_vars = {}
+        game_choices = (("dot_dash", "Dot Dash"), ("pixel_pop", "Pixel Pop"), ("surround", "Surround"), ("ascend", "Ascend"))
+        for idx, (key, title) in enumerate(game_choices, start=1):
+            gv = tk.BooleanVar(value=key in active_games)
+            game_vars[key] = gv
+            tk.Checkbutton(games_tab, text=title, variable=gv, bg="#12061f", fg="white",
+                           activebackground="#12061f", activeforeground="white", selectcolor="#261035",
+                           font=("Arial", 12, "bold")).grid(row=idx, column=0, sticky="w", pady=6)
+
+        # Advanced tab
+        adv = make_tab("Advanced")
+        tk.Label(adv, text="Most operators should not need raw JSON anymore.", bg="#12061f", fg="white", font=("Arial", 13, "bold")).pack(anchor="w", pady=(0, 8))
+        tk.Label(adv, text="Use Raw JSON only when adding new experimental fields that the guided editor does not expose yet.", bg="#12061f", fg="#cfd3ff", wraplength=620, justify="left").pack(anchor="w")
+        def open_raw_from_gui():
+            self.close_splash_config_window()
+            # Temporarily bypass Splash-friendly branch by opening the raw editor directly.
+            self.open_raw_config_window(self.config_path_for_current_game())
+        self.neon_button(adv, "OPEN RAW JSON", open_raw_from_gui, bg="#9440ff", width=16).pack(anchor="w", pady=18)
+
+        status = tk.Label(win, textvariable=status_var, bg="#0f0617", fg="#ffdf6e", font=("Arial", 10), wraplength=700, justify="left")
+        status.pack(fill="x", padx=14, pady=(0, 6))
+
+        def collect_config():
+            raw = copy.deepcopy(config)
+            raw["difficulty"] = difficulty.get()
+            raw["show_scoreboard"] = bool(show_scoreboard.get())
+            raw["invert_playfield"] = bool(invert_playfield.get())
+            raw["sound_pack"] = sound_pack.get().strip() or "default"
+            raw["sla"] = {
+                "enabled": bool(sla_enabled.get()),
+                "mode": sla_mode.get(),
+                "assist_strength": float(sla_strength.get()),
+                "allow_game_reassessment": bool(sla_reassess.get()),
+                "show_debug": bool(sla_debug.get()),
+                "min_games_for_valid_sla": int(sla_min_games.get()),
+                "accuracy_weight": _safe_float(sla_cfg.get("accuracy_weight"), DEFAULT_SLA_GLOBAL["accuracy_weight"]),
+                "reaction_weight": _safe_float(sla_cfg.get("reaction_weight"), DEFAULT_SLA_GLOBAL["reaction_weight"]),
+                "reset_on_new_checkin": bool(sla_reset.get()),
+                "save_to_history": bool(sla_history.get()),
+                "calibration": copy.deepcopy(sla_cfg.get("calibration") or DEFAULT_SLA_GLOBAL["calibration"]),
+            }
+            raw["controller_rumble"] = {
+                "enabled": bool(rumble_enabled.get()),
+                "hit_low_frequency": float(rumble_low.get()),
+                "hit_high_frequency": float(rumble_high.get()),
+                "hit_duration_ms": int(rumble_duration.get()),
+                "cooldown_ms": int(rumble_cooldown.get()),
+                "dmx_enabled": bool(rumble_dmx.get()),
+                "dmx_duration_ms": int(rumble_cfg.get("dmx_duration_ms", rumble_duration.get())),
+            }
+            actions = copy.deepcopy(actions_cfg if isinstance(actions_cfg, dict) else DEFAULT_CONTROLLER_ACTIONS)
+            actions["enabled"] = bool(actions_enabled.get())
+            actions["xbox_profile_enabled"] = bool(xbox_enabled.get())
+            actions["active_games"] = [key for key, gv in game_vars.items() if gv.get()]
+            raw["controller_actions"] = actions
+            return raw
+
+        def save_gui():
+            try:
+                normalized, save_warnings = self._save_global_game_config(collect_config(), log_change=True)
+                message = "Saved Splash / Global Config."
+                if save_warnings:
+                    message += "\n\nCorrections:\n- " + "\n- ".join(save_warnings)
+                    status_var.set("Saved with corrections: " + "; ".join(save_warnings))
+                else:
+                    status_var.set("Saved. Global config applied to Falcon, controller actions, rumble, and SLA.")
+                messagebox.showinfo("Splash Config", message)
+            except Exception as e:
+                messagebox.showerror("Splash Config", f"Failed to save: {e}")
+
+        def reset_defaults():
+            if not messagebox.askyesno("Reset", "Reset Splash / Global Config to safe defaults?"):
+                return
+            try:
+                normalized, _warnings = self._save_global_game_config(self._default_global_game_config(), log_change=True)
+                messagebox.showinfo("Reset", "Defaults saved. Reopen CONFIG to view refreshed values.")
+                self.close_splash_config_window()
+            except Exception as e:
+                messagebox.showerror("Reset", f"Failed to reset: {e}")
+
+        buttons = tk.Frame(win, bg="#0f0617")
+        buttons.pack(fill="x", padx=14, pady=(4, 12))
+        self.neon_button(buttons, "SAVE", save_gui, bg="#2ea62e", width=10).pack(side="left", padx=(0, 8))
+        self.neon_button(buttons, "RESET DEFAULTS", reset_defaults, bg="#c9871e", width=16).pack(side="left", padx=8)
+        self.neon_button(buttons, "CLOSE", self.close_splash_config_window, bg="#c93b1e", width=10).pack(side="right")
+
+    def close_splash_config_window(self):
+        if self.splash_config_window and tk.Toplevel.winfo_exists(self.splash_config_window):
+            try:
+                self.splash_config_window.grab_release()
+            except Exception:
+                pass
+            self.splash_config_window.destroy()
+        self.splash_config_window = None
+
+
+    def _friendly_config_label(self, key):
+        text = str(key).replace("_", " ").strip()
+        if not text:
+            return "Value"
+        return " ".join(part.upper() if part in {"sla", "dmx", "ip", "id"} else part.capitalize() for part in text.split())
+
+    def _short_config_help(self, path_tuple, value):
+        key = str(path_tuple[-1]).lower() if path_tuple else ""
+        joined = ".".join(str(p).lower() for p in path_tuple)
+        hints = {
+            "spawn_chance_per_sec": "Higher values create bands more often.",
+            "min_simultaneous": "Minimum active bands the game tries to keep alive.",
+            "max_simultaneous": "Upper safety limit for active bands.",
+            "min_spacing_px": "Minimum distance between bands; larger is more forgiving.",
+            "band_speed_min": "Slowest falling-band speed for this leg.",
+            "band_speed_max": "Fastest falling-band speed for this leg.",
+            "fragment_speed_px_per_sec": "How fast 1x1 build fragments travel.",
+            "fragment_interval_sec": "How soon the next build fragment launches.",
+            "pixel_tick_every_n": "Play one construction tick every N placed pixels.",
+            "pixel_tick_min_interval_sec": "Prevents construction ticks from playing too fast.",
+            "hit_grace_sec": "Temporary protection after a collision/respawn.",
+            "respawn_clear_zone_px": "Clears danger near the respawn point.",
+            "invert_joystick_y": "Flip up/down input if joystick direction feels reversed.",
+            "ground_move_points_per_px": "Points earned while moving upward on the ground.",
+            "collision_penalty": "Score penalty when the player hits a danger band.",
+            "wrong_color_penalty": "Penalty when firing the wrong color in a color-match phase.",
+        }
+        if key in hints:
+            return hints[key]
+        if "brightness" in joined:
+            return "Usually 0.0 to 1.0. Higher is brighter."
+        if "speed" in joined:
+            return "Higher is faster unless the field name says delay/time."
+        if "enabled" in joined:
+            return "Turn this behavior on or off."
+        if "color" in joined:
+            return "Use a named color such as red, orange, yellow, green, blue, purple, cyan, or white."
+        return ""
+
+    def _sound_pack_choices(self):
+        """Known operator-facing sound pack choices. Keep compact and safe."""
+        choices = ["default", "quiet", "arcade", "retro", "event", "off"]
+        try:
+            audio_root = os.path.join(PROJECT_ROOT, "assets", "audio")
+            if os.path.isdir(audio_root):
+                for name in sorted(os.listdir(audio_root)):
+                    path = os.path.join(audio_root, name)
+                    if os.path.isdir(path) and name not in choices:
+                        choices.append(name)
+        except Exception:
+            pass
+        return tuple(choices)
+
+    def _splash_soundtrack_choices(self):
+        return ("default", "main", "dot_dash", "pixel_pop", "surround", "ascend", "off")
+
+    def _known_audio_key_choices(self):
+        keys = ["none", "off"]
+        try:
+            audio_root = os.path.join(PROJECT_ROOT, "assets", "audio")
+            if os.path.isdir(audio_root):
+                for root, _dirs, files in os.walk(audio_root):
+                    for fname in files:
+                        stem, ext = os.path.splitext(fname)
+                        if ext.lower() in (".wav", ".ogg", ".mp3") and stem not in keys:
+                            keys.append(stem)
+        except Exception:
+            pass
+        # Common logical keys used by Ascend/configs even if placeholder files are not present yet.
+        for stem in (
+            "as_music_gameplay", "as_music_victory", "as_band_build_start", "as_band_build_tick",
+            "as_band_build_complete", "as_move_forward", "as_move_backward", "as_jump", "as_land",
+            "as_player_hit", "as_warp", "as_wall_build_start", "as_wall_build_tick",
+            "as_wall_build_complete", "as_laser_fire", "as_wall_hit", "as_wall_break",
+            "as_wall_miss", "as_launch", "as_glass_break", "as_game_over", "as_winner"
+        ):
+            if stem not in keys:
+                keys.append(stem)
+        return tuple(keys)
+
+    def _short_config_tab_title(self, title):
+        mapping = {
+            "Game Info": "Info",
+            "Difficulty Presets": "Presets",
+            "SLA Scaling": "SLA",
+            "Audio Build": "Build Audio",
+            "Winner Sound": "Winner",
+            "Game Over": "Game Over",
+            "Intro Build": "Intro",
+            "Projectile": "Shot",
+            "Visuals": "Visual",
+        }
+        if title in mapping:
+            return mapping[title]
+        text = str(title).strip()
+        if len(text) <= 12:
+            return text
+        parts = text.replace("_", " ").split()
+        if len(parts) > 1:
+            candidate = " ".join(p[:4].title() for p in parts[:2])
+            return candidate[:12]
+        return text[:12]
+
+    def _bind_mousewheel_to_canvas(self, widget, canvas):
+        def _on_mousewheel(event):
+            try:
+                delta = event.delta
+                if delta == 0:
+                    return
+                canvas.yview_scroll(int(-1 * (delta / 120)), "units")
+            except Exception:
+                pass
+        def _on_button4(event):
+            try:
+                canvas.yview_scroll(-3, "units")
+            except Exception:
+                pass
+        def _on_button5(event):
+            try:
+                canvas.yview_scroll(3, "units")
+            except Exception:
+                pass
+        for target in (widget, canvas):
+            target.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _on_mousewheel))
+            target.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
+            target.bind("<Button-4>", _on_button4)
+            target.bind("<Button-5>", _on_button5)
+
+    def _config_value_choices(self, path_tuple, value):
+        key = str(path_tuple[-1]).lower() if path_tuple else ""
+        joined = ".".join(str(p).lower() for p in path_tuple)
+        if not isinstance(value, str):
+            return None
+
+        if key in {"sound_pack", "soundpack", "audio_pack"}:
+            return self._sound_pack_choices()
+        if key in {"soundtrack", "music_pack", "splash_music", "splash_soundtrack"}:
+            return self._splash_soundtrack_choices()
+        if joined.startswith("audio.events") or key.endswith("_sound") or key.endswith("_music") or key in {
+            "music_gameplay", "victory_music", "leg_start", "leg_complete", "intro_build",
+            "move_forward", "move_backward", "jump", "land", "hit", "warp", "wall_build",
+            "wall_build_complete", "fire", "wall_hit", "wall_break", "wall_miss",
+            "launch", "glass_break", "game_over", "winner", "band_tick_sound", "wall_tick_sound"
+        }:
+            return self._known_audio_key_choices()
+        if key in {"difficulty", "difficulty_preset"}:
+            return ("easy", "casual", "normal", "hard", "challenge", "tournament")
+        if key == "input_priority":
+            return ("joystick", "buttons", "joystick_then_buttons", "buttons_then_joystick", "latest_input")
+        if key in {"mode"} and "game_over" in joined:
+            return ("after_glass_complete", "timeout", "first_place_finish", "all_players_finish")
+        if key in {"mode"} and "sla" in joined:
+            return ("adaptive", "fixed", "off")
+        if key in {"mode"}:
+            return ("normal", "manual", "auto", "adaptive", "fixed", "off")
+        if key in {"build_order"}:
+            return ("bottom_to_top", "top_to_bottom")
+        if key in {"collapse_mode"}:
+            return ("top_to_bottom", "center_to_edges", "edges_to_center", "fade")
+        if key in {"hit_destroys"}:
+            return ("head_only", "whole_band", "none")
+        if key in {"band_size_mode"}:
+            return ("fixed", "varied")
+        if key in {"play_when"}:
+            return ("first_place_finish", "last_player_finish")
+        if "color" in joined and (value.lower() in COLOR_MAP or key.endswith("color")):
+            return tuple(k for k in COLOR_MAP.keys() if k != "off")
+        return None
+
+    def _default_game_config_for_key(self, game_key):
+        # Safe fallback used only when a game config file is missing or badly corrupt.
+        if game_key == "dot_dash":
+            return {
+                "countdown_seconds": 5,
+                "lane_pixel_count": self.get_pixels_per_lane(),
+                "dash_length": 3,
+                "round_timeout_sec": 50,
+                "show_scoreboard": True,
+                "sound_pack": "default",
+                "difficulty_preset": "normal",
+                "brightness": {"countdown_red": 0.5, "armed_green": 1.0, "gameplay": 1.0, "finish_red": 1.0},
+                "scoring": {"reaction_weight": 120, "completion_weight": 40, "accuracy_weight": 300, "consistency_weight": 200, "first_finisher_bonus": 200},
+            }
+        if game_key == "pixel_pop":
+            return {
+                "game_duration_sec": 60,
+                "lives_enabled": False,
+                "lives_count": 3,
+                "lanes": {
+                    "left": {"snake_speed_ms": 500, "band_count_min": 4, "band_count_max": 6, "band_size_mode": "varied", "reverse_direction": True},
+                    "right": {"snake_speed_ms": 300, "band_count_min": 2, "band_count_max": 3, "band_size_mode": "fixed", "band_size_fixed_px": 5, "reverse_direction": True},
+                },
+                "snake": {"start_length": 20, "growth_on_wrong_hit": 2, "min_speed_ms": 100, "respawn_delay_ms": 250},
+                "bands": {"colors_enabled": ["white", "orange", "red", "green", "blue"]},
+            }
+        if game_key == "surround":
+            return {"difficulty": "normal", "show_scoreboard": True, "sound_pack": "default", "notes": "auto-created by guided config editor"}
+        if game_key == "ascend":
+            return {"game_info": {"name": "Ascend"}, "gameplay": {"climb_legs": 6}}
+        return {"difficulty": "normal", "show_scoreboard": True, "sound_pack": "default"}
+
+    def _load_game_config_for_editor(self, path):
+        warnings = []
+        game_key = self.current_game_key()
+        default = self._default_game_config_for_key(game_key)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        if not os.path.exists(path):
+            warnings.append("Config file was missing; created safe defaults.")
+            return copy.deepcopy(default), warnings
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if not isinstance(data, dict):
+                warnings.append("Config was not a JSON object; restored safe defaults.")
+                return copy.deepcopy(default), warnings
+            return data, warnings
+        except Exception as e:
+            # Back up the bad file instead of silently destroying it.
+            try:
+                backup = f"{path}.bad-{time.strftime('%Y%m%d-%H%M%S')}"
+                os.replace(path, backup)
+                warnings.append(f"Config JSON was invalid and was backed up to {os.path.basename(backup)}.")
+            except Exception:
+                warnings.append(f"Config JSON was invalid: {e}")
+            return copy.deepcopy(default), warnings
+
+    def _assign_config_path_value(self, root, path_tuple, value):
+        target = root
+        for key in path_tuple[:-1]:
+            if not isinstance(target.get(key), dict):
+                target[key] = {}
+            target = target[key]
+        target[path_tuple[-1]] = value
+
+    def _parse_config_editor_value(self, kind, var, meta):
+        if kind == "bool":
+            return bool(var.get())
+        if kind == "int":
+            return _safe_int(var.get(), meta.get("default", 0))
+        if kind == "float":
+            return _safe_float(var.get(), meta.get("default", 0.0))
+        if kind == "list":
+            text = var.get().strip()
+            if text == "":
+                return []
+            original = meta.get("original", [])
+            # Prefer comma-separated editing for normal color/name/number lists.
+            parts = [p.strip() for p in text.split(",") if p.strip() != ""]
+            if original and all(isinstance(x, int) and not isinstance(x, bool) for x in original):
+                return [_safe_int(p, 0) for p in parts]
+            if original and all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in original):
+                return [_safe_float(p, 0.0) for p in parts]
+            return parts
+        if kind == "json":
+            return json.loads(var.get().strip() or "null")
+        return str(var.get())
+
+    def _validate_game_config_for_editor(self, game_key, config):
+        """Best-effort self-correction for game configs edited through the guided GUI."""
+        warnings = []
+        if not isinstance(config, dict):
+            return self._default_game_config_for_key(game_key), ["Config was not an object; restored defaults."]
+        cfg = copy.deepcopy(config)
+
+        def clamp_num(section, key, low=None, high=None, default=0.0, integer=False):
+            if not isinstance(section, dict) or key not in section:
+                return
+            old = section.get(key)
+            val = _safe_int(old, default) if integer else _safe_float(old, default)
+            if low is not None and val < low:
+                val = low
+            if high is not None and val > high:
+                val = high
+            if integer:
+                val = int(val)
+            if val != old:
+                warnings.append(f"{key} corrected to {val}.")
+            section[key] = val
+
+        def ensure_min_max(section, min_key, max_key, label):
+            if not isinstance(section, dict):
+                return
+            if min_key in section and max_key in section:
+                mn = _safe_float(section.get(min_key), 0)
+                mx = _safe_float(section.get(max_key), mn)
+                if mx < mn:
+                    section[max_key] = section[min_key]
+                    warnings.append(f"{label}: {max_key} was below {min_key}; raised to match.")
+
+        if game_key == "ascend":
+            bands = cfg.setdefault("bands", {})
+            clamp_num(bands, "height_min", 1, 200, 1, True)
+            clamp_num(bands, "height_max", 1, 200, 6, True)
+            ensure_min_max(bands, "height_min", "height_max", "Bands")
+            clamp_num(bands, "min_spacing_px", 0, 1000, 20, True)
+            clamp_num(bands, "min_simultaneous", 0, 50, 2, True)
+            clamp_num(bands, "max_simultaneous", 1, 100, 6, True)
+            legs = cfg.get("legs") if isinstance(cfg.get("legs"), dict) else {}
+            highest_leg_min = 0
+            for leg_id, leg in legs.items():
+                if not isinstance(leg, dict):
+                    continue
+                clamp_num(leg, "spawn_chance_per_sec", 0.0, 10.0, 0.2, False)
+                clamp_num(leg, "band_speed_min", 0.1, 500.0, 5.0, False)
+                clamp_num(leg, "band_speed_max", 0.1, 500.0, 10.0, False)
+                ensure_min_max(leg, "band_speed_min", "band_speed_max", f"Leg {leg_id}")
+                clamp_num(leg, "min_simultaneous", 0, 50, bands.get("min_simultaneous", 2), True)
+                highest_leg_min = max(highest_leg_min, _safe_int(leg.get("min_simultaneous"), 0))
+            if _safe_int(bands.get("max_simultaneous"), 0) < highest_leg_min:
+                bands["max_simultaneous"] = highest_leg_min
+                warnings.append(f"bands.max_simultaneous raised to {highest_leg_min} so it is not below a leg minimum.")
+            intro = cfg.setdefault("intro_build", {})
+            clamp_num(intro, "fragment_speed_px_per_sec", 1, 5000, 500, False)
+            clamp_num(intro, "fragment_interval_sec", 0.001, 10.0, 0.015, False)
+            audio_build = cfg.setdefault("audio_build", {})
+            audio_build.setdefault("pixel_tick_enabled", True)
+            clamp_num(audio_build, "pixel_tick_every_n", 1, 1000, 2, True)
+            clamp_num(audio_build, "pixel_tick_min_interval_sec", 0.0, 5.0, 0.035, False)
+        elif game_key == "pixel_pop":
+            clamp_num(cfg, "game_duration_sec", 5, 3600, 60, True)
+            clamp_num(cfg, "lives_count", 1, 99, 3, True)
+            lanes = cfg.get("lanes") if isinstance(cfg.get("lanes"), dict) else {}
+            for lane_name, lane in lanes.items():
+                if not isinstance(lane, dict):
+                    continue
+                clamp_num(lane, "snake_speed_ms", 10, 10000, 500, True)
+                clamp_num(lane, "band_count_min", 0, 100, 1, True)
+                clamp_num(lane, "band_count_max", 0, 100, 3, True)
+                ensure_min_max(lane, "band_count_min", "band_count_max", f"{lane_name} lane")
+            snake = cfg.get("snake") if isinstance(cfg.get("snake"), dict) else {}
+            clamp_num(snake, "start_length", 1, 1000, 20, True)
+            clamp_num(snake, "min_speed_ms", 1, 10000, 100, True)
+            bands = cfg.get("bands") if isinstance(cfg.get("bands"), dict) else {}
+            if isinstance(bands.get("colors_enabled"), list) and not bands["colors_enabled"]:
+                bands["colors_enabled"] = ["white", "orange", "red", "green", "blue"]
+                warnings.append("Pixel Pop colors_enabled was empty; restored default colors.")
+        elif game_key == "dot_dash":
+            clamp_num(cfg, "countdown_seconds", 0, 60, 5, True)
+            clamp_num(cfg, "lane_pixel_count", 1, 1000, self.get_pixels_per_lane(), True)
+            clamp_num(cfg, "dash_length", 1, 100, 3, True)
+            clamp_num(cfg, "round_timeout_sec", 1, 3600, 50, True)
+            preset = str(cfg.get("difficulty_preset", "normal")).lower()
+            if preset not in {"easy", "normal", "hard", "casual", "challenge", "tournament"}:
+                cfg["difficulty_preset"] = "normal"
+                warnings.append("difficulty_preset was not recognized; changed to normal.")
+        elif game_key == "surround":
+            if "difficulty" in cfg:
+                difficulty = str(cfg.get("difficulty") or "normal").lower()
+                if difficulty not in {"easy", "normal", "hard", "casual", "challenge", "tournament"}:
+                    cfg["difficulty"] = "normal"
+                    warnings.append("Surround difficulty was not recognized; changed to normal.")
+        return cfg, warnings
+
+    def _make_scrollable_config_tab(self, notebook, title):
+        outer = tk.Frame(notebook, bg="#12061f")
+        notebook.add(outer, text=self._short_config_tab_title(title))
+        canvas = tk.Canvas(outer, bg="#12061f", highlightthickness=0)
+        scroll = ttk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+        body = tk.Frame(canvas, bg="#12061f")
+        body.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas_window = canvas.create_window((0, 0), window=body, anchor="nw")
+        canvas.configure(yscrollcommand=scroll.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        scroll.pack(side="right", fill="y")
+        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(canvas_window, width=e.width))
+        self._bind_mousewheel_to_canvas(body, canvas)
+        return body
+
+    def _make_scrollable_config_page(self, container):
+        """Scrollable page body for the guided config editor's wrapped navigation."""
+        outer = tk.Frame(container, bg="#12061f")
+        canvas = tk.Canvas(outer, bg="#12061f", highlightthickness=0)
+        scroll = ttk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+        body = tk.Frame(canvas, bg="#12061f")
+        body.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas_window = canvas.create_window((0, 0), window=body, anchor="nw")
+        canvas.configure(yscrollcommand=scroll.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        scroll.pack(side="right", fill="y")
+        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(canvas_window, width=e.width))
+        self._bind_mousewheel_to_canvas(body, canvas)
+        return outer, body
+
+    def _render_config_editor_section(self, parent, data, prefix, bindings, depth=0):
+        row = 0
+        for key, value in data.items():
+            path_tuple = tuple(prefix) + (key,)
+            label_text = self._friendly_config_label(key)
+            help_text = self._short_config_help(path_tuple, value)
+            if isinstance(value, dict):
+                frame = tk.LabelFrame(parent, text=label_text, bg="#12061f", fg="#ffdf6e",
+                                      font=("Arial", 11, "bold"), bd=2, relief="groove", labelanchor="nw")
+                frame.grid(row=row, column=0, columnspan=3, sticky="ew", padx=8 + depth * 8, pady=8)
+                frame.grid_columnconfigure(1, weight=1)
+                self._render_config_editor_section(frame, value, path_tuple, bindings, depth + 1)
+                row += 1
+                continue
+
+            tk.Label(parent, text=label_text, bg="#12061f", fg="white",
+                     font=("Arial", 10, "bold"), anchor="w", width=22).grid(
+                         row=row, column=0, sticky="nw", padx=(8 + depth * 8, 10), pady=(7, 2))
+            control_frame = tk.Frame(parent, bg="#12061f")
+            control_frame.grid(row=row, column=1, sticky="w", pady=(5, 2))
+            parent.grid_columnconfigure(1, weight=1)
+
+            kind = "str"
+            meta = {"default": value, "original": value}
+            if isinstance(value, bool):
+                var = tk.BooleanVar(value=value)
+                tk.Checkbutton(control_frame, text="ON" if value else "OFF", variable=var,
+                               bg="#12061f", fg="white", activebackground="#12061f",
+                               activeforeground="white", selectcolor="#261035",
+                               font=("Arial", 10, "bold")).pack(anchor="w")
+                kind = "bool"
+            elif isinstance(value, int) and not isinstance(value, bool):
+                var = tk.StringVar(value=str(value))
+                tk.Spinbox(control_frame, from_=-100000, to=100000, increment=1,
+                           textvariable=var, width=10, bg="#1b0b28", fg="white",
+                           insertbackground="white").pack(anchor="w")
+                kind = "int"
+            elif isinstance(value, float):
+                var = tk.StringVar(value=str(value))
+                tk.Spinbox(control_frame, from_=-100000.0, to=100000.0, increment=0.01,
+                           textvariable=var, width=10, bg="#1b0b28", fg="white",
+                           insertbackground="white").pack(anchor="w")
+                kind = "float"
+            elif isinstance(value, list):
+                if all(not isinstance(x, (dict, list)) for x in value):
+                    var = tk.StringVar(value=", ".join(str(x) for x in value))
+                    width = 46 if len(str(var.get())) > 24 else 30
+                    tk.Entry(control_frame, textvariable=var, bg="#1b0b28", fg="white",
+                             insertbackground="white", font=("Arial", 10), width=width).pack(anchor="w")
+                    kind = "list"
+                else:
+                    var = tk.StringVar(value=json.dumps(value))
+                    tk.Entry(control_frame, textvariable=var, bg="#1b0b28", fg="white",
+                             insertbackground="white", font=("Consolas", 10), width=60).pack(anchor="w")
+                    kind = "json"
+            else:
+                choices = self._config_value_choices(path_tuple, value)
+                var = tk.StringVar(value=str(value))
+                if choices:
+                    ttk.Combobox(control_frame, textvariable=var, values=choices, state="readonly",
+                                 width=30).pack(anchor="w")
+                else:
+                    text_value = str(value)
+                    width = 70 if key in ("description", "notes", "note", "background_note") else 32
+                    tk.Entry(control_frame, textvariable=var, bg="#1b0b28", fg="white",
+                             insertbackground="white", font=("Arial", 10), width=width).pack(anchor="w")
+                kind = "str"
+
+            if help_text:
+                tk.Label(parent, text=help_text, bg="#12061f", fg="#aeb6ff", font=("Arial", 8),
+                         wraplength=420, justify="left").grid(row=row + 1, column=1, sticky="w", pady=(0, 5))
+                row += 2
+            else:
+                row += 1
+            bindings[path_tuple] = (kind, var, meta)
+
+    def open_game_config_window(self, path):
+        """Guided editor for the currently selected game's config JSON."""
+        if self.game_config_window and tk.Toplevel.winfo_exists(self.game_config_window):
+            self.game_config_window.focus_set()
+            return
+
+        game_name = self.selected_game.get()
+        game_key = self.current_game_key()
+        config, load_warnings = self._load_game_config_for_editor(path)
+        config, validation_warnings = self._validate_game_config_for_editor(game_key, config)
+        bindings = {}
+
+        win = tk.Toplevel(self.root, bg="#0f0617")
+        self.game_config_window = win
+        win.title(f"{game_name} Config")
+        win.geometry("980x700")
+        win.minsize(860, 600)
+        win.transient(self.root)
+        win.grab_set()
+
+        header = tk.Frame(win, bg="#0f0617")
+        header.pack(fill="x", padx=14, pady=(12, 6))
+        tk.Label(header, text=f"{game_name} Config", bg="#0f0617", fg="white", font=("Arial", 20, "bold")).pack(anchor="w")
+        tk.Label(header, text=f"Guided editor for {os.path.relpath(path, PROJECT_ROOT)}. Values are self-corrected before saving.", bg="#0f0617", fg="#cfd3ff", font=("Arial", 10), wraplength=820, justify="left").pack(anchor="w", pady=(2, 0))
+
+        all_warnings = load_warnings + validation_warnings
+        status_var = tk.StringVar(value="Ready. Use Save to write the corrected config file.")
+        if all_warnings:
+            status_var.set("Loaded with corrections: " + "; ".join(all_warnings))
+
+        nav_outer = tk.Frame(win, bg="#0f0617")
+        nav_outer.pack(fill="x", padx=14, pady=(4, 2))
+        tk.Label(nav_outer, text="Sections", bg="#0f0617", fg="#cfd3ff", font=("Arial", 9, "bold")).pack(anchor="w")
+        nav = tk.Frame(nav_outer, bg="#0f0617")
+        nav.pack(fill="x", pady=(2, 0))
+
+        page_container = tk.Frame(win, bg="#12061f", bd=2, relief="ridge")
+        page_container.pack(fill="both", expand=True, padx=14, pady=6)
+
+        pages = {}
+        nav_buttons = {}
+        page_order = []
+
+        def add_config_page(title, builder):
+            display_title = self._short_config_tab_title(title)
+            page_frame, body = self._make_scrollable_config_page(page_container)
+            builder(body)
+            pages[display_title] = page_frame
+            page_order.append(display_title)
+
+        scalar_items = {k: v for k, v in config.items() if not isinstance(v, dict)}
+        dict_items = {k: v for k, v in config.items() if isinstance(v, dict)}
+        if scalar_items:
+            add_config_page("General", lambda body, data=scalar_items: self._render_config_editor_section(body, data, tuple(), bindings))
+        for key, value in dict_items.items():
+            title = self._friendly_config_label(key)
+            add_config_page(title, lambda body, k=key, v=value: self._render_config_editor_section(body, v, (k,), bindings))
+
+        def build_advanced_page(body):
+            tk.Label(body, text="The guided editor covers normal tuning. Raw JSON is still available for experimental fields.", bg="#12061f", fg="white", font=("Arial", 12, "bold"), wraplength=760, justify="left").pack(anchor="w", padx=10, pady=(10, 8))
+            def open_raw_game_config():
+                self.close_game_config_window()
+                self.open_raw_config_window(path)
+            self.neon_button(body, "OPEN RAW JSON", open_raw_game_config, bg="#9440ff", width=16).pack(anchor="w", padx=10, pady=8)
+        add_config_page("Advanced", build_advanced_page)
+
+        def show_config_page(name):
+            for page in pages.values():
+                page.pack_forget()
+            pages[name].pack(fill="both", expand=True)
+            for label, btn in nav_buttons.items():
+                if label == name:
+                    btn.configure(bg="#2f84ff", fg="white", relief="sunken")
+                else:
+                    btn.configure(bg="#251334", fg="#f0eaff", relief="raised")
+
+        buttons_per_row = 7
+        for idx, name in enumerate(page_order):
+            btn = tk.Button(nav, text=name, command=lambda n=name: show_config_page(n),
+                            bg="#251334", fg="#f0eaff", activebackground="#3a1b52",
+                            activeforeground="white", font=("Arial", 9, "bold"),
+                            width=13, padx=2, pady=3, bd=1, relief="raised")
+            btn.grid(row=idx // buttons_per_row, column=idx % buttons_per_row, padx=3, pady=3, sticky="ew")
+            nav_buttons[name] = btn
+        for col in range(buttons_per_row):
+            nav.grid_columnconfigure(col, weight=1)
+        if page_order:
+            show_config_page(page_order[0])
+
+        status = tk.Label(win, textvariable=status_var, bg="#0f0617", fg="#ffdf6e", font=("Arial", 10), wraplength=820, justify="left")
+        status.pack(fill="x", padx=14, pady=(0, 6))
+
+        def collect_config():
+            result = copy.deepcopy(config)
+            for path_tuple, (kind, var, meta) in bindings.items():
+                value = self._parse_config_editor_value(kind, var, meta)
+                self._assign_config_path_value(result, path_tuple, value)
+            return result
+
+        def save_guided_game_config():
+            try:
+                proposed = collect_config()
+                normalized, save_warnings = self._validate_game_config_for_editor(game_key, proposed)
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                tmp_path = path + ".tmp"
+                with open(tmp_path, "w", encoding="utf-8") as f:
+                    json.dump(normalized, f, indent=2)
+                    f.write("\n")
+                os.replace(tmp_path, path)
+                self.log(f"Guided config saved: {path}")
+                if save_warnings:
+                    status_var.set("Saved with corrections: " + "; ".join(save_warnings))
+                    messagebox.showinfo("Game Config", "Saved with corrections:\n- " + "\n- ".join(save_warnings))
+                else:
+                    status_var.set("Saved. Config file updated.")
+                    messagebox.showinfo("Game Config", "Saved.")
+            except Exception as e:
+                messagebox.showerror("Game Config", f"Failed to save: {e}")
+
+        def reset_safe_defaults():
+            if not messagebox.askyesno("Reset", f"Reset {game_name} config to safe defaults?\n\nThis only affects {os.path.basename(path)}."):
+                return
+            try:
+                defaults = self._default_game_config_for_key(game_key)
+                defaults, save_warnings = self._validate_game_config_for_editor(game_key, defaults)
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(defaults, f, indent=2)
+                    f.write("\n")
+                self.log(f"Guided config reset to safe defaults: {path}")
+                messagebox.showinfo("Game Config", "Defaults saved. Reopen CONFIG to view refreshed values.")
+                self.close_game_config_window()
+            except Exception as e:
+                messagebox.showerror("Game Config", f"Failed to reset: {e}")
+
+        buttons = tk.Frame(win, bg="#0f0617")
+        buttons.pack(fill="x", padx=14, pady=(4, 12))
+        self.neon_button(buttons, "SAVE", save_guided_game_config, bg="#2ea62e", width=10).pack(side="left", padx=(0, 8))
+        self.neon_button(buttons, "RESET DEFAULTS", reset_safe_defaults, bg="#c9871e", width=16).pack(side="left", padx=8)
+        self.neon_button(buttons, "CLOSE", self.close_game_config_window, bg="#c93b1e", width=10).pack(side="right")
+
+    def close_game_config_window(self):
+        if self.game_config_window and tk.Toplevel.winfo_exists(self.game_config_window):
+            try:
+                self.game_config_window.grab_release()
+            except Exception:
+                pass
+            self.game_config_window.destroy()
+        self.game_config_window = None
+
+    def open_raw_config_window(self, path):
         if self.config_window and tk.Toplevel.winfo_exists(self.config_window):
             self.config_window.focus_set()
             return
-        path = self.config_path_for_current_game()
         os.makedirs(os.path.dirname(path), exist_ok=True)
         if not os.path.exists(path):
             with open(path, "w", encoding="utf-8") as f:
                 json.dump({"difficulty": "normal"}, f, indent=2)
         self.config_window = tk.Toplevel(self.root, bg="#0f0617")
-        self.config_window.title("Config")
+        self.config_window.title("Raw Config JSON")
         self.config_window.geometry("640x520")
         self.config_window.transient(self.root)
         self.config_window.grab_set()
-        tk.Label(self.config_window, text=f"Config: {self.selected_game.get()}", bg="#0f0617", fg="white", font=("Arial", 18, "bold")).pack(pady=6)
+        tk.Label(self.config_window, text=f"Raw Config: {self.selected_game.get()}", bg="#0f0617", fg="white", font=("Arial", 18, "bold")).pack(pady=6)
         self.config_text = tk.Text(self.config_window, wrap="none", bg="#12061f", fg="white", insertbackground="white", font=("Consolas", 12), undo=True)
         self.config_text.pack(fill="both", expand=True, padx=8, pady=6)
         try:
@@ -7898,14 +9581,31 @@ class PixelChallengeConsole:
         self.neon_button(btn_frame, "SAVE", lambda: self.save_config_file(path), bg="#2ea62e", width=8).pack(side="left", padx=6)
         self.neon_button(btn_frame, "CLOSE", self.close_config_window, bg="#c93b1e", width=8).pack(side="right", padx=6)
 
+    def open_config_window(self):
+        if self.current_game_key() == "splash":
+            self.open_splash_config_window()
+            return
+        path = self.config_path_for_current_game()
+        self.open_game_config_window(path)
+
     def save_config_file(self, path):
         try:
             parsed = json.loads(self.config_text.get("1.0", "end").strip() or "{}")
+            if os.path.basename(path) == "global.config.json":
+                normalized, warnings = self._save_global_game_config(parsed, log_change=True)
+                if self.config_text:
+                    self.config_text.delete("1.0", "end")
+                    self.config_text.insert("1.0", json.dumps(normalized, indent=2))
+                self.log(f"Global config saved: {path}")
+                if warnings:
+                    messagebox.showinfo("Config", "Saved with corrections:\n- " + "\n- ".join(warnings))
+                else:
+                    messagebox.showinfo("Config", "Saved.")
+                return
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(parsed, f, indent=2)
+                f.write("\n")
             self.log(f"Config saved: {path}")
-            if os.path.basename(path) == "global.config.json":
-                self.apply_global_game_config(log_change=True)
             messagebox.showinfo("Config", "Saved.")
         except Exception as e:
             messagebox.showerror("Config", f"Failed: {e}")
@@ -7989,14 +9689,32 @@ class PixelChallengeConsole:
         tk.Label(falcon_inner, text="1-170 per lane/universe; Dot Dash uses this on next game start",
                  bg="#1a1a2e", fg="#888888", font=("Arial", 9, "italic")
                  ).grid(row=1, column=2, columnspan=2, sticky="w", pady=2)
+
+        tk.Checkbutton(falcon_inner, text="Mirror pixel output to Windows simulator", variable=self.pixel_sim_enabled,
+                       bg="#1a1a2e", fg="white", activebackground="#1a1a2e", activeforeground="white",
+                       selectcolor="#3a3a5c", font=("Arial", 10)
+                       ).grid(row=2, column=0, columnspan=2, sticky="w", pady=(6, 2))
+        tk.Label(falcon_inner, text="Simulator IP", bg="#1a1a2e", fg="white",
+                 font=("Arial", 10)).grid(row=2, column=2, sticky="e", padx=(0, 8), pady=(6, 2))
+        self.pixel_sim_ip_entry = tk.Entry(falcon_inner, textvariable=self.pixel_sim_ip,
+                                           font=("Arial", 11), width=18,
+                                           bg="#3a3a5c", fg="white", insertbackground="white")
+        self.pixel_sim_ip_entry.grid(row=2, column=3, sticky="w", pady=(6, 2))
+        tk.Checkbutton(falcon_inner, text="Also mirror DMX universe", variable=self.pixel_sim_include_dmx,
+                       bg="#1a1a2e", fg="#ffd74f", activebackground="#1a1a2e", activeforeground="#ffd74f",
+                       selectcolor="#3a3a5c", font=("Arial", 9)
+                       ).grid(row=3, column=0, columnspan=2, sticky="w", pady=2)
+        tk.Label(falcon_inner, text="Leave OFF for pixel-only simulator; enable later if the sim previews DMX too.",
+                 bg="#1a1a2e", fg="#888888", font=("Arial", 9, "italic")
+                 ).grid(row=3, column=2, columnspan=2, sticky="w", pady=2)
         
-        tk.Label(falcon_inner, text="(IP and pixel count apply on SAVE)", bg="#1a1a2e", fg="#888888", 
-                 font=("Arial", 9, "italic")).grid(row=2, column=0, columnspan=4, sticky="w", pady=(2, 0))
+        tk.Label(falcon_inner, text="(Falcon IP, simulator mirror, and pixel count apply on SAVE)", bg="#1a1a2e", fg="#888888", 
+                 font=("Arial", 9, "italic")).grid(row=4, column=0, columnspan=4, sticky="w", pady=(2, 0))
         self.find_falcon_status_var = tk.StringVar(value="Find Falcon: idle")
         self.find_falcon_progress = ttk.Progressbar(falcon_inner, mode="indeterminate", length=210)
-        self.find_falcon_progress.grid(row=3, column=0, columnspan=2, sticky="we", pady=(6, 0))
+        self.find_falcon_progress.grid(row=5, column=0, columnspan=2, sticky="we", pady=(6, 0))
         tk.Label(falcon_inner, textvariable=self.find_falcon_status_var, bg="#1a1a2e", fg="#8ec5ff",
-                 font=("Arial", 9, "italic")).grid(row=3, column=2, columnspan=2, sticky="w", pady=(6, 0))
+                 font=("Arial", 9, "italic")).grid(row=5, column=2, columnspan=2, sticky="w", pady=(6, 0))
 
         # === DMX Hardware Configuration ===
         dmx_hw_frame = tk.LabelFrame(self.setup_window, text="DMX Hardware Configuration",
@@ -8430,6 +10148,8 @@ class PixelChallengeConsole:
         # Update Falcon hardware settings from setup entries
         if hasattr(self, 'falcon_ip_entry'):
             self.falcon_ip = self.falcon_ip_entry.get().strip() or DEFAULT_FALCON_IP
+        if hasattr(self, 'pixel_sim_ip_entry'):
+            self.pixel_sim_ip.set(self.pixel_sim_ip_entry.get().strip())
         self.pixels_per_lane = self.get_pixels_per_lane()
         
         # Save geometry
@@ -8454,6 +10174,9 @@ class PixelChallengeConsole:
             self.get_pixels_per_lane(),
             dmx_universe=self.dmx_universe_num.get(),
             playfield_inverted=_safe_bool(global_config.get("invert_playfield", False), False),
+            simulator_enabled=bool(self.pixel_sim_enabled.get()),
+            simulator_ip=self.pixel_sim_ip.get(),
+            simulator_include_dmx=bool(self.pixel_sim_include_dmx.get()),
         )
         self.falcon.set_flame_theme_tuning(self.flame_theme_tuning)
         self.attract.falcon = self.falcon
@@ -8471,8 +10194,13 @@ class PixelChallengeConsole:
                 pass
         self.apply_brightness_for_state()
         
-        self.log(f"Setup saved. Falcon IP: {self.falcon_ip}; Pixels/Lane: {self.get_pixels_per_lane()}")
-        messagebox.showinfo("Setup", f"Settings saved successfully.\nFalcon IP: {self.falcon_ip}\nPixels per lane: {self.get_pixels_per_lane()}")
+        sim_state = "ON" if self.pixel_sim_enabled.get() and self.pixel_sim_ip.get().strip() else "OFF"
+        sim_ip = self.pixel_sim_ip.get().strip() or "not set"
+        self.log(f"Setup saved. Falcon IP: {self.falcon_ip}; Pixels/Lane: {self.get_pixels_per_lane()}; Pixel simulator mirror: {sim_state} ({sim_ip})")
+        messagebox.showinfo(
+            "Setup",
+            f"Settings saved successfully.\nFalcon IP: {self.falcon_ip}\nPixels per lane: {self.get_pixels_per_lane()}\nPixel simulator mirror: {sim_state} ({sim_ip})"
+        )
         self.close_setup_window()
 
     def _open_add_profile_dialog(self, profile_listbox, profile_combo,

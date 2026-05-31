@@ -12,10 +12,11 @@
     "Lane Chase LR": 4,
     "Ice Burst": 8,
     "Galaxy Wave": 10,
-    "Lane Chase RL": 3
+    "Lane Chase RL": 3,
+    "Sound Visualizer": 4
   },
   "selected_themes": [
-    "Color Wash"
+    "Sound Visualizer"
   ],
   "flame_theme_tuning": {
     "Candle Flame": {
@@ -49,6 +50,42 @@
       "smooth": 42
     }
   },
+  "sound_visualizer_tuning": {
+    "direction": "Center Out",
+    "input_mode": "Stereo",
+    "stereo_mapping": "Player Pair Stereo",
+    "lab_mirror": "Mirror Player 1 to All",
+    "peak_mode": "Off",
+    "sensitivity": 75,
+    "noise_gate": 27,
+    "smoothing": 15,
+    "peak_hold": 15
+  },
+  "sound_visualizer_active_profile": "Internal Mic",
+  "sound_visualizer_profiles": {
+    "Internal Mic": {
+      "direction": "Center Out",
+      "input_mode": "Stereo",
+      "stereo_mapping": "Player Pair Stereo",
+      "lab_mirror": "Mirror Player 1 to All",
+      "peak_mode": "Off",
+      "sensitivity": 75,
+      "noise_gate": 27,
+      "smoothing": 15,
+      "peak_hold": 15
+    },
+    "External Mic": {
+      "direction": "Center Out",
+      "input_mode": "Stereo",
+      "stereo_mapping": "Players 1-2 Left / Players 3-4 Right",
+      "lab_mirror": "Off",
+      "peak_mode": "Floating",
+      "sensitivity": 42,
+      "noise_gate": 6,
+      "smoothing": 45,
+      "peak_hold": 65
+    }
+  },
   "sash_left_attract_bottom": 588,
   "sash_center_ctrl": 401,
   "sash_main_info": 504,
@@ -58,11 +95,14 @@
   "falcon_brightness": 10,
   "gameplay_brightness": 20,
   "music_volume": 0,
-  "sfx_volume": 21,
+  "sfx_volume": 28,
   "voice_volume": 50,
-  "master_volume": 28,
+  "master_volume": 20,
   "falcon_ip": "192.168.2.25",
   "pixels_per_lane": 143,
+  "pixel_sim_enabled": true,
+  "pixel_sim_ip": "192.168.2.250",
+  "pixel_sim_include_dmx": true,
   "wifi_dhcp": true,
   "wifi_ssid": "skynet",
   "wifi_psk": "",
@@ -83,7 +123,7 @@
   "window_geometry": "1854x1011+66+32",
   "dmx_universe": 9,
   "dmx_num_fixtures": 4,
-  "dmx_channels_per_fixture": 7,
-  "dmx_start_address": 1,
-  "dmx_profile_id": "betopper_lpc-019-h_7-ch"
+  "dmx_channels_per_fixture": 8,
+  "dmx_start_address": 33,
+  "dmx_profile_id": "venue_by_proline_thintri_38_copy"
 }

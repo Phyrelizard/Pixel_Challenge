@@ -1,0 +1,279 @@
+{
+  "window_title": "Pixel Challenge Simulator - Home Lab Pixels + DMX + Switch/Dimmer",
+  "window_geometry": "1420x840",
+  "udp_port": 5568,
+  "pixels_per_lane": 143,
+  "color_order": "RGB",
+  "brightness_scale": 3.0,
+  "display_gamma": 0.45,
+  "pixel_gap": 1,
+  "notes": "Pixels U1-U8; DMX U9. Simulator brightness/gamma is monitor-only and persists when changed. Sync DMX can import fixtures from a local copy or network share of Pixel Challenge dmx_visualizer_layouts.json; use the Project Folder button to point the simulator at the Pixel Challenge project folder.",
+  "lanes": [
+    {
+      "name": "P1 Left",
+      "universe": 1,
+      "pixel_count": 143,
+      "reverse": false,
+      "color_order": "RGB"
+    },
+    {
+      "name": "P1 Right",
+      "universe": 2,
+      "pixel_count": 143,
+      "reverse": false,
+      "color_order": "RGB"
+    },
+    {
+      "name": "P2 Left",
+      "universe": 3,
+      "pixel_count": 143,
+      "reverse": false,
+      "color_order": "RGB"
+    },
+    {
+      "name": "P2 Right",
+      "universe": 4,
+      "pixel_count": 143,
+      "reverse": false,
+      "color_order": "RGB"
+    },
+    {
+      "name": "P3 Left",
+      "universe": 5,
+      "pixel_count": 143,
+      "reverse": false,
+      "color_order": "RGB"
+    },
+    {
+      "name": "P3 Right",
+      "universe": 6,
+      "pixel_count": 143,
+      "reverse": false,
+      "color_order": "RGB"
+    },
+    {
+      "name": "P4 Left",
+      "universe": 7,
+      "pixel_count": 143,
+      "reverse": false,
+      "color_order": "RGB"
+    },
+    {
+      "name": "P4 Right",
+      "universe": 8,
+      "pixel_count": 143,
+      "reverse": false,
+      "color_order": "RGB"
+    }
+  ],
+  "dmx_universe": 9,
+  "dmx_side_width": 215,
+  "dmx_fixtures": [
+    {
+      "name": "F1",
+      "type": "betopper_lpc_7ch",
+      "side": "left",
+      "universe": 9,
+      "start_address": 1,
+      "channels": 7,
+      "profile_id": "betopper_lpc-019-h_7-ch",
+      "channel_map": {
+        "dimmer": 1,
+        "red": 2,
+        "green": 3,
+        "blue": 4,
+        "strobe": 5,
+        "mode": 6,
+        "sound_active": 7
+      }
+    },
+    {
+      "name": "F2",
+      "type": "betopper_lpc_7ch",
+      "side": "left",
+      "universe": 9,
+      "start_address": 9,
+      "channels": 7,
+      "profile_id": "betopper_lpc-019-h_7-ch",
+      "channel_map": {
+        "dimmer": 1,
+        "red": 2,
+        "green": 3,
+        "blue": 4,
+        "strobe": 5,
+        "mode": 6,
+        "sound_active": 7
+      }
+    },
+    {
+      "name": "F3",
+      "type": "betopper_lpc_7ch",
+      "side": "right",
+      "universe": 9,
+      "start_address": 17,
+      "channels": 7,
+      "profile_id": "betopper_lpc-019-h_7-ch",
+      "channel_map": {
+        "dimmer": 1,
+        "red": 2,
+        "green": 3,
+        "blue": 4,
+        "strobe": 5,
+        "mode": 6,
+        "sound_active": 7
+      }
+    },
+    {
+      "name": "F4",
+      "type": "betopper_lpc_7ch",
+      "side": "right",
+      "universe": 9,
+      "start_address": 25,
+      "channels": 7,
+      "profile_id": "betopper_lpc-019-h_7-ch",
+      "channel_map": {
+        "dimmer": 1,
+        "red": 2,
+        "green": 3,
+        "blue": 4,
+        "strobe": 5,
+        "mode": 6,
+        "sound_active": 7
+      }
+    },
+    {
+      "name": "F5",
+      "type": "thintri38",
+      "side": "left",
+      "universe": 9,
+      "start_address": 33,
+      "channels": 8,
+      "profile_id": "venue_thintri38",
+      "channel_map": {
+        "red": 1,
+        "green": 2,
+        "blue": 3,
+        "color_macros": 4,
+        "strobe": 5,
+        "mode": 6,
+        "dimmer": 7,
+        "dimmer_speed": 8
+      }
+    },
+    {
+      "name": "F6",
+      "type": "thintri38",
+      "side": "left",
+      "universe": 9,
+      "start_address": 41,
+      "channels": 8,
+      "profile_id": "venue_thintri38",
+      "channel_map": {
+        "red": 1,
+        "green": 2,
+        "blue": 3,
+        "color_macros": 4,
+        "strobe": 5,
+        "mode": 6,
+        "dimmer": 7,
+        "dimmer_speed": 8
+      }
+    },
+    {
+      "name": "F7",
+      "type": "thintri38",
+      "side": "right",
+      "universe": 9,
+      "start_address": 49,
+      "channels": 8,
+      "profile_id": "venue_thintri38",
+      "channel_map": {
+        "red": 1,
+        "green": 2,
+        "blue": 3,
+        "color_macros": 4,
+        "strobe": 5,
+        "mode": 6,
+        "dimmer": 7,
+        "dimmer_speed": 8
+      }
+    },
+    {
+      "name": "F8",
+      "type": "thintri38",
+      "side": "right",
+      "universe": 9,
+      "start_address": 57,
+      "channels": 8,
+      "profile_id": "venue_thintri38",
+      "channel_map": {
+        "red": 1,
+        "green": 2,
+        "blue": 3,
+        "color_macros": 4,
+        "strobe": 5,
+        "mode": 6,
+        "dimmer": 7,
+        "dimmer_speed": 8
+      }
+    },
+    {
+      "name": "F9",
+      "type": "dimmer_switch_1ch",
+      "side": "left",
+      "universe": 9,
+      "start_address": 65,
+      "channels": 1,
+      "profile_id": "elation_dp_dmx4b_port",
+      "channel_map": {
+        "dimmer": 1,
+        "switch": 1
+      }
+    },
+    {
+      "name": "F10",
+      "type": "dimmer_switch_1ch",
+      "side": "left",
+      "universe": 9,
+      "start_address": 66,
+      "channels": 1,
+      "profile_id": "elation_dp_dmx4b_port",
+      "channel_map": {
+        "dimmer": 1,
+        "switch": 1
+      }
+    },
+    {
+      "name": "F11",
+      "type": "dimmer_switch_1ch",
+      "side": "right",
+      "universe": 9,
+      "start_address": 67,
+      "channels": 1,
+      "profile_id": "elation_dp_dmx4b_port",
+      "channel_map": {
+        "dimmer": 1,
+        "switch": 1
+      }
+    },
+    {
+      "name": "F12",
+      "type": "dimmer_switch_1ch",
+      "side": "right",
+      "universe": 9,
+      "start_address": 68,
+      "channels": 1,
+      "profile_id": "elation_dp_dmx4b_port",
+      "channel_map": {
+        "dimmer": 1,
+        "switch": 1
+      }
+    }
+  ],
+  "brightness_max": 25.0,
+  "brightness_min": 0.1,
+  "brightness_step": 1.35,
+  "sync_dmx_from_pixel_challenge_config": true,
+  "pixel_challenge_layout_id": "small_rig_8_fixture",
+  "pixel_challenge_project_root": ""
+}
