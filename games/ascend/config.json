@@ -1,8 +1,8 @@
 {
   "game_info": {
     "name": "Ascend",
-    "version": "2.1.5-audio-map-build-ticks",
-    "description": "v2.1.4 build tick behavior plus console-compatible Ascend sound keys and debug-friendly audio_build tick controls."
+    "version": "2.1.7-band-passing",
+    "description": "Ascend update: independent falling-band speeds can overlap/pass, plus v2.1.6 polish features."
   },
   "debug": {
     "log_inputs": true,
@@ -152,6 +152,8 @@
     "height_min": 2,
     "height_max": 6,
     "min_spacing_px": 20,
+    "allow_band_passing": true,
+    "passing_note": "When true, bands keep independent speeds after spawning and may catch, overlap, and pass each other. min_spacing_px still controls initial spawn spacing.",
     "max_simultaneous": 6,
     "min_simultaneous": 2,
     "spawn_from_top_only": true,
@@ -185,7 +187,7 @@
     "fire_cooldown_sec": 0.14,
     "start_after_climb_leg": 6,
     "ordered_hits_only": true,
-    "note": "Only the lowest/lead wall block can be damaged. Wrong colors pass through the wall cluster without damaging higher matching colors.",
+    "note": "Only the lowest/lead wall block can be damaged. Shots are judged on impact against the block they actually reach, so rapid follow-up colors can become correct after an earlier shot clears the lead band.",
     "build_enabled": true,
     "build_fragment_speed_px_per_sec": 500,
     "build_fragment_interval_sec": 0.01,
@@ -236,11 +238,11 @@
     "final_completion_bonus": 500
   },
   "visual": {
-    "field_brightness": 0.0,
-    "field_color": "white",
-    "band_brightness": 0.5,
-    "field_background_enabled": false,
-    "background_note": "Off by default. Do not use this as global brightness; it lights every pixel."
+    "background_glow_enabled": false,
+    "background_glow_color": "blue",
+    "background_glow_brightness": 0.04,
+    "band_brightness": 0.7,
+    "background_note": "Dim playfield glow rendered behind all gameplay objects. Set brightness low, usually 0.01 to 0.10."
   },
   "firing": {
     "enabled": true,
@@ -293,7 +295,9 @@
         220,
         255
       ]
-    }
+    },
+    "impact_judgement": true,
+    "note": "Button press only fires a visible projectile. Correct/wrong hit sounds and scoring occur when the projectile reaches the current lead wall block."
   },
   "gameplay": {
     "climb_legs": 6
@@ -305,12 +309,18 @@
     "fragment_interval_sec": 0.01,
     "target_top_fraction_from_bottom": 0.74,
     "target_bottom_fraction_from_bottom": 0.34,
-    "lock_player_until_complete": true,
-    "note": "At the beginning of each climb leg, the player is locked at bottom while starting bands are assembled one at a time by 1-pixel fragments falling from the top."
+    "lock_player_until_complete": false,
+    "note": "Odd climb legs use the falling-fragment build. Even climb legs materialize each band in place from the center outward, then the band starts descending. Held-UP input may climb as soon as a visible/climbable band exists.",
+    "allow_climb_during_build": true,
+    "odd_leg_style": "falling",
+    "even_leg_style": "materialize",
+    "materialize_pair_fade_sec": 0.14,
+    "materialize_pair_interval_sec": 0.01,
+    "materialize_dim_floor": 0.12
   },
   "audio": {
     "enabled": true,
-    "movement_sound_cooldown_sec": 0.35,
+    "movement_sound_cooldown_sec": 0.18,
     "events": {
       "music_gameplay": "as_music_gameplay",
       "leg_start": "as_band_build_start",

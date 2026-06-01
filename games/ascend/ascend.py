@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-Ascend Game Module v2.1.5-audio-map-build-ticks
+Ascend Game Module v2.1.7-band-passing
 
-Six climb-leg Ascend foundation for Pixel Challenge with wall build, audio event names, extended glass-break effects, and repeated build tick sounds and console sound-map compatible audio keys.
+Six climb-leg Ascend foundation for Pixel Challenge with wall build, audio event names, repeated build tick sounds, alternating intro build styles, configurable background glow, impact-time wall-shot judgement, and continuous movement audio.
 
 Legs 1-6:
   - Player climbs upward/downward with joystick.
   - White button hold makes the player airborne.
   - Colored danger bands descend from the top.
-  - Bands are spacing-protected so they do not visually run into each other.
+  - Bands can optionally pass/overlap each other at independent speeds.
   - Player scores mainly while grounded and moving upward.
 
 Final wall leg:
@@ -29,7 +29,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from games.base import GameMeta, GameModule, GamePhase as BaseGamePhase, GameResult, GameSession, HostAPI, PlayerConfig
 
-VERSION_LABEL = "v2.1.5-audio-map-build-ticks"
+VERSION_LABEL = "v2.1.7-band-passing"
 LANE_LENGTH = 100
 RGB = Tuple[int, int, int]
 
@@ -102,9 +102,18 @@ class IntroBuildBand:
     built_rows: int = 0
     fragment_y: float = 0.0
     fragment_wait: float = 0.0
+    build_style: str = "falling"
+    materialize_step: int = 0
+    materialize_progress: float = 0.0
+
+    @property
+    def materialize_pair_count(self) -> int:
+        return max(1, (int(self.height) + 1) // 2)
 
     @property
     def complete(self) -> bool:
+        if str(self.build_style).lower() == "materialize":
+            return self.materialize_step >= self.materialize_pair_count
         return self.built_rows >= self.height
 
 
@@ -382,10 +391,42 @@ class AscendSession(GameSession):
         if self.phase != BaseGamePhase.RUNNING:
             return
 
+        # During the intro/build phase, allow live UP/DOWN state tracking so a
+        # player already holding UP starts climbing as soon as a climbable band
+        # exists. Other controls remain ignored until normal running resumes.
+        if self.state == AscendState.INTRO_BUILD and self._allow_intro_build_climb():
+            if norm in ("up", "forward", "north", "joyup", "joystick_up", "dpad_up"):
+                ps.held_up = bool(pressed)
+                if pressed:
+                    ps.held_down = False
+                    self._play_move_sfx(ps.player_id, "forward")
+                return
+            if norm in ("down", "back", "backward", "south", "joydown", "joystick_down", "dpad_down"):
+                ps.held_down = bool(pressed)
+                if pressed:
+                    ps.held_up = False
+                    self._play_move_sfx(ps.player_id, "backward")
+                return
+            if norm in ("ystop", "neutral", "center", "stop", "release_up", "release_down"):
+                ps.held_up = False
+                ps.held_down = False
+                return
+            if norm in ("joystick", "stick", "axis", "axis_y") and isinstance(value, dict):
+                y = float(value.get("y", value.get("axis_y", value.get("hat_y", 0.0))))
+                invert = bool(self.config.get("controls", {}).get("invert_joystick_y", False))
+                if invert:
+                    y = -y
+                deadzone = float(self.config.get("controls", {}).get("deadzone", 0.35))
+                ps.held_up = y > deadzone
+                ps.held_down = y < -deadzone
+                if ps.held_up:
+                    ps.held_down = False
+                return
+            return
+
         # During automated states, ignore player control so inputs do not queue
         # up and fire/jump unexpectedly when control returns.
         if self.state in (
-            AscendState.INTRO_BUILD,
             AscendState.WARP_EXPAND,
             AscendState.WARP_COLLAPSE,
             AscendState.WALL_BUILD,
@@ -618,6 +659,7 @@ class AscendSession(GameSession):
             bottom_frac, top_frac = top_frac, bottom_frac
 
         self.intro_build_queue.clear()
+        build_style = self._intro_build_style_for_leg()
         last_y: Optional[int] = None
         denom = max(1, count - 1)
         for i in range(count):
@@ -636,19 +678,48 @@ class AscendSession(GameSession):
                 speed=random.uniform(speed_min, speed_max),
                 color_name=random.choice(colors),
                 fragment_y=float(self.lane_length - 1),
+                build_style=build_style,
             ))
         return bool(self.intro_build_queue)
 
+    def _allow_intro_build_climb(self) -> bool:
+        cfg = self.config.get("intro_build", {})
+        return bool(cfg.get("allow_climb_during_build", True))
+
+    def _intro_build_style_for_leg(self) -> str:
+        cfg = self.config.get("intro_build", {})
+        default_odd = str(cfg.get("odd_leg_style", "falling")).strip().lower()
+        default_even = str(cfg.get("even_leg_style", "materialize")).strip().lower()
+        style = default_even if (int(self.current_leg) % 2 == 0) else default_odd
+        if style not in {"falling", "materialize"}:
+            style = "falling"
+        return style
+
+    def _intro_build_has_climbable_structure(self) -> bool:
+        if self.bands:
+            return True
+        if not self.intro_build_queue:
+            return False
+        active = self.intro_build_queue[0]
+        if str(active.build_style).lower() == "materialize":
+            return active.materialize_step > 0 or active.materialize_progress > 0.15
+        return active.built_rows > 0
+
     def _tick_intro_build(self, dt: float, now: float) -> None:
-        # Player is visible but locked at bottom until the field is prepared.
+        # Keep the player grounded during the build phase, but no longer erase
+        # held-UP input every tick. If the operator/player is already holding UP,
+        # movement begins once at least part of a starting band exists.
         start_y = self._player_start_y()
+        early_climb = self._allow_intro_build_climb() and self._intro_build_has_climbable_structure()
         for ps in self.players_state.values():
-            ps.y = start_y
             ps.airborne = False
             ps.jump_hold_time = 0.0
-            ps.held_up = False
-            ps.held_down = False
-            self._fade_trail(ps, dt)
+            if early_climb:
+                self._tick_player_movement(ps, dt)
+                self._check_band_collisions(ps)
+            else:
+                ps.y = start_y
+                self._fade_trail(ps, dt)
 
         if not self.intro_build_queue:
             self.state = AscendState.RUNNING
@@ -656,7 +727,6 @@ class AscendSession(GameSession):
             return
 
         cfg = self.config.get("intro_build", {})
-        fragment_speed = max(1.0, float(cfg.get("fragment_speed_px_per_sec", 135.0)))
         fragment_interval = max(0.0, float(cfg.get("fragment_interval_sec", 0.045)))
         active = self.intro_build_queue[0]
 
@@ -681,6 +751,18 @@ class AscendSession(GameSession):
             active.fragment_wait = max(0.0, active.fragment_wait - dt)
             return
 
+        if str(active.build_style).lower() == "materialize":
+            fade_sec = max(0.01, float(cfg.get("materialize_pair_fade_sec", 0.14)))
+            pair_interval = max(0.0, float(cfg.get("materialize_pair_interval_sec", fragment_interval)))
+            active.materialize_progress = min(1.0, active.materialize_progress + (dt / fade_sec))
+            if active.materialize_progress >= 1.0:
+                active.materialize_step += 1
+                active.materialize_progress = 0.0
+                active.fragment_wait = pair_interval
+                self._play_build_tick("band", now)
+            return
+
+        fragment_speed = max(1.0, float(cfg.get("fragment_speed_px_per_sec", 135.0)))
         target_y = active.target_y + active.built_rows
         active.fragment_y -= fragment_speed * dt
         if active.fragment_y <= float(target_y):
@@ -701,7 +783,7 @@ class AscendSession(GameSession):
         for ps in self.players_state.values():
             self._tick_player_movement(ps, dt)
             self._check_band_collisions(ps)
-            if ps.y < summit_y:
+            if ps.y < summit_y or ps.airborne:
                 all_at_summit = False
 
         if all_at_summit:
@@ -731,6 +813,11 @@ class AscendSession(GameSession):
             ps.y = max(start_y, ps.y - down_speed * dt)
 
         moved_up = ps.y > old_y + 0.001
+        moved_down = ps.y < old_y - 0.001
+        if moved_up:
+            self._play_move_sfx(ps.player_id, "forward")
+        elif moved_down:
+            self._play_move_sfx(ps.player_id, "backward")
         if not ps.airborne and moved_up:
             ps.add_score(float(self.config.get("scoring", {}).get("ground_move_points_per_px", 2)) * (ps.y - old_y))
             self._add_trail(ps, old_y)
@@ -753,18 +840,27 @@ class AscendSession(GameSession):
         ps.trail = [(y, max(0.0, b - fade * dt)) for y, b in ps.trail if b - fade * dt > 0.03]
 
     def _update_bands(self, dt: float) -> None:
-        # Move bands downward, then clamp spacing so a faster top band cannot run into a lower band.
-        min_gap = float(self.config.get("bands", {}).get("min_spacing_px", 10))
+        band_cfg = self.config.get("bands", {})
+        allow_passing = bool(band_cfg.get("allow_band_passing", True))
+
+        # Move each band independently.  When allow_band_passing is enabled,
+        # faster bands are allowed to catch, overlap, and pass slower bands
+        # instead of being clamped back to a protected spacing.  Initial spawn
+        # spacing still uses min_spacing_px so new bands do not appear already
+        # stacked on top of each other.
         for band in self.bands:
             band.y -= band.speed * dt
 
         self.bands.sort(key=lambda b: b.y)  # bottom to top
-        for i in range(1, len(self.bands)):
-            lower = self.bands[i - 1]
-            upper = self.bands[i]
-            min_upper_y = lower.top + min_gap + 1
-            if upper.y < min_upper_y:
-                upper.y = min_upper_y
+
+        if not allow_passing:
+            min_gap = float(band_cfg.get("min_spacing_px", 10))
+            for i in range(1, len(self.bands)):
+                lower = self.bands[i - 1]
+                upper = self.bands[i]
+                min_upper_y = lower.top + min_gap + 1
+                if upper.y < min_upper_y:
+                    upper.y = min_upper_y
 
         self.bands = [b for b in self.bands if b.top >= 0]
 
@@ -1066,16 +1162,12 @@ class AscendSession(GameSession):
             color_name=color,
             speed=float(firing_cfg.get("shot_speed_px_per_sec", 90.0)),
             length=max(1, int(firing_cfg.get("shot_length_px", 5))),
-            valid_target=self._lowest_matching_wall_block(color) is not None,
+            # Do not judge correctness at fire-time. A later shot can become
+            # correct if an earlier in-flight shot clears the current lead band.
+            valid_target=True,
         )
         self.wall_shots.append(shot)
         self._safe_sound("fire")
-        if not shot.valid_target:
-            # Preserve old wrong-color feedback, but keep the visual bolt so the
-            # button press still feels like a shot rather than invisible math.
-            ps.wrong_shots += 1
-            ps.add_score(self.config.get("scoring", {}).get("wrong_color_penalty", -10))
-            self._safe_sound("wall_miss")
 
     def _lead_wall_block(self) -> Optional[WallBlock]:
         """Return the lowest/lead wall block closest to the player.
@@ -1101,13 +1193,26 @@ class AscendSession(GameSession):
             shot.age += dt
             shot.y += shot.speed * dt
             ps = self.players_state.get(shot.player_id)
-            target = self._lowest_matching_wall_block(shot.color_name)
-            if target is not None and shot.y >= target.y:
-                self._apply_wall_hit(ps, target)
+            lead = self._lead_wall_block()
+            if lead is not None and shot.y >= lead.y:
+                if lead.color_name == shot.color_name:
+                    self._apply_wall_hit(ps, lead)
+                else:
+                    self._apply_wall_miss(ps, shot, lead)
                 continue
             if shot.y - float(shot.length) <= float(self.lane_length + 2):
                 remaining.append(shot)
         self.wall_shots = remaining
+
+    def _apply_wall_miss(self, ps: Optional[AscendPlayerState], shot: WallShot, block: WallBlock) -> None:
+        if ps is not None:
+            ps.wrong_shots += 1
+            ps.add_score(self.config.get("scoring", {}).get("wrong_color_penalty", -10))
+        self._safe_sound("wall_miss")
+        try:
+            self.host.log(f"[ASCEND] P{shot.player_id} wrong wall shot: {shot.color_name} hit {block.color_name} at y={block.y}")
+        except Exception:
+            pass
 
     def _apply_wall_hit(self, ps: Optional[AscendPlayerState], block: WallBlock) -> None:
         block.hp -= 1
@@ -1284,6 +1389,10 @@ class AscendSession(GameSession):
         if not self.intro_build_queue:
             return
         active = self.intro_build_queue[0]
+        if str(active.build_style).lower() == "materialize":
+            self._draw_materializing_intro_band(left, right, active)
+            return
+
         brightness = float(self.config.get("visual", {}).get("band_brightness", 0.50))
         base = self._dim(COLORS.get(active.color_name, COLORS["red"]), brightness)
         # Already-landed fragments become part of the partially assembled band.
@@ -1293,6 +1402,42 @@ class AscendSession(GameSession):
         if not active.complete:
             fragment_y = max(0, min(self.lane_length - 1, int(round(active.fragment_y))))
             self._draw_span(left, right, fragment_y, 1, COLORS.get(active.color_name, COLORS["red"]))
+
+    def _materialize_offsets_for_pair(self, height: int, pair_index: int) -> List[int]:
+        height = max(1, int(height))
+        center_left = (height - 1) // 2
+        center_right = height // 2
+        if pair_index == 0:
+            if center_left == center_right:
+                return [center_left]
+            return [center_left, center_right]
+        offsets = []
+        lo = center_left - pair_index
+        hi = center_right + pair_index
+        if 0 <= lo < height:
+            offsets.append(lo)
+        if 0 <= hi < height and hi != lo:
+            offsets.append(hi)
+        return offsets
+
+    def _draw_materializing_intro_band(self, left: List[RGB], right: List[RGB], active: IntroBuildBand) -> None:
+        visual = self.config.get("visual", {})
+        full_brightness = float(visual.get("band_brightness", 0.50))
+        intro_cfg = self.config.get("intro_build", {})
+        dim_floor = max(0.0, min(1.0, float(intro_cfg.get("materialize_dim_floor", 0.12))))
+        base_color = COLORS.get(active.color_name, COLORS["red"])
+        pair_count = active.materialize_pair_count
+        for pair_idx in range(pair_count):
+            if pair_idx < active.materialize_step:
+                brightness = full_brightness
+            elif pair_idx == active.materialize_step:
+                t = max(0.0, min(1.0, active.materialize_progress))
+                brightness = full_brightness * (dim_floor + (1.0 - dim_floor) * t)
+            else:
+                continue
+            col = self._dim(base_color, brightness)
+            for offset in self._materialize_offsets_for_pair(active.height, pair_idx):
+                self._draw_span(left, right, active.target_y + offset, 1, col)
 
     def _draw_summit(self, left: List[RGB], right: List[RGB], now: float) -> None:
         summit_cfg = self.config.get("summit", {})
@@ -1518,17 +1663,16 @@ class AscendSession(GameSession):
 
     def _background_color(self) -> RGB:
         visual = self.config.get("visual", {})
-        # Important: this is a literal background fill. If enabled, every unused
-        # pixel in both lanes is lit. Keep it OFF by default so the game does
-        # not turn into a full white light bar. Use player/band brightness
-        # settings for gameplay brightness tuning instead.
-        if not bool(visual.get("field_background_enabled", False)):
+        # Dim playfield glow is rendered first, behind all gameplay objects.
+        # Legacy field_* keys are still honored so older configs keep working.
+        enabled = visual.get("background_glow_enabled", visual.get("field_background_enabled", False))
+        if not bool(enabled):
             return (0, 0, 0)
-        color_name = str(visual.get("field_color", "white")).lower()
-        brightness = float(visual.get("field_brightness", 0.0))
+        color_name = str(visual.get("background_glow_color", visual.get("field_color", "purple"))).lower()
+        brightness = float(visual.get("background_glow_brightness", visual.get("field_brightness", 0.03)))
         if brightness <= 0:
             return (0, 0, 0)
-        return self._dim(COLORS.get(color_name, COLORS["white"]), brightness)
+        return self._dim(COLORS.get(color_name, COLORS["purple"]), brightness)
 
     def _normalize_action(self, action: str) -> str:
         s = (action or "").strip().lower().replace("-", "_").replace(" ", "_")

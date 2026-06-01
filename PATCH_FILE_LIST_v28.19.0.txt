@@ -1,0 +1,9 @@
+pixel_challenge_console_v28.19.0.py
+games/ascend/ascend.py
+games/ascend/config.json
+games/global.config.json
+attract_theme_maps.json
+requirements_t480s_working.txt
+CHANGELOG.md
+README_v28.19.0_ascend_polish_patch.txt
+PATCH_FILE_LIST_v28.19.0.txt
