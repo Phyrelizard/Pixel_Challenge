@@ -1,8 +1,8 @@
 {
   "game_info": {
     "name": "Ascend",
-    "version": "2.1.7-band-passing",
-    "description": "Ascend update: independent falling-band speeds can overlap/pass, plus v2.1.6 polish features."
+    "version": "2.1.12-warp-sound-sync",
+    "description": "Warp sound starts with the center-out expansion while preserving pause/resume, held-stick movement, scoring, wall timing, and Ascend polish."
   },
   "debug": {
     "log_inputs": true,
@@ -171,7 +171,9 @@
     ],
     "collapse_mode": "top_to_bottom",
     "collapse_fade_amount": 0.45,
-    "note": "Expand center-out, then clear/collapse from the physical top toward the bottom before player materializes."
+    "note": "Expand center-out, then clear/collapse from the physical top toward the bottom before player materializes.",
+    "sound_timing": "play_at_expand_start",
+    "sound_note": "as_warp plays when center-out expansion begins, not at the collapse boundary."
   },
   "wall": {
     "start_y": 95,
@@ -232,10 +234,16 @@
     "ground_move_points_per_px": 5,
     "jump_clear_bonus": 25,
     "collision_penalty": -200,
-    "wall_hit": 50,
-    "wall_break": 100,
+    "wall_hit": 60,
+    "wall_break": 40,
     "wrong_color_penalty": -50,
-    "final_completion_bonus": 500
+    "final_completion_bonus": 500,
+    "tight_gap_bonus_enabled": true,
+    "tight_gap_reference_px": 20,
+    "tight_gap_bonus_per_px": 15,
+    "tight_gap_max_bonus": 800,
+    "log_tight_gap_bonus": true,
+    "tight_gap_note": "A single-band jump earns the base jump_clear_bonus after landing. If the next band is close, add a bonus based on empty pixels between bands. Clearing 2+ bands in one jump earns no jump-clear bonus."
   },
   "visual": {
     "background_glow_enabled": false,
@@ -343,7 +351,9 @@
       "glass_break": "as_glass_break",
       "game_over": "as_game_over",
       "winner": "as_winner"
-    }
+    },
+    "movement_loop_enabled": true,
+    "movement_loop_note": "When true, move_forward/move_backward use host play_looping_sound instead of repeating one-shots."
   },
   "audio_build": {
     "pixel_tick_enabled": true,
@@ -375,5 +385,13 @@
       "last_player_finish"
     ],
     "note": "If enabled, plays the configured special winner sound at the selected finish event."
+  },
+  "wall_time_bonus": {
+    "enabled": true,
+    "max_bonus": 750,
+    "target_sec": 8.0,
+    "zero_bonus_sec": 30.0,
+    "award_to": "last_wall_hit_player",
+    "note": "Timer starts when the stationary blockade becomes player-controlled. Faster clears earn more points, decaying linearly to zero by zero_bonus_sec. Wrong color penalties still apply separately."
   }
 }

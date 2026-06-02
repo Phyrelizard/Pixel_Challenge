@@ -16,8 +16,7 @@
     "Sound Visualizer": 4
   },
   "selected_themes": [
-    "Sound Visualizer",
-    "Ember Glow"
+    "Sound Visualizer"
   ],
   "flame_theme_tuning": {
     "Candle Flame": {
@@ -57,10 +56,10 @@
     "stereo_mapping": "Player Pair Stereo",
     "lab_mirror": "Mirror Player 1 to All",
     "peak_mode": "Floating",
-    "sensitivity": 80,
-    "noise_gate": 65,
-    "smoothing": 15,
-    "peak_hold": 15
+    "sensitivity": 45,
+    "noise_gate": 100,
+    "smoothing": 0,
+    "peak_hold": 0
   },
   "sound_visualizer_active_profile": "Internal Mic",
   "sound_visualizer_profiles": {
@@ -70,10 +69,10 @@
       "stereo_mapping": "Player Pair Stereo",
       "lab_mirror": "Mirror Player 1 to All",
       "peak_mode": "Floating",
-      "sensitivity": 80,
-      "noise_gate": 65,
-      "smoothing": 15,
-      "peak_hold": 15
+      "sensitivity": 45,
+      "noise_gate": 100,
+      "smoothing": 0,
+      "peak_hold": 0
     },
     "External Mic": {
       "direction": "Center Out",
@@ -95,10 +94,10 @@
   "sash_mixer_height": null,
   "falcon_brightness": 10,
   "gameplay_brightness": 20,
-  "music_volume": 0,
+  "music_volume": 10,
   "sfx_volume": 28,
   "voice_volume": 50,
-  "master_volume": 10,
+  "master_volume": 14,
   "falcon_ip": "192.168.2.25",
   "pixels_per_lane": 143,
   "pixel_sim_enabled": true,

@@ -79,6 +79,23 @@ class GameManager:
             except Exception as e:
                 self.host.log(f"GameManager: signal_start error: {e}")
 
+
+    def pause_game(self):
+        """Soft-pause the current game session if it supports pause hooks."""
+        if self.current_session and hasattr(self.current_session, 'on_pause'):
+            try:
+                self.current_session.on_pause()
+            except Exception as e:
+                self.host.log(f"GameManager: pause_game error: {e}")
+
+    def resume_game(self):
+        """Resume the current game session if it supports pause hooks."""
+        if self.current_session and hasattr(self.current_session, 'on_resume'):
+            try:
+                self.current_session.on_resume()
+            except Exception as e:
+                self.host.log(f"GameManager: resume_game error: {e}")
+
     def tick(self):
         """Called periodically to update the game state."""
         if self.current_session:

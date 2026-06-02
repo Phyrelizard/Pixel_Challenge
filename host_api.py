@@ -2,7 +2,7 @@
 """
 ConsoleHostAPI - Bridge between the Console and Game Sessions
 Provides all methods that game modules need to interact with hardware and console.
-Version: 21.8.0 - Added SLA support
+Version: 21.8.2 - Added looping sound bridge support
 """
 from __future__ import annotations
 
@@ -63,6 +63,36 @@ class ConsoleHostAPI:
         """Play a sound effect."""
         try:
             self.console.play_sound(sound_name)
+        except Exception:
+            pass  # Sound errors are non-fatal
+
+    def play_looping_sound(self, sound_name: str) -> None:
+        """Start a looping sound effect if the console supports it.
+
+        Used by games for sustained sounds such as Ascend forward movement.
+        Falls back to a one-shot only on older console builds.
+        """
+        try:
+            if hasattr(self.console, "play_looping_sound"):
+                self.console.play_looping_sound(sound_name)
+            else:
+                self.console.play_sound(sound_name)
+        except Exception:
+            pass  # Sound errors are non-fatal
+
+    def stop_looping_sound(self, sound_name: str) -> None:
+        """Stop a previously-started looping sound effect."""
+        try:
+            if hasattr(self.console, "stop_looping_sound"):
+                self.console.stop_looping_sound(sound_name)
+        except Exception:
+            pass  # Sound errors are non-fatal
+
+    def stop_all_looping_sounds(self) -> None:
+        """Stop all console-managed looping sound effects."""
+        try:
+            if hasattr(self.console, "stop_all_looping_sounds"):
+                self.console.stop_all_looping_sounds()
         except Exception:
             pass  # Sound errors are non-fatal
 

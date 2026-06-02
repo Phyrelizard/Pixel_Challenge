@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Ascend Game Module v2.1.7-band-passing
+Ascend Game Module v2.1.12-warp-sound-sync
 
-Six climb-leg Ascend foundation for Pixel Challenge with wall build, audio event names, repeated build tick sounds, alternating intro build styles, configurable background glow, impact-time wall-shot judgement, and continuous movement audio.
+Six climb-leg Ascend foundation for Pixel Challenge with wall build, audio event names, repeated build tick sounds, alternating intro build styles, configurable background glow, impact-time wall-shot judgement, and continuous movement audio through the host API loop bridge.
 
 Legs 1-6:
   - Player climbs upward/downward with joystick.
@@ -29,7 +29,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from games.base import GameMeta, GameModule, GamePhase as BaseGamePhase, GameResult, GameSession, HostAPI, PlayerConfig
 
-VERSION_LABEL = "v2.1.7-band-passing"
+VERSION_LABEL = "v2.1.12-warp-sound-sync"
 LANE_LENGTH = 100
 RGB = Tuple[int, int, int]
 
@@ -179,6 +179,12 @@ class AscendPlayerState:
     reached_final: bool = False
     last_fire_time: float = 0.0
     hit_grace: float = 0.0
+    moving_forward_audio: bool = False
+    moving_backward_audio: bool = False
+    # Bands cleared during the current single jump.  Score is settled only
+    # when the player lands/release-jumps.  This prevents one long hover over
+    # multiple bands from earning multiple skill bonuses.
+    jump_clear_pending: List[Dict[str, Any]] = field(default_factory=list)
 
     def add_score(self, points: int) -> None:
         self.score = max(0, self.score + int(points))
@@ -217,8 +223,12 @@ class AscendSession(GameSession):
         self.final_t = 0.0
         self._winner_sound_played = False
         self._last_move_sfx: Dict[Tuple[int, str], float] = {}
+        self._active_movement_loop_keys: set[str] = set()
         self._build_tick_counter: Dict[str, int] = {"band": 0, "wall": 0}
         self._last_build_tick_time: Dict[str, float] = {"band": -9999.0, "wall": -9999.0}
+        self.wall_phase_start_time = 0.0
+        self.wall_time_bonus_awarded = False
+        self.wall_last_hit_player_id: Optional[int] = None
         self.round_start = 0.0
         self._last_position_log = 0.0
         start_y = self._player_start_y()
@@ -362,6 +372,9 @@ class AscendSession(GameSession):
         self.final_dots.clear()
         self.ceiling_shards.clear()
         self.ceiling_t = 0.0
+        self.wall_phase_start_time = 0.0
+        self.wall_time_bonus_awarded = False
+        self.wall_last_hit_player_id = None
         self._reset_players_for_leg()
         self._safe_sound("music_gameplay")
         self._safe_sound("leg_start")
@@ -375,7 +388,8 @@ class AscendSession(GameSession):
 
         pressed = value if isinstance(value, bool) else True
         norm = self._normalize_action(action)
-        if self.config.get("debug", {}).get("log_inputs", True) and pressed:
+        is_continuous_axis = isinstance(value, dict) and bool(value.get("continuous", False)) and norm in ("joystick", "stick", "axis", "axis_y")
+        if self.config.get("debug", {}).get("log_inputs", True) and pressed and not is_continuous_axis:
             self.host.log(f"[ASCEND INPUT] P{player_id} action={action!r} norm={norm!r} value={value!r} state={self.state.value}")
 
         if self.state == AscendState.WAITING:
@@ -474,6 +488,9 @@ class AscendSession(GameSession):
         if color == "white":
             if pressed:
                 if not ps.airborne:
+                    # New jump attempt: clear any stale pending awards from a
+                    # previous interrupted attempt.
+                    ps.jump_clear_pending.clear()
                     ps.airborne = True
                     ps.jump_hold_time = 0.0
                     # No new footprint while airborne; existing trail fades naturally.
@@ -483,6 +500,7 @@ class AscendSession(GameSession):
                 if ps.airborne:
                     ps.airborne = False
                     ps.jump_hold_time = 0.0
+                    self._settle_jump_awards(ps)
                     self.host.log(f"[ASCEND] P{player_id} JUMP released")
                     self._safe_sound("land")
             return
@@ -509,6 +527,7 @@ class AscendSession(GameSession):
         elif self.state == AscendState.COMPLETE:
             self.game_complete = True
 
+        self._sync_movement_audio()
         self._maybe_log_positions(now)
         self._render_all(now)
 
@@ -551,7 +570,35 @@ class AscendSession(GameSession):
             }
         return GameResult("ascend", True, winner, results)
 
+
+    def on_pause(self) -> None:
+        """Freeze Ascend timers and sustained audio during console pause."""
+        if self._paused:
+            return
+        now = self.host.now()
+        self._paused = True
+        self._pause_started_at = now
+        self._stop_all_movement_audio()
+        self.host.log(f"[ASCEND] Paused at state={self.state.value}")
+
+    def on_resume(self) -> None:
+        """Resume Ascend without charging elapsed-time bonuses for pause time."""
+        now = self.host.now()
+        if self._paused and self._pause_started_at > 0.0:
+            pause_dt = max(0.0, now - self._pause_started_at)
+            # The wall timer uses absolute host time, so move the start point
+            # forward by the pause duration to keep the time bonus fair.
+            if self.wall_phase_start_time > 0.0:
+                self.wall_phase_start_time += pause_dt
+            self.round_start += pause_dt
+            self.host.log(f"[ASCEND] Resumed after {pause_dt:.2f}s pause")
+        self._paused = False
+        self._pause_started_at = 0.0
+        # Prevent the first resumed tick from consuming the whole pause gap.
+        self.last_tick = now
+
     def on_exit(self) -> None:
+        self._stop_all_movement_audio()
         self._safe_sound("stop_music")
         self.host.clear_all_pixels()
         self.host.log("[ASCEND] Session exiting")
@@ -814,10 +861,8 @@ class AscendSession(GameSession):
 
         moved_up = ps.y > old_y + 0.001
         moved_down = ps.y < old_y - 0.001
-        if moved_up:
-            self._play_move_sfx(ps.player_id, "forward")
-        elif moved_down:
-            self._play_move_sfx(ps.player_id, "backward")
+        ps.moving_forward_audio = bool(moved_up)
+        ps.moving_backward_audio = bool(moved_down)
         if not ps.airborne and moved_up:
             ps.add_score(float(self.config.get("scoring", {}).get("ground_move_points_per_px", 2)) * (ps.y - old_y))
             self._add_trail(ps, old_y)
@@ -921,6 +966,66 @@ class AscendSession(GameSession):
         self.bands.sort(key=lambda b: b.y)
         return True
 
+    def _gap_to_next_band_above(self, band: DangerBand) -> Optional[float]:
+        """Return empty pixel gap to the next higher/upper band, if present."""
+        upper = [b for b in self.bands if b is not band and b.y > band.top]
+        if not upper:
+            return None
+        next_band = min(upper, key=lambda b: b.y)
+        return max(0.0, float(next_band.y - band.top - 1.0))
+
+    def _tight_gap_bonus_for_gap(self, gap_px: Optional[float]) -> int:
+        cfg = self.config.get("scoring", {})
+        if gap_px is None or not bool(cfg.get("tight_gap_bonus_enabled", True)):
+            return 0
+        try:
+            reference = float(cfg.get("tight_gap_reference_px", 20.0))
+            per_px = float(cfg.get("tight_gap_bonus_per_px", 3.0))
+            max_bonus = int(cfg.get("tight_gap_max_bonus", 75))
+        except Exception:
+            reference, per_px, max_bonus = 20.0, 3.0, 75
+        if gap_px > reference:
+            return 0
+        bonus = int(round((reference - max(0.0, gap_px) + 1.0) * per_px))
+        return max(0, min(max_bonus, bonus))
+
+    def _register_airborne_band_clear(self, ps: AscendPlayerState, band: DangerBand) -> None:
+        band_key = id(band)
+        if any(item.get("band_key") == band_key for item in ps.jump_clear_pending):
+            return
+        gap_px = self._gap_to_next_band_above(band)
+        ps.jump_clear_pending.append({
+            "band_key": band_key,
+            "gap_px": gap_px,
+            "tight_bonus": self._tight_gap_bonus_for_gap(gap_px),
+        })
+
+    def _settle_jump_awards(self, ps: AscendPlayerState) -> None:
+        """Score a jump only after landing/release.
+
+        A single-band jump earns the base jump-clear bonus plus any tight-gap
+        bonus.  Clearing two or more bands during one airborne stretch earns no
+        jump-clear points, which rewards precise jump-land-jump timing between
+        close bands instead of simply hovering across a cluster.
+        """
+        if not ps.jump_clear_pending:
+            return
+        cfg = self.config.get("scoring", {})
+        if len(ps.jump_clear_pending) == 1:
+            item = ps.jump_clear_pending[0]
+            base = int(cfg.get("jump_clear_bonus", 25))
+            tight = int(item.get("tight_bonus", 0))
+            total = base + tight
+            ps.add_score(total)
+            ps.bands_cleared += 1
+            if bool(cfg.get("log_tight_gap_bonus", False)) and tight > 0:
+                gap = item.get("gap_px")
+                self.host.log(f"[ASCEND] P{ps.player_id} tight-gap jump bonus +{tight} (gap={gap:.1f}px); total jump +{total}")
+        else:
+            if bool(cfg.get("log_tight_gap_bonus", False)):
+                self.host.log(f"[ASCEND] P{ps.player_id} cleared {len(ps.jump_clear_pending)} bands in one jump; no jump bonus")
+        ps.jump_clear_pending.clear()
+
     def _check_band_collisions(self, ps: AscendPlayerState) -> None:
         # Brief grace after respawn prevents instant repeat collisions at the bottom.
         if getattr(ps, "hit_grace", 0.0) > 0.0:
@@ -937,8 +1042,7 @@ class AscendSession(GameSession):
                 # It must NOT make a band permanently harmless after a respawn.
                 if band.top < ps.y - 2 and not band.cleared_by_player.get(ps.player_id, False):
                     if ps.airborne:
-                        ps.add_score(self.config.get("scoring", {}).get("jump_clear_bonus", 25))
-                        ps.bands_cleared += 1
+                        self._register_airborne_band_clear(ps, band)
                     band.cleared_by_player[ps.player_id] = True
                 continue
 
@@ -963,14 +1067,19 @@ class AscendSession(GameSession):
     def _respawn_player_after_hit(self, ps: AscendPlayerState) -> None:
         """Put a hit player back at the bottom without freezing the game."""
         start_y = self._player_start_y()
+        was_up = bool(getattr(ps, "held_up", False))
+        was_down = bool(getattr(ps, "held_down", False))
         ps.y = start_y
         ps.airborne = False
         ps.jump_hold_time = 0.0
-        ps.held_up = False
-        ps.held_down = False
+        ps.held_up = was_up
+        ps.held_down = was_down
+        ps.moving_forward_audio = False
+        ps.moving_backward_audio = False
         ps.trail.clear()
         ps.last_ground_y = start_y
         ps.hit_grace = float(self.config.get("player", {}).get("hit_grace_sec", 1.25))
+        ps.jump_clear_pending.clear()
         # A respawn resets this player's relationship with every surviving band:
         # all visible bands must be jumped again and can penalize again.
         for band in self.bands:
@@ -988,7 +1097,11 @@ class AscendSession(GameSession):
         self.state = AscendState.WARP_EXPAND
         self.warp_t = 0.0
         self.bands.clear()
+        # Start the warp SFX at the same moment the center-out visual begins.
+        # Earlier builds played this after expand_sec, at the collapse boundary,
+        # which made the sound feel roughly a half-second late.
         self._safe_sound("leg_complete")
+        self._safe_sound("warp")
         self.host.log(f"[ASCEND] Leg {self.current_leg} complete - warp transition")
 
     def _tick_warp(self, dt: float, now: float) -> None:
@@ -999,7 +1112,6 @@ class AscendSession(GameSession):
         if self.state == AscendState.WARP_EXPAND and self.warp_t >= expand_sec:
             self.state = AscendState.WARP_COLLAPSE
             self.warp_t = 0.0
-            self._safe_sound("warp")
         elif self.state == AscendState.WARP_COLLAPSE and self.warp_t >= collapse_sec:
             if self.current_leg < self.total_climb_legs:
                 self.current_leg += 1
@@ -1018,23 +1130,30 @@ class AscendSession(GameSession):
                         self._safe_sound("wall_build")
                     self.host.log(f"[ASCEND] Leg {self.current_leg} wall build started: {len(self.wall_build_queue)} block(s)")
                 else:
-                    self.state = AscendState.LEG4_WALL
                     self._build_wall()
                     if bool(self.config.get("audio_build", {}).get("play_wall_build_start_sound", False)):
                         self._safe_sound("wall_build")
-                    self.host.log(f"[ASCEND] Leg {self.current_leg} wall started")
+                    self._enter_wall_phase("wall started")
 
     def _reset_players_for_leg(self) -> None:
         start_y = self._player_start_y()
         for ps in self.players_state.values():
+            # Preserve held joystick state across leg resets. The console also
+            # sends live axis snapshots, but keeping the current state prevents
+            # a dead frame where a held-up stick does not advance.
+            was_up = bool(getattr(ps, "held_up", False))
+            was_down = bool(getattr(ps, "held_down", False))
             ps.y = start_y
             ps.airborne = False
             ps.jump_hold_time = 0.0
-            ps.held_up = False
-            ps.held_down = False
+            ps.held_up = was_up
+            ps.held_down = was_down
+            ps.moving_forward_audio = False
+            ps.moving_backward_audio = False
             ps.trail.clear()
             ps.last_ground_y = start_y
             ps.hit_grace = float(self.config.get("player", {}).get("start_grace_sec", 1.0))
+            ps.jump_clear_pending.clear()
 
     # ------------------------------------------------------------------
     # Leg 4 wall
@@ -1084,6 +1203,14 @@ class AscendSession(GameSession):
             y += block_h
         return bool(self.wall_build_queue)
 
+    def _enter_wall_phase(self, reason: str = "blockade active") -> None:
+        """Enter the player-controlled final wall phase and start its timer."""
+        self.state = AscendState.LEG4_WALL
+        self.wall_phase_start_time = self.host.now()
+        self.wall_time_bonus_awarded = False
+        self.wall_last_hit_player_id = None
+        self.host.log(f"[ASCEND] Leg {self.current_leg} {reason}; wall timer started")
+
     def _tick_wall_build(self, dt: float, now: float) -> None:
         start_y = self._player_start_y()
         for ps in self.players_state.values():
@@ -1095,9 +1222,8 @@ class AscendSession(GameSession):
             self._fade_trail(ps, dt)
 
         if not self.wall_build_queue:
-            self.state = AscendState.LEG4_WALL
             self._safe_sound("wall_build_complete")
-            self.host.log(f"[ASCEND] Leg {self.current_leg} wall build complete - blockade active")
+            self._enter_wall_phase("wall build complete - blockade active")
             return
 
         wall_cfg = self.config.get("wall", {})
@@ -1118,9 +1244,8 @@ class AscendSession(GameSession):
                 self.wall_build_queue[0].fragment_y = float(self.lane_length - 1)
                 self.wall_build_queue[0].fragment_wait = fragment_interval
             else:
-                self.state = AscendState.LEG4_WALL
                 self._safe_sound("wall_build_complete")
-                self.host.log(f"[ASCEND] Leg {self.current_leg} wall build complete - blockade active")
+                self._enter_wall_phase("wall build complete - blockade active")
             return
 
         if active.fragment_wait > 0.0:
@@ -1217,6 +1342,7 @@ class AscendSession(GameSession):
     def _apply_wall_hit(self, ps: Optional[AscendPlayerState], block: WallBlock) -> None:
         block.hp -= 1
         if ps is not None:
+            self.wall_last_hit_player_id = ps.player_id
             ps.wall_hits += 1
             ps.add_score(self.config.get("scoring", {}).get("wall_hit", 50))
         self._safe_sound("wall_hit")
@@ -1226,14 +1352,53 @@ class AscendSession(GameSession):
             except ValueError:
                 return
             if ps is not None:
+                self.wall_last_hit_player_id = ps.player_id
                 ps.add_score(self.config.get("scoring", {}).get("wall_break", 100))
             self._safe_sound("wall_break")
+
+    def _award_wall_time_bonus(self) -> None:
+        """Award a configurable time bonus to the player who finishes the wall.
+
+        Timer starts when the player-controlled stationary blockade phase begins,
+        not during the non-interactive wall-build animation.  Faster completion
+        earns more points; the bonus decays linearly to zero by zero_bonus_sec.
+        """
+        if self.wall_time_bonus_awarded:
+            return
+        self.wall_time_bonus_awarded = True
+        cfg = self.config.get("wall_time_bonus", {})
+        if not bool(cfg.get("enabled", True)):
+            return
+        if self.wall_phase_start_time <= 0.0:
+            return
+        now = self.host.now()
+        elapsed = max(0.0, now - self.wall_phase_start_time)
+        try:
+            max_bonus = int(cfg.get("max_bonus", 750))
+            target_sec = float(cfg.get("target_sec", 8.0))
+            zero_sec = float(cfg.get("zero_bonus_sec", 30.0))
+        except Exception:
+            max_bonus, target_sec, zero_sec = 750, 8.0, 30.0
+        target_sec = max(0.01, target_sec)
+        zero_sec = max(target_sec + 0.01, zero_sec)
+        if elapsed <= target_sec:
+            bonus = max_bonus
+        elif elapsed >= zero_sec:
+            bonus = 0
+        else:
+            bonus = int(round(max_bonus * (1.0 - ((elapsed - target_sec) / (zero_sec - target_sec)))))
+        pid = self.wall_last_hit_player_id
+        ps = self.players_state.get(pid) if pid is not None else None
+        if ps is not None and bonus > 0:
+            ps.add_score(bonus)
+        self.host.log(f"[ASCEND] Wall clear time {elapsed:.2f}s; time bonus {bonus} awarded to P{pid if pid is not None else '?'}")
 
     # ------------------------------------------------------------------
     # Final ascension
     # ------------------------------------------------------------------
 
     def _start_final_ascend(self) -> None:
+        self._award_wall_time_bonus()
         self.wall_shots.clear()
         self.state = AscendState.FINAL_ASCEND
         self.final_t = 0.0
@@ -1728,7 +1893,70 @@ class AscendSession(GameSession):
         except Exception:
             pass
 
+    def _event_sound_key(self, event_name: str, fallback: str = "") -> str:
+        audio_cfg = self.config.get("audio", {})
+        events = audio_cfg.get("events", {})
+        if isinstance(events, dict):
+            value = str(events.get(event_name, fallback or event_name) or "").strip()
+        else:
+            value = fallback or event_name
+        return value
+
+    def _movement_loop_enabled(self) -> bool:
+        audio_cfg = self.config.get("audio", {})
+        return bool(audio_cfg.get("movement_loop_enabled", True))
+
+    def _start_movement_loop(self, sound_key: str) -> None:
+        if not sound_key or sound_key in self._active_movement_loop_keys:
+            return
+        if hasattr(self.host, "play_looping_sound"):
+            try:
+                self.host.play_looping_sound(sound_key)
+                self._active_movement_loop_keys.add(sound_key)
+                return
+            except Exception:
+                pass
+        # Fallback for older console builds: one-shot with cooldown.
+        self._safe_sound(sound_key)
+        self._active_movement_loop_keys.add(sound_key)
+
+    def _stop_movement_loop(self, sound_key: str) -> None:
+        if not sound_key or sound_key not in self._active_movement_loop_keys:
+            return
+        if hasattr(self.host, "stop_looping_sound"):
+            try:
+                self.host.stop_looping_sound(sound_key)
+            except Exception:
+                pass
+        self._active_movement_loop_keys.discard(sound_key)
+
+    def _stop_all_movement_audio(self) -> None:
+        for key in list(self._active_movement_loop_keys):
+            self._stop_movement_loop(key)
+
+    def _sync_movement_audio(self) -> None:
+        """Keep Ascend movement audio continuous while movement is actually happening."""
+        if not self._movement_loop_enabled():
+            return
+        controllable = self.state in (AscendState.RUNNING, AscendState.INTRO_BUILD)
+        if self.state == AscendState.INTRO_BUILD:
+            controllable = controllable and self._allow_intro_build_climb() and self._intro_build_has_climbable_structure()
+        forward_key = self._event_sound_key("move_forward", "as_move_forward")
+        backward_key = self._event_sound_key("move_backward", "as_move_backward")
+        forward_active = controllable and any(bool(getattr(ps, "moving_forward_audio", False)) for ps in self.players_state.values())
+        backward_active = controllable and any(bool(getattr(ps, "moving_backward_audio", False)) for ps in self.players_state.values())
+        if forward_active:
+            self._start_movement_loop(forward_key)
+        else:
+            self._stop_movement_loop(forward_key)
+        if backward_active:
+            self._start_movement_loop(backward_key)
+        else:
+            self._stop_movement_loop(backward_key)
+
     def _play_move_sfx(self, player_id: int, direction: str) -> None:
+        if self._movement_loop_enabled():
+            return
         now = self.host.now()
         cooldown = float(self.config.get("audio", {}).get("movement_sound_cooldown_sec", 0.35))
         key = (player_id, direction)

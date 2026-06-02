@@ -1,5 +1,41 @@
 # Pixel Challenge Changelog
 
+## v28.19.8 - Ascend warp sound sync
+- Bumped console to v28.19.8.
+- Updated Ascend to v2.1.12 so as_warp starts at the beginning of the center-out warp expansion instead of after expand_sec at the collapse boundary.
+- Preserved PAUSE/RESUME restore behavior, held-stick movement, movement loop audio, tight-gap scoring, and wall-time bonus support from recent Ascend builds.
+
+## v28.19.7 - Console pause and resume restore
+- Bumped console to v28.19.7.
+- Restored START -> PAUSE -> RESUME behavior while keeping STOP as the hard abort / return-to-splash control.
+- Added a GAME_PAUSED host state so the console can soft-pause active games without resetting the session.
+- Added pause_game() and resume_game() hooks through GameManager, plus optional on_pause()/on_resume() hooks in the base game session class.
+- Updated Ascend to v2.1.11 so pause freezes its tick gap and protects wall-time bonus scoring from counting paused time.
+- Stops active looping SFX while paused and resumes gameplay cleanly when the operator presses RESUME.
+
+## v28.19.6 - Ascend host loop audio bridge
+- Bumped console to v28.19.6.
+- Updated Ascend to v2.1.10 with a HostAPI bridge for true looping movement audio.
+- Fixed Ascend forward/backward movement sounds so they no longer fall back to one-shot playback through host.play_sound().
+- Added play_looping_sound(), stop_looping_sound(), and stop_all_looping_sounds() methods to host_api.py so game modules can control sustained SFX cleanly.
+- Preserved the v28.19.5 held-axis movement behavior and included the current as_move_forward.wav asset.
+
+## v28.19.5 - Ascend held-axis and movement audio loop
+- Bumped console to v28.19.5.
+- Updated Ascend to v2.1.9 with live vertical-axis snapshots while Ascend is running.
+- Fixed held-UP joystick behavior so players continue advancing when a new leg begins or after respawn without needing neutral-first input.
+- Added dedicated looping SFX support for Ascend movement sounds to eliminate gaps from repeated short clips.
+- Added movement_loop_enabled config support and mapped Ascend forward/backward movement audio to as_move_forward/as_move_backward.
+- Included updated as_move_forward.wav in the Ascend audio folder.
+
+## v28.19.4 - Ascend held stick and skill scoring
+- Bumped console to v28.19.4.
+- Updated Ascend to v2.1.8 with held-UP joystick preservation when a climb leg begins.
+- Added single-band jump scoring that awards points only after a successful land/release.
+- Added tight-gap jump bonuses based on empty pixels between close bands, with no bonus for hovering over multiple bands in one jump.
+- Added final wall clear time bonus so faster stationary-blockade completion earns more points.
+- Preserved wrong-color wall penalties and global inverted playfield setting in games/global.config.json.
+
 ## v28.19.3 - Ascend band passing
 - Bumped console to v28.19.3.
 - Updated Ascend to v2.1.7 with configurable falling-band passing.
