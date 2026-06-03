@@ -1,5 +1,0 @@
-CHANGELOG.md
-tools/pixel_controller_simulator_windows.py
-tools/pixel_simulator_layout_home_lab.json
-README_v28.16.1_simulator_brightness_patch.txt
-PATCH_FILE_LIST_v28.16.1.txt

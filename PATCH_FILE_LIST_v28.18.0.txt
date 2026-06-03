@@ -1,7 +1,0 @@
-pixel_challenge_console_v28.18.0.py
-attract_theme_maps.json
-requirements_t480s_working.txt
-CHANGELOG.md
-README_v28.18.0_sound_visualizer_profiles_patch.txt
-PATCH_FILE_LIST_v28.18.0.txt
-games/global.config.json

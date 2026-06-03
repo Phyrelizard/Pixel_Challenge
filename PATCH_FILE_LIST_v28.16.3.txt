@@ -1,4 +1,0 @@
-CHANGELOG.md
-README_v28.16.3_simulator_dmx_sync_brightness_patch.txt
-tools/pixel_controller_simulator_windows.py
-tools/pixel_simulator_layout_home_lab.json

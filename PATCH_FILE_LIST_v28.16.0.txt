@@ -1,8 +1,0 @@
-pixel_challenge_console_v28.16.0.py
-CHANGELOG.md
-README_v28.16.0_patch.txt
-PATCH_FILE_LIST_v28.16.0.txt
-games/global.config.json
-tools/pixel_controller_simulator_windows.py
-tools/pixel_simulator_layout_home_lab.json
-tools/run_pixel_simulator_windows.bat
