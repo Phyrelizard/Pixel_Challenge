@@ -36,7 +36,8 @@
     "enabled": true,
     "active_games": [
       "dot_dash",
-      "ascend"
+      "ascend",
+      "chomp_chase"
     ],
     "xbox_profile_enabled": true,
     "xbox": {

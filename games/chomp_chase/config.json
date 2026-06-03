@@ -1,0 +1,91 @@
+{
+  "game_info": {
+    "name": "Chomp Chase",
+    "version": "1.0.1-easier",
+    "notes": "v28.20.1 easier tuning: slower/less aggressive ghost, close-range ghost commitment window, lane-change dodge grace, longer power mode, and longer ghost start/respawn delay."
+  },
+  "initial_lives": 4,
+  "dot_spacing": 3,
+  "player_move_ms": 88,
+  "ghost_move_ms": 330,
+  "scared_ghost_move_ms": 300,
+  "power_duration_sec": 7.0,
+  "ghost_respawn_sec": 1.6,
+  "ghost_start_delay_sec": 2.5,
+  "ghost_close_commit_distance": 9,
+  "ghost_lane_switch_chance": 0.12,
+  "ghost_random_lane_switch_chance": 0.03,
+  "player_lane_change_grace_sec": 0.18,
+  "hit_cooldown_sec": 1.0,
+  "timed_duration_sec": 300,
+  "objective_boards_to_clear": 3,
+  "fruit": {
+    "enabled": true,
+    "spawn_chance_per_sec": 0.04,
+    "duration_sec": 7.0,
+    "points": 500
+  },
+  "scoring": {
+    "dot": 10,
+    "power_pellet": 50,
+    "fruit": 500,
+    "ghost_base": 200,
+    "board_clear": 500,
+    "unused_power_pellet_bonus": 100,
+    "life_bonus": 250
+  },
+  "colors": {
+    "dot": [
+      8,
+      8,
+      8
+    ],
+    "player": [
+      255,
+      220,
+      0
+    ],
+    "scared_ghost": [
+      0,
+      90,
+      255
+    ],
+    "life": [
+      255,
+      220,
+      0
+    ],
+    "last_life": [
+      255,
+      40,
+      0
+    ],
+    "border": [
+      70,
+      70,
+      70
+    ],
+    "ghosts": [
+      [
+        255,
+        0,
+        0
+      ],
+      [
+        0,
+        255,
+        0
+      ],
+      [
+        255,
+        90,
+        0
+      ],
+      [
+        160,
+        0,
+        255
+      ]
+    ]
+  }
+}

@@ -635,5 +635,11 @@
       "accuracy_expert": 0.85,
       "accuracy_beginner": 0.3
     }
+  },
+  "chomp_chase": {
+    "sample_count": 7,
+    "last_calibrated": 0,
+    "thresholds": {},
+    "defaults": {}
   }
 }

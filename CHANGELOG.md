@@ -1,5 +1,19 @@
 # Pixel Challenge Changelog
 
+## v28.20.1 - Chomp Chase easier first-pass tuning
+- Bumped console to v28.20.1.
+- Updated Chomp Chase to v1.0.1-easier so ghosts no longer snap onto the player's lane at close range.
+- Slowed normal ghosts, slightly sped up the player, lengthened power mode, and added a longer ghost start/respawn delay.
+- Added a close-range ghost commitment window so the player can sidestep around a ghost instead of being hard-locked.
+- Added a short lane-change dodge grace to prevent unfair instant hits during quick left/right jukes.
+
+## v28.20.0 - Chomp Chase foundation
+- Bumped console to v28.20.0.
+- Added Chomp Chase as a new selectable game with a temporary splash screen.
+- Added the first playable foundation: ready-up, two-lane movement, dim white spaced dots, bottom lives, border, RGB power pellets, one ghost per player, scared blue ghost behavior, ghost-eaten pop animation, board refill, and basic fruit bonus.
+- Added games/chomp_chase/config.json with configurable player speed, ghost speed, power duration, dot spacing, lives, scoring, colors, and fruit timing.
+- Preserved global inverted playfield orientation and added chomp_chase to the controller action active-games list.
+
 ## v28.19.8 - Ascend warp sound sync
 - Bumped console to v28.19.8.
 - Updated Ascend to v2.1.12 so as_warp starts at the beginning of the center-out warp expansion instead of after expand_sec at the collapse boundary.

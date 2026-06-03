@@ -28,7 +28,6 @@ def build_game_registry() -> dict:
     except ImportError as e:
         print(f"[REGISTRY] Failed to load pixel_pop: {e}")
     
-    # Future games:
     # Import and register Surround
     try:
         from games.surround import SurroundModule
@@ -41,5 +40,11 @@ def build_game_registry() -> dict:
         registry["ascend"] = AscendModule()
     except ImportError as e:
         print(f"[REGISTRY] Failed to load ascend: {e}")
+
+    try:
+        from games.chomp_chase import ChompChaseModule
+        registry["chomp_chase"] = ChompChaseModule()
+    except ImportError as e:
+        print(f"[REGISTRY] Failed to load chomp_chase: {e}")
     
     return registry
