@@ -16,7 +16,7 @@
     "Sound Visualizer": 4
   },
   "selected_themes": [
-    "Sound Visualizer"
+    "Bounce Chase"
   ],
   "flame_theme_tuning": {
     "Candle Flame": {
@@ -86,22 +86,22 @@
       "peak_hold": 65
     }
   },
-  "sash_left_attract_bottom": 588,
+  "sash_left_attract_bottom": 599,
   "sash_center_ctrl": 401,
   "sash_main_info": 504,
-  "sash_bottom_log": 516,
-  "sash_center_mixer": 576,
+  "sash_bottom_log": 507,
+  "sash_center_mixer": 630,
   "sash_mixer_height": null,
   "falcon_brightness": 10,
   "gameplay_brightness": 20,
-  "music_volume": 12,
+  "music_volume": 0,
   "sfx_volume": 28,
   "voice_volume": 50,
-  "master_volume": 30,
+  "master_volume": 31,
   "falcon_ip": "192.168.2.25",
   "pixels_per_lane": 143,
   "pixel_sim_enabled": true,
-  "pixel_sim_ip": "192.168.2.250",
+  "pixel_sim_ip": "127.0.0.1",
   "pixel_sim_include_dmx": true,
   "wifi_dhcp": true,
   "wifi_ssid": "skynet",
@@ -120,7 +120,7 @@
   "debug_logging": true,
   "setup_geometry": "1244x922+132+31",
   "game_mode": 1,
-  "window_geometry": "1854x1011+66+32",
+  "window_geometry": "1854x1011+52+20",
   "dmx_universe": 9,
   "dmx_num_fixtures": 4,
   "dmx_channels_per_fixture": 8,

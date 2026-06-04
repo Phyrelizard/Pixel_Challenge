@@ -1,5 +1,36 @@
 # Pixel Challenge Changelog
 
+## v28.20.5 - Chomp Chase ghost train and audio placeholders
+- Bumped console to v28.20.5.
+- Updated Chomp Chase to v1.0.4-train-audio with default train-style ghost movement so four ghosts stay in one spaced lane instead of forming an impenetrable two-lane wall.
+- Added ghost_train_lane, ghost_lane_policy, ghost_train_lane_switch_chance, larger ghost spacing, and revised speed offsets so ghosts stay separated while remaining configurable.
+- Added configurable field power pellets with field_enabled, field_per_lane_count, and field_margin_from_edges_px so power pellets can be sprinkled throughout each lane.
+- Changed scared ghost behavior so blue ghosts are slower, hesitate, do not auto-juke into the other lane in train mode, and can be caught with a wider powered catch radius.
+- Added eaten-ghost RGB strobe retreat animation: eaten ghosts flash/strobe back to the top, wait through the respawn timeout, then re-enter play.
+- Added Chomp Chase audio keys and placeholder WAV files for dot, power, ghost-eat, player-hit, fruit, round-start, round-clear, game-over, ready, and temporary gameplay/splash music.
+
+## v28.20.4 - Chomp Chase ghost spacing and motion balance
+- Bumped console to v28.20.4.
+- Updated Chomp Chase to v1.0.3-motion-balance with ghost no-overlap spacing, larger spawn separation, and per-ghost speed offsets so multiple ghosts do not stack on top of each other.
+- Added smoother gliding render interpolation for player and ghost movement so sprites slide between pixels instead of hard stepping from one LED to the next.
+- Reworked scared ghost movement so blue ghosts hesitate, lane-switch less aggressively, and remain catchable when the player traps or chases them.
+- Added a powered catch radius and lengthened default power mode to make eating ghosts feel achievable without making normal ghost hits unfair.
+
+## v28.20.3 - Chomp Chase layout and ghost configuration
+- Bumped console to v28.20.3, preserving the v28.20.2 local simulator offline mirror fix.
+- Updated Chomp Chase to v1.0.2-layout-config with configurable ghost_count from 1-4 ghosts per player.
+- Added configurable player_start_position and player_start_lane so the player can start at bottom, middle, top, random, or a numeric pixel.
+- Added configurable bottom/top power pellet zones with per-lane count, top enable, bottom enable, and even-lane stagger offset.
+- Added dot_stagger_even_lanes and dot_stagger_offset_px so every-other-pixel dots can be offset on the even lane for a cleaner staggered look.
+- Default Chomp Chase config now starts the player in the middle, uses four ghosts, uses every-other-pixel staggered dots, and staggers the even lane power pellets by one pixel.
+- Preserved global inverted playfield orientation in games/global.config.json.
+
+## v28.20.2 - Local simulator offline mirror fix
+- Bumped console to v28.20.2, based on Dana's uploaded v28.20.1 project folder.
+- Changed the optional pixel/DMX simulator mirror to use an independent raw UDP E1.31 sender instead of a second python-sacn sender.
+- Allows same-laptop simulator mode at 127.0.0.1 to keep working when the laptop is offline with no Wi-Fi, Ethernet, internet, gateway, or Falcon connected.
+- Preserved the real Falcon output path, Chomp Chase v28.20.1 easier tuning, Sound Visualizer, and ultra-dim output dithering behavior.
+
 ## v28.20.1 - Chomp Chase easier first-pass tuning
 - Bumped console to v28.20.1.
 - Updated Chomp Chase to v1.0.1-easier so ghosts no longer snap onto the player's lane at close range.

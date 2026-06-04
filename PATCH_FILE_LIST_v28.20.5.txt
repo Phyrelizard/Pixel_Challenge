@@ -1,0 +1,20 @@
+PATCH FILE LIST - v28.20.5 Chomp Chase train/audio patch
+
+pixel_challenge_console_v28.20.5.py
+CHANGELOG.md
+games/chomp_chase/__init__.py
+games/chomp_chase/chomp_chase.py
+games/chomp_chase/config.json
+assets/audio/chomp_chase/README_AUDIO_PLACEHOLDERS.txt
+assets/audio/chomp_chase/cc_ready.wav
+assets/audio/chomp_chase/cc_dot.wav
+assets/audio/chomp_chase/cc_power.wav
+assets/audio/chomp_chase/cc_ghost_eat.wav
+assets/audio/chomp_chase/cc_player_hit.wav
+assets/audio/chomp_chase/cc_fruit.wav
+assets/audio/chomp_chase/cc_round_start.wav
+assets/audio/chomp_chase/cc_round_clear.wav
+assets/audio/chomp_chase/cc_game_over.wav
+assets/audio/chomp_chase/cc_music_gameplay.wav
+READMEs/README_v28.20.5_chomp_chase_train_audio_patch.txt
+PATCH_FILE_LIST_v28.20.5.txt

@@ -4,15 +4,15 @@
   "phase": "running",
   "mode": 1,
   "instruction": "RUN!",
-  "time_remaining": 9,
+  "time_remaining": 28,
   "players": [
     {
       "id": 1,
       "ready": true,
-      "score": 6960,
-      "lives": 4,
+      "score": 24490,
+      "lives": 3,
       "boards_cleared": 3,
-      "dots_remaining": 92,
+      "dots_remaining": 255,
       "powered": false,
       "game_over": false,
       "completed_objective": false

@@ -1,16 +1,21 @@
 # -*- coding: utf-8 -*-
 """
-Chomp Chase Game Module v1.0.1-easier
+Chomp Chase Game Module v1.0.4-train-audio
 
 A two-lane 1D arcade chase game for Pixel Challenge.
-Foundation/easier tuning build for console v28.20.1:
+Train/audio/pellet tuning build for console v28.20.5:
 - no color-selection setup; players ready up with any button/direction
 - dim white dots every N pixels
 - four life LEDs at the bottom, two per lane
 - white divider border above lives
 - four pulsing RGB power pellets, two per lane
-- one colored ghost per player
+- configurable 1-4 ghosts per player
+- configurable bottom/top power pellet zones
+- configurable player start position and staggered dot/pellet patterns
 - scared blue ghosts scatter away after a power pellet
+- ghost train spacing/no-overlap protection so ghosts do not form a two-lane wall
+- catchable scared ghosts with hesitation, powered catch radius, and animated RGB retreat
+- configurable field power pellets and Chomp Chase audio keys
 - board refill after all dots are cleared
 """
 from __future__ import annotations
@@ -23,7 +28,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from games.base import GameMeta, GameModule, GamePhase, GameResult, GameSession, PlayerConfig
 
-VERSION_LABEL = "chomp_chase_v1.0.1-easier"
+VERSION_LABEL = "chomp_chase_v1.0.4-train-audio"
 Color = Tuple[int, int, int]
 
 BLACK: Color = (0, 0, 0)
@@ -33,15 +38,47 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "initial_lives": 4,
     "lane_pixel_count": 100,
     "dot_spacing": 3,
-    "player_move_ms": 110,
-    "ghost_move_ms": 330,
-    "scared_ghost_move_ms": 300,
-    "power_duration_sec": 7.0,
-    "ghost_respawn_sec": 1.6,
-    "ghost_start_delay_sec": 2.5,
+    "dot_stagger_even_lanes": False,
+    "dot_stagger_offset_px": 1,
+    "player_start_position": "bottom",
+    "player_start_lane": "left",
+    "ghost_count": 4,
+    "ghost_lane_policy": "train",
+    "ghost_train_lane": "right",
+    "ghost_train_lane_switch_chance": 0.0,
+    "ghost_min_separation_px": 8,
+    "ghost_spawn_separation_px": 11,
+    "ghost_speed_offsets_ms": [0, 90, 190, 320],
+    "powered_catch_distance_px": 2,
+    "scared_ghost_hesitation_chance": 0.25,
+    "scared_ghost_lane_switch_chance": 0.0,
+    "ghost_eaten_retreat_sec": 1.2,
+    "ghost_respawn_strobe_hz": 12.0,
+    "movement_glide": {
+        "enabled": True,
+        "player_fraction": 0.85,
+        "ghost_fraction": 0.90,
+        "minimum_duration_sec": 0.045,
+    },
+    "power_pellets": {
+        "bottom_enabled": True,
+        "top_enabled": False,
+        "per_lane_count": 2,
+        "stagger_even_lanes": False,
+        "stagger_offset_px": 1,
+        "field_enabled": True,
+        "field_per_lane_count": 3,
+        "field_margin_from_edges_px": 8,
+    },
+    "player_move_ms": 105,
+    "ghost_move_ms": 440,
+    "scared_ghost_move_ms": 650,
+    "power_duration_sec": 9.0,
+    "ghost_respawn_sec": 1.8,
+    "ghost_start_delay_sec": 3.0,
     "ghost_close_commit_distance": 9,
-    "ghost_lane_switch_chance": 0.12,
-    "ghost_random_lane_switch_chance": 0.03,
+    "ghost_lane_switch_chance": 0.04,
+    "ghost_random_lane_switch_chance": 0.01,
     "player_lane_change_grace_sec": 0.18,
     "hit_cooldown_sec": 1.0,
     "timed_duration_sec": 90,
@@ -78,8 +115,19 @@ class ChompGhost:
     lane: str
     pos: int
     normal_color: Color
+    ghost_id: int = 0
+    speed_offset_ms: int = 0
     respawn_until: float = 0.0
     next_move_at: float = 0.0
+    visual_from_pos: float = 0.0
+    visual_to_pos: float = 0.0
+    visual_started_at: float = 0.0
+    visual_duration_sec: float = 0.001
+    retreat_lane: Optional[str] = None
+    retreat_from_pos: float = 0.0
+    retreat_started_at: float = 0.0
+    retreat_duration_sec: float = 0.0
+    eaten_strobe: bool = False
 
 
 @dataclass
@@ -105,6 +153,10 @@ class ChompPlayerState:
     completed_objective: bool = False
     lane: str = "left"
     pos: int = 5
+    visual_from_pos: float = 5.0
+    visual_to_pos: float = 5.0
+    visual_started_at: float = 0.0
+    visual_duration_sec: float = 0.001
     held_vertical: Optional[str] = None
     next_player_move_at: float = 0.0
     lives: int = 4
@@ -148,19 +200,59 @@ class ChompChaseSession(GameSession):
         )
         self.initial_lives = self._safe_int(self.config.get("initial_lives"), 4, 1, 4)
         self.dot_spacing = self._safe_int(self.config.get("dot_spacing"), 3, 1, 20)
-        self.player_move_ms = self._safe_int(self.config.get("player_move_ms"), 110, 30, 2000)
-        self.ghost_move_ms = self._safe_int(self.config.get("ghost_move_ms"), 330, 30, 5000)
-        self.scared_ghost_move_ms = self._safe_int(self.config.get("scared_ghost_move_ms"), 300, 30, 5000)
+        self.dot_stagger_even_lanes = self._safe_bool(self.config.get("dot_stagger_even_lanes"), False)
+        self.dot_stagger_offset_px = self._safe_int(self.config.get("dot_stagger_offset_px"), 1, 0, 20)
+        self.player_start_position = self.config.get("player_start_position", "bottom")
+        self.player_start_lane = self._safe_lane(self.config.get("player_start_lane", "left"), "left")
+        self.ghost_count = self._safe_int(self.config.get("ghost_count"), 4, 1, 4)
+        self.ghost_lane_policy = str(self.config.get("ghost_lane_policy", "train") or "train").strip().lower()
+        if self.ghost_lane_policy not in ("train", "split", "alternating"):
+            self.ghost_lane_policy = "train"
+        self.ghost_train_lane = self._safe_lane(self.config.get("ghost_train_lane", "right"), "right")
+        self.ghost_train_lane_switch_chance = self._safe_float(self.config.get("ghost_train_lane_switch_chance"), 0.0, 0.0, 1.0)
+        self.ghost_min_separation_px = self._safe_int(self.config.get("ghost_min_separation_px"), 8, 0, 50)
+        self.ghost_spawn_separation_px = self._safe_int(self.config.get("ghost_spawn_separation_px"), 11, 1, 100)
+        self.ghost_speed_offsets_ms = self._safe_int_list(self.config.get("ghost_speed_offsets_ms"), [0, 90, 190, 320], 0, 5000)
+        self.powered_catch_distance_px = self._safe_int(self.config.get("powered_catch_distance_px"), 2, 0, 5)
+        self.scared_ghost_hesitation_chance = self._safe_float(self.config.get("scared_ghost_hesitation_chance"), 0.25, 0.0, 1.0)
+        self.scared_ghost_lane_switch_chance = self._safe_float(self.config.get("scared_ghost_lane_switch_chance"), 0.0, 0.0, 1.0)
+        self.ghost_eaten_retreat_sec = self._safe_float(self.config.get("ghost_eaten_retreat_sec"), 1.2, 0.0, 5.0)
+        self.ghost_respawn_strobe_hz = self._safe_float(self.config.get("ghost_respawn_strobe_hz"), 12.0, 1.0, 30.0)
+        glide_cfg = self.config.get("movement_glide") if isinstance(self.config.get("movement_glide"), dict) else {}
+        default_glide = DEFAULT_CONFIG["movement_glide"]
+        self.glide_enabled = self._safe_bool(glide_cfg.get("enabled", default_glide["enabled"]), True)
+        self.player_glide_fraction = self._safe_float(glide_cfg.get("player_fraction", default_glide["player_fraction"]), 0.85, 0.0, 1.0)
+        self.ghost_glide_fraction = self._safe_float(glide_cfg.get("ghost_fraction", default_glide["ghost_fraction"]), 0.90, 0.0, 1.0)
+        self.glide_min_duration_sec = self._safe_float(glide_cfg.get("minimum_duration_sec", default_glide["minimum_duration_sec"]), 0.045, 0.0, 1.0)
+        self.power_pellet_cfg = copy.deepcopy(DEFAULT_CONFIG["power_pellets"])
+        if isinstance(self.config.get("power_pellets"), dict):
+            self.power_pellet_cfg.update(self.config["power_pellets"])
+        self.bottom_power_enabled = self._safe_bool(self.power_pellet_cfg.get("bottom_enabled"), True)
+        self.top_power_enabled = self._safe_bool(self.power_pellet_cfg.get("top_enabled"), False)
+        self.power_pellet_count = self._safe_int(self.power_pellet_cfg.get("per_lane_count"), 2, 0, 12)
+        self.power_stagger_even_lanes = self._safe_bool(self.power_pellet_cfg.get("stagger_even_lanes"), False)
+        self.power_stagger_offset_px = self._safe_int(self.power_pellet_cfg.get("stagger_offset_px"), 1, 0, 20)
+        self.field_power_enabled = self._safe_bool(self.power_pellet_cfg.get("field_enabled"), True)
+        self.field_power_per_lane_count = self._safe_int(self.power_pellet_cfg.get("field_per_lane_count"), 3, 0, 20)
+        self.field_power_margin_px = self._safe_int(self.power_pellet_cfg.get("field_margin_from_edges_px"), 8, 0, 200)
+        max_bottom_offset = self.power_stagger_offset_px if self.bottom_power_enabled and self.power_stagger_even_lanes else 0
+        self.playfield_start = self.BORDER_PIXEL + 1
+        if self.bottom_power_enabled and self.power_pellet_count > 0:
+            self.playfield_start += self.power_pellet_count + max_bottom_offset
+        self.playfield_start = self._safe_int(self.playfield_start, self.PLAYFIELD_START, self.BORDER_PIXEL + 1, self.lane_pixel_count - 1)
+        self.player_move_ms = self._safe_int(self.config.get("player_move_ms"), 105, 30, 2000)
+        self.ghost_move_ms = self._safe_int(self.config.get("ghost_move_ms"), 440, 30, 5000)
+        self.scared_ghost_move_ms = self._safe_int(self.config.get("scared_ghost_move_ms"), 650, 30, 5000)
         if self.ghost_move_ms < self.player_move_ms:
             self.ghost_move_ms = self.player_move_ms + 40
         if self.scared_ghost_move_ms < self.player_move_ms:
             self.scared_ghost_move_ms = self.player_move_ms + 40
-        self.power_duration_sec = self._safe_float(self.config.get("power_duration_sec"), 7.0, 0.5, 60.0)
-        self.ghost_respawn_sec = self._safe_float(self.config.get("ghost_respawn_sec"), 1.6, 0.1, 10.0)
-        self.ghost_start_delay_sec = self._safe_float(self.config.get("ghost_start_delay_sec"), 2.5, 0.0, 10.0)
+        self.power_duration_sec = self._safe_float(self.config.get("power_duration_sec"), 9.0, 0.5, 60.0)
+        self.ghost_respawn_sec = self._safe_float(self.config.get("ghost_respawn_sec"), 1.8, 0.1, 10.0)
+        self.ghost_start_delay_sec = self._safe_float(self.config.get("ghost_start_delay_sec"), 3.0, 0.0, 10.0)
         self.ghost_close_commit_distance = self._safe_int(self.config.get("ghost_close_commit_distance"), 9, 0, 100)
-        self.ghost_lane_switch_chance = self._safe_float(self.config.get("ghost_lane_switch_chance"), 0.12, 0.0, 1.0)
-        self.ghost_random_lane_switch_chance = self._safe_float(self.config.get("ghost_random_lane_switch_chance"), 0.03, 0.0, 1.0)
+        self.ghost_lane_switch_chance = self._safe_float(self.config.get("ghost_lane_switch_chance"), 0.04, 0.0, 1.0)
+        self.ghost_random_lane_switch_chance = self._safe_float(self.config.get("ghost_random_lane_switch_chance"), 0.01, 0.0, 1.0)
         self.player_lane_change_grace_sec = self._safe_float(self.config.get("player_lane_change_grace_sec"), 0.18, 0.0, 1.0)
         self.hit_cooldown_sec = self._safe_float(self.config.get("hit_cooldown_sec"), 1.0, 0.1, 10.0)
         self.timed_duration_sec = self._safe_int(self.config.get("timed_duration_sec"), 90, 10, 3600)
@@ -183,11 +275,10 @@ class ChompChaseSession(GameSession):
         self.state: Dict[int, ChompPlayerState] = {}
         for idx, player in enumerate(players):
             ps = ChompPlayerState(player_id=player.player_id, lives=self.initial_lives)
-            ps.pos = self.PLAYFIELD_START
-            ps.lane = "left"
-            ghost_color = self.colors["ghosts"][idx % len(self.colors["ghosts"])]
-            ps.ghosts = [ChompGhost(lane="right", pos=max(self.PLAYFIELD_START, self.lane_pixel_count - 1), normal_color=ghost_color)]
+            self._place_player_at_start(ps)
+            ps.ghosts = self._make_ghosts(idx)
             self._refill_board(ps)
+            self._discard_dot_under_player(ps)
             self.state[player.player_id] = ps
 
     # ------------------------------------------------------------------
@@ -197,8 +288,8 @@ class ChompChaseSession(GameSession):
         self.phase = GamePhase.SETUP
         self.last_tick_time = self.host.now()
         self.host.clear_all_pixels()
-        self.host.log("=== CHOMP CHASE v1.0.1-easier ===")
-        self.host.log("Press any button/direction to ready up. Basic build: dots, lives, pellets, one ghost per player.")
+        self.host.log("=== CHOMP CHASE v1.0.4-train-audio ===")
+        self.host.log(f"Press any button/direction to ready up. Chomp Chase: {self.ghost_count} ghost(s), start={self.player_start_position}, top_pellets={self.top_power_enabled}.")
         self._render_all(self.last_tick_time)
         self._update_viewer("PRESS ANY BUTTON")
 
@@ -214,7 +305,7 @@ class ChompChaseSession(GameSession):
                 if not ps.ready:
                     ps.ready = True
                     self.host.log(f"[CHOMP] P{player_id} ready")
-                    self.host.play_sound("dd_shot_hit_correct")
+                    self.host.play_sound("cc_ready")
                 if all(p.ready for p in self.state.values()):
                     self.phase = GamePhase.READY
                     self.host.log("[CHOMP] All players ready - notifying console")
@@ -268,11 +359,16 @@ class ChompChaseSession(GameSession):
         for ps in self.state.values():
             ps.next_player_move_at = now
             ps.next_fruit_check_at = now + 2.0 + random.random() * 2.0
-            for ghost in ps.ghosts:
-                ghost.respawn_until = now + self.ghost_start_delay_sec
+            for ghost_index, ghost in enumerate(ps.ghosts):
+                ghost.respawn_until = now + self.ghost_start_delay_sec + ghost_index * 0.75
                 ghost.next_move_at = ghost.respawn_until
+                ghost.visual_from_pos = float(ghost.pos)
+                ghost.visual_to_pos = float(ghost.pos)
+                ghost.visual_started_at = now
+                ghost.visual_duration_sec = 0.001
         self.host.log(f"[CHOMP] GO - mode {self.mode}")
-        self.host.play_sound("dd_round_start")
+        self.host.play_sound("cc_round_start")
+        self.host.play_sound("cc_music_gameplay")
         self.host.visual_event("Gameplay", "on")
         self._render_all(now)
         self._update_viewer("CHOMP!")
@@ -370,9 +466,10 @@ class ChompChaseSession(GameSession):
         if now < ps.next_player_move_at:
             return
         direction = 1 if ps.held_vertical == "up" else -1
-        min_pos = self.POWER_PIXELS[0]
-        max_pos = max(self.PLAYFIELD_START, self.lane_pixel_count - 1)
-        ps.pos = max(min_pos, min(max_pos, ps.pos + direction))
+        min_pos = self._min_player_pos(ps)
+        max_pos = max(self.playfield_start, self.lane_pixel_count - 1)
+        new_pos = max(min_pos, min(max_pos, ps.pos + direction))
+        self._set_player_pos(ps, new_pos, now)
         ps.next_player_move_at = now + (self.player_move_ms / 1000.0)
         self._collect_at_player(ps, now)
 
@@ -380,14 +477,31 @@ class ChompChaseSession(GameSession):
         for ghost in ps.ghosts:
             if ghost.respawn_until > now:
                 continue
-            move_ms = self.scared_ghost_move_ms if ps.powered(now) else self._round_adjusted_ghost_ms(ps)
+            if ghost.eaten_strobe:
+                ghost.eaten_strobe = False
+                ghost.retreat_lane = None
+                ghost.retreat_started_at = 0.0
+                ghost.retreat_duration_sec = 0.0
+                ghost.visual_from_pos = float(ghost.pos)
+                ghost.visual_to_pos = float(ghost.pos)
+                ghost.visual_started_at = now
+                ghost.visual_duration_sec = 0.001
+            move_ms = self._ghost_move_interval_ms(ps, ghost, now)
             if now < ghost.next_move_at:
                 continue
+            old_pos = ghost.pos
             if ps.powered(now):
                 self._move_scared_ghost(ps, ghost)
             else:
                 self._move_normal_ghost(ps, ghost)
+            self._set_ghost_visual(ghost, old_pos, ghost.pos, now, move_ms)
             ghost.next_move_at = now + (move_ms / 1000.0)
+
+    def _ghost_move_interval_ms(self, ps: ChompPlayerState, ghost: ChompGhost, now: float) -> int:
+        base = self.scared_ghost_move_ms if ps.powered(now) else self._round_adjusted_ghost_ms(ps)
+        # Positive offsets intentionally separate the ghosts over time instead
+        # of letting four of them become one unfair stacked mega-ghost.
+        return max(self.player_move_ms + 35, int(base + ghost.speed_offset_ms))
 
     def _round_adjusted_ghost_ms(self, ps: ChompPlayerState) -> int:
         # Each cleared board tightens ghost timing a little, but never lets the ghost outrun the player.
@@ -395,41 +509,74 @@ class ChompChaseSession(GameSession):
         return max(self.player_move_ms + 35, adjusted)
 
     def _move_normal_ghost(self, ps: ChompPlayerState, ghost: ChompGhost) -> None:
-        # Chase vertically, but do NOT perfectly mirror the player's lane.
-        # With only two lanes, the player needs a close-range dodge window.
+        # Default v28.20.5 behavior: keep ghosts in a single spaced-out train.
+        # This prevents the unfair two-lane wall where the player has no route.
+        if self.ghost_lane_policy == "train":
+            target_pos = ghost.pos
+            if ghost.pos > ps.pos:
+                target_pos -= 1
+            elif ghost.pos < ps.pos:
+                target_pos += 1
+            desired_lane = ghost.lane
+            if self.ghost_train_lane_switch_chance > 0 and random.random() < self.ghost_train_lane_switch_chance:
+                desired_lane = self._other_lane(ghost.lane)
+            candidates = [
+                (desired_lane, target_pos),
+                (ghost.lane, target_pos),
+                (ghost.lane, ghost.pos),
+            ]
+            ghost.lane, ghost.pos = self._choose_ghost_move_without_overlap(ps, ghost, candidates)
+            return
+
+        # Split/alternating mode: chase vertically, but do NOT perfectly mirror
+        # the player's lane. With only two lanes, the player needs a close-range
+        # dodge window.
         distance = abs(ghost.pos - ps.pos)
+        desired_lane = ghost.lane
 
         if distance > self.ghost_close_commit_distance:
             if ghost.lane != ps.lane and random.random() < self.ghost_lane_switch_chance:
-                ghost.lane = ps.lane
+                desired_lane = ps.lane
             elif random.random() < self.ghost_random_lane_switch_chance:
-                ghost.lane = self._other_lane(ghost.lane)
+                desired_lane = self._other_lane(ghost.lane)
         # Inside the close commit distance, the ghost stays in its current lane.
-        # This lets the player sidestep around it instead of being hard-locked.
 
+        target_pos = ghost.pos
         if ghost.pos > ps.pos:
-            ghost.pos -= 1
+            target_pos -= 1
         elif ghost.pos < ps.pos:
-            ghost.pos += 1
-        else:
-            # Same height: hold lane instead of snapping to the player.
-            pass
-        ghost.pos = self._clamp_playfield_pos(ghost.pos)
+            target_pos += 1
 
-    def _move_scared_ghost(self, ps: ChompPlayerState, ghost: ChompGhost) -> None:
         candidates = [
-            (ghost.lane, ghost.pos - 1),
-            (ghost.lane, ghost.pos + 1),
-            (self._other_lane(ghost.lane), ghost.pos),
+            (desired_lane, target_pos),
+            (ghost.lane, target_pos),
+            (self._other_lane(ghost.lane), target_pos),
             (ghost.lane, ghost.pos),
         ]
-        legal = []
-        for lane, pos in candidates:
-            pos = self._clamp_playfield_pos(pos)
-            distance = abs(pos - ps.pos) + (0 if lane == ps.lane else 2)
-            legal.append((distance, random.random(), lane, pos))
-        legal.sort(reverse=True)
-        _, _, ghost.lane, ghost.pos = legal[0]
+        ghost.lane, ghost.pos = self._choose_ghost_move_without_overlap(ps, ghost, candidates)
+
+    def _move_scared_ghost(self, ps: ChompPlayerState, ghost: ChompGhost) -> None:
+        # Scared ghosts should scatter, but not become impossible to catch.
+        # They mostly run vertically away, hesitate sometimes, and only rarely
+        # switch lanes. This allows the player to trap and eat them.
+        if random.random() < self.scared_ghost_hesitation_chance:
+            candidates = [(ghost.lane, ghost.pos)]
+        else:
+            if ghost.pos > ps.pos:
+                target_pos = ghost.pos + 1
+            elif ghost.pos < ps.pos:
+                target_pos = ghost.pos - 1
+            else:
+                target_pos = ghost.pos + random.choice((-1, 1))
+            target_pos = self._clamp_playfield_pos(target_pos)
+            candidates = [(ghost.lane, target_pos), (ghost.lane, ghost.pos)]
+            if self.scared_ghost_lane_switch_chance > 0 and random.random() < self.scared_ghost_lane_switch_chance:
+                candidates.append((self._other_lane(ghost.lane), target_pos))
+            # In train mode, do not use the other lane as an automatic escape;
+            # the player needs to be able to trap and eat scared ghosts.
+            if self.ghost_lane_policy != "train":
+                candidates.append((self._other_lane(ghost.lane), ghost.pos))
+        ghost.lane, ghost.pos = self._choose_ghost_move_without_overlap(ps, ghost, candidates)
 
     def _tick_fruit(self, ps: ChompPlayerState, now: float) -> None:
         if not bool(self.fruit_cfg.get("enabled", True)):
@@ -459,7 +606,7 @@ class ChompChaseSession(GameSession):
             ps.dots[ps.lane].discard(ps.pos)
             ps.score += self._score_value("dot")
             ps.dots_eaten += 1
-            self.host.play_sound("dd_shot_hit_correct")
+            self.host.play_sound("cc_dot")
 
         if ps.pos in ps.power_pellets.get(ps.lane, set()):
             ps.power_pellets[ps.lane].discard(ps.pos)
@@ -467,7 +614,7 @@ class ChompChaseSession(GameSession):
             ps.pellets_eaten += 1
             ps.power_until = now + self.power_duration_sec
             ps.power_combo = 0
-            self.host.play_sound("dd_bonus_start")
+            self.host.play_sound("cc_power")
             self.host.visual_event("Special", "on")
             self.host.log(f"[CHOMP] P{ps.player_id} POWER MODE for {self.power_duration_sec:.1f}s")
 
@@ -476,7 +623,7 @@ class ChompChaseSession(GameSession):
             ps.score += points
             ps.fruit_eaten += 1
             ps.fruit = None
-            self.host.play_sound("dd_bonus_end")
+            self.host.play_sound("cc_fruit")
             self.host.visual_event("Bonus", "on")
             self.host.log(f"[CHOMP] P{ps.player_id} fruit bonus +{points}")
 
@@ -488,11 +635,14 @@ class ChompChaseSession(GameSession):
         for ghost in ps.ghosts:
             if ghost.respawn_until > now:
                 continue
-            if ghost.lane == ps.lane and ghost.pos == ps.pos:
-                if ps.powered(now):
-                    self._eat_ghost(ps, ghost, now)
-                else:
-                    self._player_hit(ps, ghost, now)
+            if ghost.lane != ps.lane:
+                continue
+            distance = abs(ghost.pos - ps.pos)
+            if ps.powered(now) and distance <= self.powered_catch_distance_px:
+                self._eat_ghost(ps, ghost, now)
+                break
+            if distance == 0:
+                self._player_hit(ps, ghost, now)
                 break
 
     def _eat_ghost(self, ps: ChompPlayerState, ghost: ChompGhost, now: float) -> None:
@@ -501,11 +651,23 @@ class ChompChaseSession(GameSession):
         ps.score += points
         ps.ghosts_eaten += 1
         ps.animations.append(GhostEatAnimation(lane=ghost.lane, pos=ghost.pos, started_at=now))
-        ghost.respawn_until = now + self.ghost_respawn_sec
-        ghost.pos = max(self.PLAYFIELD_START, self.lane_pixel_count - 1)
-        ghost.lane = random.choice(list(self.LANES))
+        eaten_lane = ghost.lane
+        eaten_pos = ghost.pos
+        top = max(self.playfield_start, self.lane_pixel_count - 1)
+        ghost.retreat_lane = eaten_lane
+        ghost.retreat_from_pos = float(eaten_pos)
+        ghost.retreat_started_at = now
+        ghost.retreat_duration_sec = self.ghost_eaten_retreat_sec
+        ghost.eaten_strobe = True
+        ghost.respawn_until = now + self.ghost_eaten_retreat_sec + self.ghost_respawn_sec
+        ghost.pos = top
+        ghost.lane = self.ghost_train_lane if self.ghost_lane_policy == "train" else eaten_lane
+        ghost.visual_from_pos = float(ghost.pos)
+        ghost.visual_to_pos = float(ghost.pos)
+        ghost.visual_started_at = now
+        ghost.visual_duration_sec = 0.001
         ghost.next_move_at = ghost.respawn_until
-        self.host.play_sound("dd_lane_clear")
+        self.host.play_sound("cc_ghost_eat")
         self.host.visual_event("Bonus", "on")
         self.host.log(f"[CHOMP] P{ps.player_id} ate a ghost +{points}")
 
@@ -514,7 +676,7 @@ class ChompChaseSession(GameSession):
             return
         ps.last_hit_at = now
         ps.lives -= 1
-        self.host.play_sound("dd_shot_hit_wrong")
+        self.host.play_sound("cc_player_hit")
         self.host.visual_event("Danger", "on")
         try:
             self.host.rumble_player(ps.player_id, reason="hit")
@@ -524,17 +686,13 @@ class ChompChaseSession(GameSession):
         if ps.lives <= 0:
             ps.game_over = True
             ps.held_vertical = None
-            self.host.play_sound("game_over")
+            self.host.play_sound("cc_game_over")
             self.host.log(f"[CHOMP] P{ps.player_id} GAME OVER")
             return
-        ps.pos = self.PLAYFIELD_START
-        ps.lane = "left"
+        self._place_player_at_start(ps)
         ps.power_until = 0.0
         ps.power_combo = 0
-        ghost.pos = max(self.PLAYFIELD_START, self.lane_pixel_count - 1)
-        ghost.lane = "right"
-        ghost.respawn_until = now + self.ghost_start_delay_sec
-        ghost.next_move_at = ghost.respawn_until
+        self._reset_ghosts(ps, now, delay=self.ghost_start_delay_sec)
 
     def _check_board_clear(self, ps: ChompPlayerState, now: float) -> None:
         if ps.dots["left"] or ps.dots["right"]:
@@ -543,7 +701,7 @@ class ChompChaseSession(GameSession):
         ps.score += self._score_value("board_clear") + unused * self._score_value("unused_power_pellet_bonus")
         ps.boards_cleared += 1
         ps.round_number += 1
-        self.host.play_sound("dd_round_end")
+        self.host.play_sound("cc_round_clear")
         self.host.visual_event("Overlay 2", "on")
         self.host.log(f"[CHOMP] P{ps.player_id} board clear #{ps.boards_cleared}")
         if self.mode == 2 and ps.boards_cleared >= self.objective_boards_to_clear:
@@ -553,22 +711,18 @@ class ChompChaseSession(GameSession):
             self._finish_session(now, f"P{ps.player_id} WINS")
             return
         self._refill_board(ps)
-        ps.pos = self.PLAYFIELD_START
-        ps.lane = "left"
+        self._place_player_at_start(ps)
+        self._discard_dot_under_player(ps)
         ps.power_until = 0.0
         ps.power_combo = 0
-        for ghost in ps.ghosts:
-            ghost.pos = max(self.PLAYFIELD_START, self.lane_pixel_count - 1)
-            ghost.lane = "right"
-            ghost.respawn_until = now + self.ghost_start_delay_sec
-            ghost.next_move_at = ghost.respawn_until
+        self._reset_ghosts(ps, now, delay=self.ghost_start_delay_sec)
 
     def _finish_session(self, now: float, reason: str) -> None:
         if self.phase not in (GamePhase.RUNNING, GamePhase.READY, GamePhase.SETUP):
             return
         self.phase = GamePhase.ROUND_COMPLETE
         self.completed_at = now
-        self.host.play_sound("dd_round_end")
+        self.host.play_sound("cc_round_clear")
         self.host.visual_event("Overlay 4", "on")
         self.host.log(f"[CHOMP] {reason} - session finishing")
         self._render_all(now)
@@ -578,15 +732,159 @@ class ChompChaseSession(GameSession):
     # Board setup
     # ------------------------------------------------------------------
     def _refill_board(self, ps: ChompPlayerState) -> None:
-        top = max(self.PLAYFIELD_START, self.lane_pixel_count - 1)
-        first_dot = self.PLAYFIELD_START + max(1, self.dot_spacing - 1)
+        top = max(self.playfield_start, self.lane_pixel_count - 1)
+        ps.power_pellets = self._make_power_pellets()
         ps.dots = {"left": set(), "right": set()}
         for lane in self.LANES:
+            lane_offset = self._dot_stagger_offset_for_lane(lane) if self.dot_stagger_even_lanes else 0
+            first_dot = self.playfield_start + max(0, self.dot_spacing - 1) + lane_offset
             for pos in range(first_dot, top + 1, self.dot_spacing):
-                ps.dots[lane].add(pos)
-        ps.power_pellets = {"left": set(self.POWER_PIXELS), "right": set(self.POWER_PIXELS)}
+                if pos not in ps.power_pellets.get(lane, set()):
+                    ps.dots[lane].add(pos)
         ps.fruit = None
         ps.animations.clear()
+
+    def _place_player_at_start(self, ps: ChompPlayerState) -> None:
+        ps.lane = self._safe_lane(self.player_start_lane, "left")
+        ps.pos = self._resolve_start_pos(self.player_start_position)
+        ps.visual_from_pos = float(ps.pos)
+        ps.visual_to_pos = float(ps.pos)
+        ps.visual_started_at = self.host.now() if hasattr(self, "host") else 0.0
+        ps.visual_duration_sec = 0.001
+
+    def _discard_dot_under_player(self, ps: ChompPlayerState) -> None:
+        # Starting in the middle can land directly on a dot. Remove that one so
+        # the player does not leave a dot behind under their starting pixel.
+        ps.dots.get(ps.lane, set()).discard(ps.pos)
+
+    def _resolve_start_pos(self, value: Any) -> int:
+        top = max(self.playfield_start, self.lane_pixel_count - 1)
+        text = str(value).strip().lower()
+        if text in ("middle", "mid", "center", "centre"):
+            return self._clamp_player_pos((self.playfield_start + top) // 2)
+        if text in ("top", "upper"):
+            return self._clamp_player_pos(top)
+        if text in ("random", "rand"):
+            return self._clamp_player_pos(random.randint(self.playfield_start, top))
+        if text in ("bottom", "lower", "start", "default"):
+            return self._clamp_player_pos(self.playfield_start)
+        try:
+            return self._clamp_player_pos(int(value))
+        except Exception:
+            return self._clamp_player_pos(self.playfield_start)
+
+    def _clamp_player_pos(self, pos: int) -> int:
+        min_pos = self.BORDER_PIXEL + 1
+        max_pos = max(self.playfield_start, self.lane_pixel_count - 1)
+        return max(min_pos, min(max_pos, int(pos)))
+
+    def _min_player_pos(self, ps: ChompPlayerState) -> int:
+        bottoms = [pos for pos in ps.power_pellets.get(ps.lane, set()) if pos < self.playfield_start]
+        if bottoms:
+            return max(self.BORDER_PIXEL + 1, min(bottoms))
+        return self.playfield_start
+
+    def _make_ghosts(self, player_index: int = 0) -> List[ChompGhost]:
+        ghosts: List[ChompGhost] = []
+        top = max(self.playfield_start, self.lane_pixel_count - 1)
+        spawn_lanes = ("right", "left")
+        for ghost_index in range(self.ghost_count):
+            if self.ghost_lane_policy == "train":
+                lane = self.ghost_train_lane
+            else:
+                lane = spawn_lanes[ghost_index % len(spawn_lanes)]
+            # Spread ghosts vertically at spawn so four ghosts begin as a
+            # spaced train instead of a wall. The speed offsets keep them from
+            # re-stacking later.
+            pos = self._clamp_playfield_pos(top - ghost_index * self.ghost_spawn_separation_px)
+            color = self.colors["ghosts"][ghost_index % len(self.colors["ghosts"])]
+            speed_offset = self.ghost_speed_offsets_ms[ghost_index % len(self.ghost_speed_offsets_ms)] if self.ghost_speed_offsets_ms else ghost_index * 70
+            ghost = ChompGhost(lane=lane, pos=pos, normal_color=color, ghost_id=ghost_index, speed_offset_ms=speed_offset)
+            ghost.visual_from_pos = float(pos)
+            ghost.visual_to_pos = float(pos)
+            ghosts.append(ghost)
+        return ghosts
+
+    def _reset_ghosts(self, ps: ChompPlayerState, now: float, delay: float = 0.0) -> None:
+        fresh = self._make_ghosts(ps.player_id - 1)
+        for idx, ghost in enumerate(ps.ghosts):
+            template = fresh[idx % len(fresh)]
+            ghost.lane = template.lane
+            ghost.pos = template.pos
+            ghost.normal_color = template.normal_color
+            ghost.ghost_id = template.ghost_id
+            ghost.speed_offset_ms = template.speed_offset_ms
+            ghost.respawn_until = now + delay + idx * 0.75
+            ghost.next_move_at = ghost.respawn_until
+            ghost.visual_from_pos = float(ghost.pos)
+            ghost.visual_to_pos = float(ghost.pos)
+            ghost.visual_started_at = now
+            ghost.visual_duration_sec = 0.001
+            ghost.retreat_lane = None
+            ghost.retreat_from_pos = 0.0
+            ghost.retreat_started_at = 0.0
+            ghost.retreat_duration_sec = 0.0
+            ghost.eaten_strobe = False
+
+    def _make_power_pellets(self) -> Dict[str, Set[int]]:
+        pellets: Dict[str, Set[int]] = {"left": set(), "right": set()}
+        if self.power_pellet_count <= 0 and (not self.field_power_enabled or self.field_power_per_lane_count <= 0):
+            return pellets
+        bottom_base = self.BORDER_PIXEL + 1
+        top = max(self.playfield_start, self.lane_pixel_count - 1)
+        # Keep the top-most pixel free as a ghost warning/spawn pixel when top pellets are enabled.
+        top_base = max(self.playfield_start, top - self.power_pellet_count)
+        for lane in self.LANES:
+            offset = self._stagger_offset_for_lane(lane) if self.power_stagger_even_lanes else 0
+            if self.bottom_power_enabled:
+                for i in range(self.power_pellet_count):
+                    pos = bottom_base + i + offset
+                    if self.BORDER_PIXEL < pos < self.lane_pixel_count:
+                        pellets[lane].add(pos)
+            if self.top_power_enabled:
+                for i in range(self.power_pellet_count):
+                    pos = top_base + i - offset
+                    if self.playfield_start <= pos < self.lane_pixel_count:
+                        pellets[lane].add(pos)
+            if self.field_power_enabled and self.field_power_per_lane_count > 0:
+                candidates = self._field_power_candidates(lane, pellets[lane])
+                if candidates:
+                    take = min(self.field_power_per_lane_count, len(candidates))
+                    for pos in random.sample(candidates, take):
+                        pellets[lane].add(pos)
+        return pellets
+
+    def _field_power_candidates(self, lane: str, reserved: Set[int]) -> List[int]:
+        top = max(self.playfield_start, self.lane_pixel_count - 1)
+        low = min(top, self.playfield_start + self.field_power_margin_px)
+        high = max(low, top - self.field_power_margin_px)
+        if high < low:
+            return []
+        lane_offset = self._dot_stagger_offset_for_lane(lane) if self.dot_stagger_even_lanes else 0
+        first = self.playfield_start + max(0, self.dot_spacing - 1) + lane_offset
+        while first < low:
+            first += max(1, self.dot_spacing)
+        candidates: List[int] = []
+        for pos in range(first, high + 1, max(1, self.dot_spacing)):
+            if pos in reserved:
+                continue
+            # Keep pellets from being jammed directly next to each other.
+            if any(abs(pos - existing) < max(2, self.dot_spacing) for existing in reserved):
+                continue
+            candidates.append(pos)
+        return candidates
+
+    def _dot_stagger_offset_for_lane(self, lane: str) -> int:
+        return self.dot_stagger_offset_px if self._lane_number(lane) % 2 == 0 else 0
+
+    def _stagger_offset_for_lane(self, lane: str) -> int:
+        return self.power_stagger_offset_px if self._lane_number(lane) % 2 == 0 else 0
+
+    def _lane_number(self, lane: str) -> int:
+        try:
+            return list(self.LANES).index(lane) + 1
+        except ValueError:
+            return 1
 
     # ------------------------------------------------------------------
     # Rendering
@@ -632,8 +930,8 @@ class ChompChaseSession(GameSession):
         for lane in self.LANES:
             if self.BORDER_PIXEL < self.lane_pixel_count:
                 frames[lane][self.BORDER_PIXEL] = self.colors["border"]
-            for pos in self.POWER_PIXELS:
-                if pos < self.lane_pixel_count and pos in ps.power_pellets.get(lane, set()):
+            for pos in ps.power_pellets.get(lane, set()):
+                if 0 <= pos < self.lane_pixel_count:
                     frames[lane][pos] = self._rgb_pulse(now, speed=2.4)
 
     def _draw_dots(self, frames: Dict[str, List[Color]], ps: ChompPlayerState) -> None:
@@ -653,17 +951,40 @@ class ChompChaseSession(GameSession):
         scared = ps.powered(now)
         for ghost in ps.ghosts:
             if ghost.respawn_until > now:
-                # Respawn warning pulse at the top.
-                if int(now * 8) % 2 == 0:
-                    pos = max(self.PLAYFIELD_START, self.lane_pixel_count - 1)
-                    color = self.colors["scared_ghost"] if scared else ghost.normal_color
-                    frames[ghost.lane][pos] = color
+                self._draw_respawning_ghost(frames, ghost, now, scared)
                 continue
             color = self.colors["scared_ghost"] if scared else ghost.normal_color
             if scared and ps.power_until - now < 1.4 and int(now * 10) % 2 == 0:
                 color = WHITE
-            if 0 <= ghost.pos < self.lane_pixel_count:
-                frames[ghost.lane][ghost.pos] = color
+            render_pos = self._render_pos(ghost.visual_from_pos, ghost.visual_to_pos, ghost.visual_started_at, ghost.visual_duration_sec, now)
+            self._draw_glide_pixel(frames[ghost.lane], render_pos, color)
+
+    def _draw_respawning_ghost(self, frames: Dict[str, List[Color]], ghost: ChompGhost, now: float, scared: bool) -> None:
+        top = max(self.playfield_start, self.lane_pixel_count - 1)
+        lane = ghost.retreat_lane or ghost.lane
+        if ghost.eaten_strobe and ghost.retreat_started_at > 0.0:
+            elapsed = now - ghost.retreat_started_at
+            if elapsed < max(0.001, ghost.retreat_duration_sec):
+                t = max(0.0, min(1.0, elapsed / max(0.001, ghost.retreat_duration_sec)))
+                # Ease upward, then strobe RGB as the eaten ghost retreats to spawn.
+                t = t * t * (3.0 - 2.0 * t)
+                pos = ghost.retreat_from_pos + (top - ghost.retreat_from_pos) * t
+                self._draw_glide_pixel(frames[lane], pos, self._ghost_strobe_color(now))
+                return
+            # At the top, keep a bright strobe while it waits out the respawn timeout.
+            if int(now * self.ghost_respawn_strobe_hz) % 2 == 0:
+                self._max_pixel(frames[ghost.lane], top, self._ghost_strobe_color(now))
+            return
+
+        # Normal start/respawn warning pulse at the top.
+        if int(now * 8) % 2 == 0:
+            color = self.colors["scared_ghost"] if scared else ghost.normal_color
+            self._max_pixel(frames[ghost.lane], top, color)
+
+    def _ghost_strobe_color(self, now: float) -> Color:
+        palette = ((255, 0, 0), (0, 255, 0), (0, 90, 255))
+        idx = int(now * self.ghost_respawn_strobe_hz) % len(palette)
+        return palette[idx]
 
     def _draw_animations(self, frames: Dict[str, List[Color]], ps: ChompPlayerState, now: float) -> None:
         still_active: List[GhostEatAnimation] = []
@@ -692,12 +1013,12 @@ class ChompChaseSession(GameSession):
             color = self._rgb_pulse(now, speed=3.0)
         else:
             color = self.colors["player"]
-        if 0 <= ps.pos < self.lane_pixel_count:
-            frames[ps.lane][ps.pos] = color
+        render_pos = self._render_pos(ps.visual_from_pos, ps.visual_to_pos, ps.visual_started_at, ps.visual_duration_sec, now)
+        self._draw_glide_pixel(frames[ps.lane], render_pos, color)
         # Tiny powered sparkle behind the player without changing the main yellow body.
         if ps.powered(now):
             behind = ps.pos - 1 if ps.held_vertical == "up" else ps.pos + 1
-            if self.PLAYFIELD_START <= behind < self.lane_pixel_count:
+            if self.playfield_start <= behind < self.lane_pixel_count:
                 frames[ps.lane][behind] = (0, 70, 255)
 
     def _draw_game_over(self, frames: Dict[str, List[Color]], now: float) -> None:
@@ -705,8 +1026,93 @@ class ChompChaseSession(GameSession):
             return
         red = (160, 0, 0)
         for lane in self.LANES:
-            for pos in range(self.PLAYFIELD_START, min(self.lane_pixel_count, self.PLAYFIELD_START + 12)):
+            for pos in range(self.playfield_start, min(self.lane_pixel_count, self.playfield_start + 12)):
                 frames[lane][pos] = red
+
+    def _set_player_pos(self, ps: ChompPlayerState, new_pos: int, now: float) -> None:
+        old_pos = ps.pos
+        ps.pos = int(new_pos)
+        if self.glide_enabled and old_pos != ps.pos:
+            ps.visual_from_pos = float(old_pos)
+            ps.visual_to_pos = float(ps.pos)
+            ps.visual_started_at = now
+            ps.visual_duration_sec = max(self.glide_min_duration_sec, (self.player_move_ms / 1000.0) * self.player_glide_fraction)
+        else:
+            ps.visual_from_pos = float(ps.pos)
+            ps.visual_to_pos = float(ps.pos)
+            ps.visual_started_at = now
+            ps.visual_duration_sec = 0.001
+
+    def _set_ghost_visual(self, ghost: ChompGhost, old_pos: int, new_pos: int, now: float, move_ms: int) -> None:
+        if self.glide_enabled and old_pos != new_pos:
+            ghost.visual_from_pos = float(old_pos)
+            ghost.visual_to_pos = float(new_pos)
+            ghost.visual_started_at = now
+            ghost.visual_duration_sec = max(self.glide_min_duration_sec, (move_ms / 1000.0) * self.ghost_glide_fraction)
+        else:
+            ghost.visual_from_pos = float(new_pos)
+            ghost.visual_to_pos = float(new_pos)
+            ghost.visual_started_at = now
+            ghost.visual_duration_sec = 0.001
+
+    def _render_pos(self, start: float, end: float, started_at: float, duration: float, now: float) -> float:
+        if not self.glide_enabled or duration <= 0.001:
+            return end
+        t = max(0.0, min(1.0, (now - started_at) / max(0.001, duration)))
+        # Smoothstep easing: starts and stops softly instead of hard stepping.
+        t = t * t * (3.0 - 2.0 * t)
+        return start + (end - start) * t
+
+    def _draw_glide_pixel(self, lane_pixels: List[Color], pos_float: float, color: Color) -> None:
+        if not lane_pixels:
+            return
+        pos_float = max(0.0, min(float(len(lane_pixels) - 1), float(pos_float)))
+        lower = int(math.floor(pos_float))
+        upper = int(math.ceil(pos_float))
+        if lower == upper:
+            self._max_pixel(lane_pixels, lower, color)
+            return
+        frac = pos_float - lower
+        # Keep a little minimum body on each side so the sprite looks like it is
+        # sliding between pixels instead of simply fading out/in.
+        low_weight = max(0.18, 1.0 - frac)
+        high_weight = max(0.18, frac)
+        self._max_pixel(lane_pixels, lower, self._scale_color(color, low_weight))
+        self._max_pixel(lane_pixels, upper, self._scale_color(color, high_weight))
+
+    @staticmethod
+    def _scale_color(color: Color, weight: float) -> Color:
+        return (
+            max(0, min(255, int(color[0] * weight))),
+            max(0, min(255, int(color[1] * weight))),
+            max(0, min(255, int(color[2] * weight))),
+        )
+
+    @staticmethod
+    def _max_pixel(pixels: List[Color], pos: int, color: Color) -> None:
+        if not (0 <= pos < len(pixels)):
+            return
+        existing = pixels[pos]
+        pixels[pos] = (max(existing[0], color[0]), max(existing[1], color[1]), max(existing[2], color[2]))
+
+    def _choose_ghost_move_without_overlap(self, ps: ChompPlayerState, ghost: ChompGhost, candidates: List[Tuple[str, int]]) -> Tuple[str, int]:
+        for lane, pos in candidates:
+            pos = self._clamp_playfield_pos(pos)
+            if not self._ghost_conflicts(ps, ghost, lane, pos):
+                return lane, pos
+        # Last resort: stay put. If the current position is already crowded,
+        # allow the least-bad current position rather than stacking another move.
+        return ghost.lane, self._clamp_playfield_pos(ghost.pos)
+
+    def _ghost_conflicts(self, ps: ChompPlayerState, ghost: ChompGhost, lane: str, pos: int) -> bool:
+        if self.ghost_min_separation_px <= 0:
+            return False
+        for other in ps.ghosts:
+            if other is ghost or other.respawn_until > self.host.now():
+                continue
+            if other.lane == lane and abs(other.pos - pos) < self.ghost_min_separation_px:
+                return True
+        return False
 
     # ------------------------------------------------------------------
     # Viewer / helpers
@@ -752,7 +1158,7 @@ class ChompChaseSession(GameSession):
         return "right" if lane == "left" else "left"
 
     def _clamp_playfield_pos(self, pos: int) -> int:
-        return max(self.PLAYFIELD_START, min(max(self.PLAYFIELD_START, self.lane_pixel_count - 1), int(pos)))
+        return max(self.playfield_start, min(max(self.playfield_start, self.lane_pixel_count - 1), int(pos)))
 
     def _rgb_pulse(self, now: float, speed: float = 2.0) -> Color:
         phase = now * speed * math.pi * 2.0
@@ -797,12 +1203,48 @@ class ChompChaseSession(GameSession):
                 base[key] = value
 
     @staticmethod
+    def _safe_bool(value: Any, default: bool = False) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        text = str(value).strip().lower()
+        if text in ("1", "true", "yes", "y", "on", "enabled"):
+            return True
+        if text in ("0", "false", "no", "n", "off", "disabled"):
+            return False
+        return default
+
+    def _safe_lane(self, value: Any, default: str = "left") -> str:
+        text = str(value or "").strip().lower()
+        if text in self.LANES:
+            return text
+        if text in ("lane1", "lane_1", "1", "a"):
+            return "left"
+        if text in ("lane2", "lane_2", "2", "b"):
+            return "right"
+        return default
+
+    @staticmethod
     def _safe_int(value: Any, default: int, low: int, high: int) -> int:
         try:
             n = int(value)
         except Exception:
             n = default
         return max(low, min(high, n))
+
+    @staticmethod
+    def _safe_int_list(value: Any, default: List[int], low: int, high: int) -> List[int]:
+        if not isinstance(value, list):
+            value = default
+        out: List[int] = []
+        for item in value:
+            try:
+                n = int(item)
+            except Exception:
+                continue
+            out.append(max(low, min(high, n)))
+        return out or list(default)
 
     @staticmethod
     def _safe_float(value: Any, default: float, low: float, high: float) -> float:
@@ -833,10 +1275,10 @@ class ChompChaseModule(GameModule):
         title="Chomp Chase",
         min_players=1,
         max_players=4,
-        version="v1.0.1-easier",
+        version="v1.0.4-train-audio",
         requires_color_selection=False,
         supports_sla=True,
-        description="Two-lane 1D arcade chase: eat dots, grab power pellets, and chase scared ghosts.",
+        description="Two-lane 1D arcade chase: eat dots, grab scattered power pellets, and chase scared ghosts.",
     )
 
     def create_session(self, host, players, settings=None) -> ChompChaseSession:

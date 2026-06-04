@@ -4,7 +4,7 @@
   "udp_port": 5568,
   "pixels_per_lane": 143,
   "color_order": "RGB",
-  "brightness_scale": 3.0,
+  "brightness_scale": 25.0,
   "display_gamma": 0.45,
   "pixel_gap": 1,
   "notes": "Pixels U1-U8; DMX U9. Simulator brightness/gamma is monitor-only and persists when changed. Sync DMX can import fixtures from a local copy or network share of Pixel Challenge dmx_visualizer_layouts.json; use the Project Folder button to point the simulator at the Pixel Challenge project folder.",
@@ -148,7 +148,7 @@
       "universe": 9,
       "start_address": 33,
       "channels": 8,
-      "profile_id": "venue_thintri38",
+      "profile_id": "venue_by_proline_thintri_38_copy",
       "channel_map": {
         "red": 1,
         "green": 2,
@@ -167,7 +167,7 @@
       "universe": 9,
       "start_address": 41,
       "channels": 8,
-      "profile_id": "venue_thintri38",
+      "profile_id": "venue_by_proline_thintri_38_copy",
       "channel_map": {
         "red": 1,
         "green": 2,
@@ -186,7 +186,7 @@
       "universe": 9,
       "start_address": 49,
       "channels": 8,
-      "profile_id": "venue_thintri38",
+      "profile_id": "venue_by_proline_thintri_38_copy",
       "channel_map": {
         "red": 1,
         "green": 2,
@@ -205,7 +205,7 @@
       "universe": 9,
       "start_address": 57,
       "channels": 8,
-      "profile_id": "venue_thintri38",
+      "profile_id": "venue_by_proline_thintri_38_copy",
       "channel_map": {
         "red": 1,
         "green": 2,
