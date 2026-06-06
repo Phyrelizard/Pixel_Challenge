@@ -2,7 +2,7 @@ import json
 import os
 import subprocess
 import tkinter as tk
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageEnhance
 
 
 class PixelChallengeViewer:
@@ -22,14 +22,25 @@ class PixelChallengeViewer:
         self.splash_path = os.path.join(self.assets_dir, "pixel_challenge_splash_final.png")
         self.command_file = os.path.join(self.app_dir, "viewer_command.txt")
         self.scoreboard_file = os.path.join(self.app_dir, "scoreboard_data.json")
+        self.console_command_file = os.path.join(self.app_dir, "console_command.txt")
+        self.tile_dir = os.path.join(self.assets_dir, "ui", "tiles")
 
         self.video_process = None
         self.current_overlay = None
         self.video_active = False
 
-        self.current_mode = "splash"  # splash | image | black | message | scoreboard | video
+        self.current_mode = "splash"  # splash | image | black | message | scoreboard | video | carousel
         self.current_photo = None
         self.current_image_path = None
+
+        # External carousel/menu-wand state
+        self.carousel_items = []
+        self.carousel_active_index = 0
+        self.carousel_canvas = None
+        self.carousel_bg_photo = None
+        self.carousel_tile_photos = []
+        self.carousel_animating = False
+        self.carousel_last_payload = {}
 
         # scoreboard state
         self.scoreboard_canvas = None
@@ -43,6 +54,10 @@ class PixelChallengeViewer:
         self.root.configure(bg="black")
 
         self.root.bind("<Escape>", self.exit_viewer)
+        self.root.bind("<Left>", lambda event: self.carousel_scroll(-1))
+        self.root.bind("<Right>", lambda event: self.carousel_scroll(1))
+        self.root.bind("<Return>", lambda event: self.activate_current_tile())
+        self.root.bind("<space>", lambda event: self.activate_current_tile())
 
         self.image_label = tk.Label(self.root, bg="black", bd=0, highlightthickness=0)
         self.image_label.pack(fill="both", expand=True)
@@ -88,6 +103,10 @@ class PixelChallengeViewer:
             except Exception:
                 pass
             self.current_overlay = None
+        self.carousel_canvas = None
+        self.carousel_bg_photo = None
+        self.carousel_tile_photos = []
+        self.carousel_animating = False
 
     def stop_scoreboard_poll(self):
         if self.scoreboard_poll_job is not None:
@@ -180,6 +199,207 @@ class PixelChallengeViewer:
                 width=self.screen_w - 200,
             )
         self.current_overlay = overlay
+
+    # ---------- external carousel / Wii menu-wand overlay ----------
+    def _load_tile_image(self, item_id: str, active: bool) -> Image.Image:
+        state = "active" if active else "inactive"
+        path = os.path.join(self.tile_dir, f"{item_id}_{state}.png")
+        if os.path.exists(path):
+            try:
+                return Image.open(path).convert("RGBA")
+            except Exception:
+                pass
+        # Fallback if artwork is missing. Real PNG tile art can replace these files.
+        label = item_id.replace("_", " ").upper()
+        w, h = (620, 280) if active else (520, 230)
+        img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        from PIL import ImageDraw, ImageFont
+        draw = ImageDraw.Draw(img)
+        fill = (20, 32, 72, 225) if active else (12, 18, 44, 190)
+        outline = (255, 230, 110, 255) if active else (95, 170, 255, 200)
+        draw.rounded_rectangle((10, 10, w - 10, h - 10), radius=42, fill=fill, outline=outline, width=5)
+        try:
+            font = ImageFont.truetype("DejaVuSans-Bold.ttf", 40 if active else 30)
+        except Exception:
+            font = ImageFont.load_default()
+        bbox = draw.textbbox((0, 0), label, font=font)
+        draw.text(((w - (bbox[2]-bbox[0])) / 2, (h - (bbox[3]-bbox[1])) / 2), label, font=font, fill=(255, 255, 255, 255))
+        return img
+
+    def _alpha_adjust(self, img: Image.Image, alpha_factor: float) -> Image.Image:
+        img = img.convert("RGBA")
+        if alpha_factor >= 0.99:
+            return img
+        r, g, b, a = img.split()
+        a = ImageEnhance.Brightness(a).enhance(max(0.0, min(1.0, alpha_factor)))
+        return Image.merge("RGBA", (r, g, b, a))
+
+    def _fit_background_photo(self, background_path: str | None):
+        path = background_path or self.splash_path
+        if not os.path.exists(path):
+            path = self.splash_path
+        try:
+            image = Image.open(path).convert("RGB")
+        except Exception:
+            image = Image.new("RGB", (self.screen_w, self.screen_h), "black")
+        fitted = self.fit_image_to_screen(image)
+        return ImageTk.PhotoImage(fitted)
+
+    def show_carousel(self, payload: dict | None = None):
+        payload = payload or {}
+        self.stop_video_if_running()
+        self.clear_scoreboard_canvas()
+        self.clear_overlay()
+        self.current_mode = "carousel"
+        self.carousel_last_payload = payload
+        self.carousel_items = payload.get("items") or [
+            {"id": "home", "label": "HOME"},
+            {"id": "previous_game", "label": "PREVIOUS GAME"},
+            {"id": "next_game", "label": "NEXT GAME"},
+            {"id": "start_game", "label": "START GAME"},
+            {"id": "score", "label": "SCORE"},
+            {"id": "menu", "label": "MENU"},
+        ]
+        if not self.carousel_items:
+            return
+        active = str(payload.get("active", "next_game"))
+        ids = [str(item.get("id", "")) for item in self.carousel_items]
+        self.carousel_active_index = ids.index(active) if active in ids else 0
+
+        canvas = tk.Canvas(
+            self.image_label,
+            width=self.screen_w,
+            height=self.screen_h,
+            bg="black",
+            highlightthickness=0,
+            bd=0,
+        )
+        canvas.place(x=0, y=0)
+        self.current_overlay = canvas
+        self.carousel_canvas = canvas
+        canvas.bind("<ButtonRelease-1>", self._carousel_mouse_release)
+        canvas.focus_set()
+
+        self.carousel_bg_photo = self._fit_background_photo(payload.get("background_path"))
+        self._draw_carousel_frame(0.0, 0)
+
+    def _draw_carousel_frame(self, t: float = 0.0, direction: int = 0):
+        if self.carousel_canvas is None or not self.carousel_items:
+            return
+        c = self.carousel_canvas
+        c.delete("all")
+        self.carousel_tile_photos = []
+        c.create_image(self.screen_w // 2, self.screen_h // 2, image=self.carousel_bg_photo)
+
+        # Darken the mid-band just enough for tile legibility while leaving splash art visible.
+        band_top = int(self.screen_h * 0.34)
+        band_bottom = int(self.screen_h * 0.66)
+        c.create_rectangle(0, band_top, self.screen_w, band_bottom, fill="#000000", stipple="gray50", outline="")
+
+        selected_game = self.carousel_last_payload.get("selected_game", "")
+        if selected_game:
+            c.create_text(
+                self.screen_w // 2,
+                int(self.screen_h * 0.22),
+                text=selected_game,
+                fill="#f8f7ff",
+                font=("Arial", 38, "bold"),
+            )
+
+        n = len(self.carousel_items)
+        center_x = self.screen_w / 2
+        center_y = self.screen_h / 2
+        spacing = min(520, self.screen_w * 0.27)
+        active_w = int(self.screen_w * 0.33)
+        inactive_w = int(self.screen_w * 0.235)
+
+        # Draw in back-to-front order so the center tile lands on top.
+        candidates = []
+        for raw_offset in (-2, -1, 0, 1, 2):
+            idx = (self.carousel_active_index + raw_offset) % n
+            anim_offset = raw_offset - (direction * t)
+            if -2.05 <= anim_offset <= 2.05:
+                candidates.append((abs(anim_offset), idx, anim_offset))
+        candidates.sort(reverse=True)
+
+        for _, idx, offset in candidates:
+            dist = min(1.0, abs(offset))
+            focus = max(0.0, 1.0 - dist)
+            target_w = int(inactive_w + (active_w - inactive_w) * focus)
+            alpha = 0.58 + 0.42 * focus
+            active = focus > 0.55
+            tile = self._load_tile_image(str(self.carousel_items[idx].get("id", "tile")), active)
+            ratio = target_w / max(1, tile.width)
+            target_h = max(1, int(tile.height * ratio))
+            tile = tile.resize((target_w, target_h), Image.LANCZOS)
+            tile = self._alpha_adjust(tile, alpha)
+            photo = ImageTk.PhotoImage(tile)
+            self.carousel_tile_photos.append(photo)
+            x = center_x + (offset * spacing)
+            y = center_y + (abs(offset) * 18)
+            c.create_image(int(x), int(y), image=photo)
+
+    def carousel_scroll(self, direction: int):
+        if self.current_mode != "carousel" or self.carousel_animating or not self.carousel_items:
+            return
+        direction = 1 if direction > 0 else -1
+        frames = 12
+        delay_ms = 18
+        self.carousel_animating = True
+
+        def step(frame: int):
+            t = frame / frames
+            # Smoothstep easing.
+            eased = t * t * (3 - 2 * t)
+            self._draw_carousel_frame(eased, direction)
+            if frame < frames:
+                self.root.after(delay_ms, lambda: step(frame + 1))
+            else:
+                self.carousel_active_index = (self.carousel_active_index + direction) % len(self.carousel_items)
+                self.carousel_animating = False
+                self._draw_carousel_frame(0.0, 0)
+        step(0)
+
+    def _carousel_mouse_release(self, event=None):
+        if self.current_mode != "carousel" or self.carousel_animating:
+            return
+        # Center tile click selects. Side clicks scroll toward that side.
+        if event is not None:
+            if event.x < self.screen_w * 0.34:
+                self.carousel_scroll(-1)
+                return
+            if event.x > self.screen_w * 0.66:
+                self.carousel_scroll(1)
+                return
+        self.activate_current_tile()
+
+    def activate_current_tile(self):
+        if self.current_mode != "carousel" or self.carousel_animating or not self.carousel_items:
+            return
+        item = self.carousel_items[self.carousel_active_index]
+        action = str(item.get("id", "")).strip()
+        if not action:
+            return
+        try:
+            with open(self.console_command_file, "w", encoding="utf-8") as f:
+                f.write(f"EXTERNAL_MENU|{action}\n")
+        except Exception as e:
+            self.show_message("MENU COMMAND ERROR", str(e))
+
+    def show_menu_placeholder(self):
+        self.stop_video_if_running()
+        self.clear_scoreboard_canvas()
+        self.clear_overlay()
+        self.current_mode = "menu_placeholder"
+        bg = self._fit_background_photo(self.carousel_last_payload.get("background_path") if self.carousel_last_payload else self.splash_path)
+        canvas = tk.Canvas(self.image_label, width=self.screen_w, height=self.screen_h, bg="black", highlightthickness=0, bd=0)
+        canvas.place(x=0, y=0)
+        self.current_overlay = canvas
+        self.carousel_bg_photo = bg
+        canvas.create_image(self.screen_w // 2, self.screen_h // 2, image=self.carousel_bg_photo)
+        canvas.create_rectangle(260, 230, self.screen_w - 260, self.screen_h - 230, fill="#061028", outline="#ffd84d", width=5)
+        canvas.create_text(self.screen_w // 2, self.screen_h // 2 - 35, text="MENU", fill="#ffd84d", font=("Arial", 56, "bold"))
+        canvas.create_text(self.screen_w // 2, self.screen_h // 2 + 40, text="Placeholder for future development", fill="white", font=("Arial", 28, "bold"))
 
     # ---------- video ----------
     def play_video(self, video_path: str):
@@ -649,6 +869,26 @@ class PixelChallengeViewer:
             self.root.deiconify()
             self.root.lift()
             self.show_image(image_path)
+            return
+
+        if cmd.startswith("SHOW_CAROUSEL|"):
+            body = cmd.split("|", 1)[1].strip()
+            try:
+                payload = json.loads(body) if body else {}
+            except Exception as e:
+                self.show_message("CAROUSEL PAYLOAD ERROR", str(e))
+                return
+            self.stop_video_if_running()
+            self.root.deiconify()
+            self.root.lift()
+            self.show_carousel(payload)
+            return
+
+        if cmd == "SHOW_MENU_PLACEHOLDER":
+            self.stop_video_if_running()
+            self.root.deiconify()
+            self.root.lift()
+            self.show_menu_placeholder()
             return
 
         if cmd.startswith("PLAY_VIDEO|"):

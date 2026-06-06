@@ -1,0 +1,5 @@
+{
+  "background_mode": "selected_game_splash",
+  "custom_background_path": "assets/external_carousel_background.png",
+  "scoreboard_return_seconds": 30
+}

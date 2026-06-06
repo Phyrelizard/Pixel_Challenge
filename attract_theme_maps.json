@@ -97,7 +97,7 @@
   "music_volume": 5,
   "sfx_volume": 28,
   "voice_volume": 50,
-  "master_volume": 31,
+  "master_volume": 34,
   "falcon_ip": "192.168.2.25",
   "pixels_per_lane": 143,
   "pixel_sim_enabled": true,
