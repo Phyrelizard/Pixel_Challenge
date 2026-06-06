@@ -1,5 +1,10 @@
 # Pixel Challenge Changelog
 
+
+## v28.23.0 rebased from stable v28.20.5.
+Begins Wii Remote Plus menu-wand/pointer work.
+Does not use Wii Remote as gameplay controller.
+
 ## v28.20.5 - Chomp Chase ghost train and audio placeholders
 - Bumped console to v28.20.5.
 - Updated Chomp Chase to v1.0.4-train-audio with default train-style ghost movement so four ghosts stay in one spaced lane instead of forming an impenetrable two-lane wall.

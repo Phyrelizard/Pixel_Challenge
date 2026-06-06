@@ -16,7 +16,7 @@
     "Sound Visualizer": 4
   },
   "selected_themes": [
-    "Bounce Chase"
+    "Sound Visualizer"
   ],
   "flame_theme_tuning": {
     "Candle Flame": {
@@ -94,7 +94,7 @@
   "sash_mixer_height": null,
   "falcon_brightness": 10,
   "gameplay_brightness": 20,
-  "music_volume": 0,
+  "music_volume": 5,
   "sfx_volume": 28,
   "voice_volume": 50,
   "master_volume": 31,
@@ -120,7 +120,7 @@
   "debug_logging": true,
   "setup_geometry": "1244x922+132+31",
   "game_mode": 1,
-  "window_geometry": "1854x1011+52+20",
+  "window_geometry": "1854x1011+66+32",
   "dmx_universe": 9,
   "dmx_num_fixtures": 4,
   "dmx_channels_per_fixture": 8,
