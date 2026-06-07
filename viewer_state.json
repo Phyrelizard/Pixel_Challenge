@@ -1,21 +1,15 @@
 {
-  "game_key": "chomp_chase",
-  "title": "Chomp Chase",
-  "phase": "round_complete",
-  "mode": 1,
-  "instruction": "ROUND COMPLETE",
-  "time_remaining": 196,
+  "game": "pixel_pop",
+  "phase": "running",
+  "time_remaining": 0,
+  "bonus_active": false,
   "players": [
     {
-      "id": 1,
-      "ready": true,
-      "score": 4170,
-      "lives": 0,
-      "boards_cleared": 0,
-      "dots_remaining": 74,
-      "powered": false,
-      "game_over": true,
-      "completed_objective": false
+      "player_id": 1,
+      "score": -50,
+      "selected_lane": "left",
+      "is_active": true,
+      "lives": null
     }
   ]
 }

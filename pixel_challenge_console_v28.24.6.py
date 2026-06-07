@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v28.20.2
+Pixel Challenge Host Console v28.20.5
 
 """
 
@@ -35,7 +35,7 @@ from games.base import PlayerConfig
 from sla import SLAStore, SLACalibration
 from dmx_editor import DMXLightingEditor
 
-VERSION_LABEL = "v28.20.2"
+VERSION_LABEL = "v28.24.6"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 # Project root is resolved from this file so the repo can live in one clean
@@ -59,6 +59,8 @@ PIXELS_PER_LANE = DEFAULT_PIXELS_PER_LANE  # legacy alias; use saved setup value
 ASSIGNMENTS_FILE = project_path("controller_assignments.json")
 SCORE_HISTORY_FILE = project_path("score_history.json")
 SCOREBOARD_DATA_FILE = project_path("scoreboard_data.json")
+CONSOLE_COMMAND_FILE = project_path("console_command.txt")
+EXTERNAL_CAROUSEL_CONFIG_FILE = project_path("external_carousel_config.json")
 ASSETS_DIR = project_path("assets")
 SETTINGS_FILE = project_path("attract_theme_maps.json")
 GAMES_ROOT = project_path("games")
@@ -329,6 +331,17 @@ class ViewerService:
     def show_final_results(self):
         self._write("SHOW_SCOREBOARD")
 
+    def show_carousel(self, payload: dict):
+        """Show the external-screen Wii Remote PNG-tile carousel overlay."""
+        try:
+            body = json.dumps(payload or {}, separators=(",", ":"))
+        except Exception:
+            body = "{}"
+        self._write(f"SHOW_CAROUSEL|{body}")
+
+    def show_menu_placeholder(self):
+        self._write("SHOW_MENU_PLACEHOLDER")
+
     def show_countdown(self, number: int):
         """Show countdown image (3, 2, 1) or 'GO' (0)"""
         if number == 0:
@@ -338,7 +351,7 @@ class ViewerService:
 
     def show_game_active(self):
         """Tell viewer game is now active"""
-        self._write(f"SHOW_IMAGE|{ASSETS_DIR}/He_Has_Risen.png")
+        self._write(f"SHOW_IMAGE|{ASSETS_DIR}/gameplay_image.png")
 
     def show_select_colors(self, image_path: str = None):
         """Show select-colors instruction screen, optionally with a custom help card."""
@@ -3057,6 +3070,11 @@ class PixelChallengeConsole:
         self.write_startup_log()
 
         self.viewer = ViewerService(project_path("viewer_command.txt"))
+        self.console_command_file = CONSOLE_COMMAND_FILE
+        # True when the Wii Menu Wand / public external front-end should be restored
+        # automatically after operator-driven returns such as STOP -> splash.
+        # Gameplay/setup still hides the carousel normally.
+        self.external_gsv_preferred = True
         self.global_game_config = self.load_global_game_config()
         self.controller_rumble = self._normalize_controller_rumble_config(
             self.global_game_config.get("controller_rumble")
@@ -3135,6 +3153,7 @@ class PixelChallengeConsole:
         self.init_joysticks()
         self.root.after(16, self.poll_joysticks)
         self.root.after(self.current_animation_interval_ms(), self.animation_tick)
+        self.root.after(100, self.poll_console_commands)
 
         self.set_state(HostState.IDLE, "System ready.")
         self.update_auto_button()
@@ -3142,7 +3161,7 @@ class PixelChallengeConsole:
         self.update_lanes_test_button()
         self.update_reassign_button()
         self.update_mode_button()
-        self.show_selected_game_splash()
+        self.show_external_carousel(active="next_game", ensure_playable=True)
 
     def write_startup_log(self):
         header = f"""
@@ -3776,6 +3795,19 @@ class PixelChallengeConsole:
             "game_over": project_path("assets/audio/ascend/as_game_over.wav"),
             "winner": project_path("assets/audio/ascend/as_winner.wav"),
 
+
+            # Chomp Chase sounds
+            "cc_ready": project_path("assets/audio/chomp_chase/cc_ready.wav"),
+            "cc_dot": project_path("assets/audio/chomp_chase/cc_dot.wav"),
+            "cc_power": project_path("assets/audio/chomp_chase/cc_power.wav"),
+            "cc_ghost_eat": project_path("assets/audio/chomp_chase/cc_ghost_eat.wav"),
+            "cc_player_hit": project_path("assets/audio/chomp_chase/cc_player_hit.wav"),
+            "cc_fruit": project_path("assets/audio/chomp_chase/cc_fruit.wav"),
+            "cc_round_start": project_path("assets/audio/chomp_chase/cc_round_start.wav"),
+            "cc_round_clear": project_path("assets/audio/chomp_chase/cc_round_clear.wav"),
+            "cc_game_over": project_path("assets/audio/chomp_chase/cc_game_over.wav"),
+            "cc_music_gameplay": project_path("assets/audio/chomp_chase/cc_music_gameplay.wav"),
+
             # Shared sounds
             "countdown_tick": project_path("assets/audio/shared/countdown_tick.wav"),
             "countdown_go": project_path("assets/audio/shared/countdown_go.wav"),
@@ -3794,6 +3826,7 @@ class PixelChallengeConsole:
             "splash_music_pixel_pop": project_path("assets/audio/splash/splash_music_pixel_pop.ogg"),
             "splash_music_surround": project_path("assets/audio/splash/splash_music_surround.ogg"),
             "splash_music_ascend": project_path("assets/audio/splash/splash_music_ascend.ogg"),
+            "splash_music_chomp_chase": project_path("assets/audio/chomp_chase/cc_music_gameplay.wav"),
 
         }
 
@@ -5796,9 +5829,19 @@ class PixelChallengeConsole:
                 pass
             self.viewer_return_after_id = None
 
-    def show_selected_game_splash(self):
+    def show_selected_game_splash(self, force_plain: bool = False):
         self.cancel_viewer_return()
         self.current_intro_index = -1
+
+        # If the Wii/GSV front-end owns the external screen and we are safely idle,
+        # restore the tile carousel instead of leaving the viewer on a plain full-screen
+        # splash. This fixes STOP -> game splash -> no way back to tiles.
+        if (not force_plain
+                and getattr(self, "external_gsv_preferred", False)
+                and self.host_state not in (HostState.GAME_RUNNING, HostState.GAME_PAUSED, HostState.COUNTDOWN, HostState.GAME_SETUP, HostState.CHECKIN_OPEN)):
+            self.show_external_carousel(active="current_game", ensure_playable=True)
+            return
+
         game = self.current_game()
         if game:
             splash_path = game.get_splash_image_path()
@@ -5811,6 +5854,13 @@ class PixelChallengeConsole:
         # Start splash background music for the selected game
         self._play_splash_music()
 
+    def return_to_external_frontend_or_splash(self, active: str = "next_game"):
+        """Return the external viewer to whichever front-end currently owns it."""
+        if getattr(self, "external_gsv_preferred", False):
+            self.show_external_carousel(active=active, ensure_playable=True)
+        else:
+            self.show_selected_game_splash(force_plain=True)
+
     def _play_splash_music(self):
         """Play background music for the current splash screen."""
         # Map game names to their splash music keys
@@ -5820,12 +5870,320 @@ class PixelChallengeConsole:
             "Pixel Pop": "splash_music_pixel_pop",
             "Surround": "splash_music_surround",
             "Ascend": "splash_music_ascend",
-            "Chomp Chase": "splash_music_main",
+            "Chomp Chase": "splash_music_chomp_chase",
         }
         game_name = self.selected_game.get()
         music_key = splash_music_map.get(game_name, "splash_music_main")
         self.play_sound(music_key)
 
+
+    # =========================================================================
+    # EXTERNAL VIEWER CAROUSEL / WII MENU WAND FOUNDATION (v28.24.6)
+    # =========================================================================
+    def load_external_carousel_config(self):
+        """Load optional external carousel background behavior."""
+        default = {
+            "background_mode": "selected_game_splash",
+            "custom_background_path": "assets/external_carousel_background.png",
+            "scoreboard_return_seconds": 30,
+        }
+        try:
+            if os.path.exists(EXTERNAL_CAROUSEL_CONFIG_FILE):
+                with open(EXTERNAL_CAROUSEL_CONFIG_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if isinstance(data, dict):
+                    default.update(data)
+        except Exception as e:
+            self.log(f"External carousel config read error: {e}")
+        return default
+
+    def external_playable_game_names(self):
+        """Game tiles shown in the same order as the console dropdown, excluding Splash."""
+        return [name for name in self.games.list_names() if name != "Splash"]
+
+    def external_game_tile_id(self, game_name: str) -> str:
+        safe = str(game_name or "game").strip().lower()
+        safe = safe.replace("&", "and")
+        safe = "".join(ch if ch.isalnum() else "_" for ch in safe)
+        while "__" in safe:
+            safe = safe.replace("__", "_")
+        safe = safe.strip("_") or "game"
+        return f"game_{safe}"
+
+    def ensure_external_playable_selection(self):
+        names = self.external_playable_game_names()
+        if not names:
+            return None
+        if self.selected_game.get() not in names:
+            self.selected_game.set(names[0])
+        return self.selected_game.get()
+
+    def move_external_game_selection(self, delta: int, ensure_playable: bool = True):
+        names = self.external_playable_game_names()
+        if not names:
+            return None
+        current = self.selected_game.get()
+        if current not in names:
+            idx = 0 if delta >= 0 else len(names) - 1
+        else:
+            idx = (names.index(current) + delta) % len(names)
+        self.selected_game.set(names[idx])
+        self.current_intro_index = -1
+        if ensure_playable:
+            self.final_results_active = False
+        self.log(f"External carousel game selection: {self.selected_game.get()}")
+        return self.selected_game.get()
+
+    def _carousel_background_path(self, game_name: str = None):
+        cfg = self.load_external_carousel_config()
+        mode = str(cfg.get("background_mode", "selected_game_splash")).strip().lower()
+        if mode in ("custom", "custom_carousel_background", "static_default_background"):
+            custom_path = str(cfg.get("custom_background_path", "")).strip()
+            if custom_path:
+                if not os.path.isabs(custom_path):
+                    custom_path = project_path(custom_path)
+                if os.path.exists(custom_path):
+                    return custom_path
+
+        game = None
+        if game_name:
+            try:
+                game = self.games.get(game_name)
+            except Exception:
+                game = None
+        else:
+            game = self.current_game()
+
+        if game:
+            splash_path = game.get_splash_image_path()
+            if os.path.exists(splash_path):
+                return splash_path
+        return project_path("assets", "pixel_challenge_splash_final.png")
+
+    def external_carousel_items(self):
+        """Build GSV tiles: Home, one tile per game, Score, Menu."""
+        pixel_splash = project_path("assets", "pixel_challenge_splash_final.png")
+        items = [{
+            "id": "home",
+            "label": "HOME",
+            "action": "home",
+            "preview_action": "preview_non_game|home",
+            "background_path": pixel_splash,
+        }]
+        for game_name in self.external_playable_game_names():
+            items.append({
+                "id": self.external_game_tile_id(game_name),
+                "label": game_name,
+                "action": f"game|{game_name}",
+                "preview_action": f"preview_game|{game_name}",
+                "game_name": game_name,
+                "background_path": self._carousel_background_path(game_name),
+            })
+        items.extend([
+            {
+                "id": "score",
+                "label": "SCORE",
+                "action": "score",
+                "preview_action": "preview_non_game|score",
+                "background_path": pixel_splash,
+            },
+            {
+                "id": "menu",
+                "label": "MENU",
+                "action": "menu",
+                "preview_action": "preview_non_game|menu",
+                "background_path": pixel_splash,
+            },
+        ])
+        return items
+
+    def resolve_external_carousel_active_id(self, requested: str = None):
+        requested = (requested or "current_game").strip()
+        playable = self.external_playable_game_names()
+
+        if requested in ("home", "score", "menu"):
+            return requested
+
+        # Legacy aliases from v28.24.x. These now point to the selected game tile.
+        if requested in ("next_game", "previous_game", "start_game", "current_game", "selected_game", "game"):
+            current = self.selected_game.get()
+            if current not in playable and playable:
+                current = playable[0]
+            return self.external_game_tile_id(current) if current in playable else "home"
+
+        if requested.startswith("game|"):
+            game_name = requested.split("|", 1)[1]
+            if game_name in playable:
+                return self.external_game_tile_id(game_name)
+
+        if requested.startswith("game_"):
+            return requested
+
+        return self.external_game_tile_id(self.selected_game.get()) if self.selected_game.get() in playable else "home"
+
+    def play_external_carousel_preview(self, action_raw: str):
+        """Play/update audio for the tile currently centered in the GSV."""
+        action_raw = (action_raw or "").strip()
+        action = action_raw.lower()
+        if action.startswith("preview_game|"):
+            requested_game_name = action_raw.split("|", 1)[1]
+            playable_names = self.external_playable_game_names()
+            game_name = next((name for name in playable_names if name.lower() == requested_game_name.lower()), None)
+            if game_name is None:
+                self.log(f"External carousel preview: unknown game {requested_game_name}")
+                return
+            if self.selected_game.get() != game_name:
+                self.selected_game.set(game_name)
+                self.current_intro_index = -1
+            self._play_splash_music()
+            self.log(f"External carousel preview: {game_name}")
+            return
+
+        if action.startswith("preview_non_game|"):
+            # Non-game centered tiles use the Pixel Challenge splash background and
+            # main splash audio. Do not change selected_game here; Score/Menu should
+            # not disturb the game that is currently selected behind the scenes.
+            try:
+                self.play_sound("splash_music_main")
+            except Exception:
+                pass
+            self.log(f"External carousel preview: {action_raw}")
+            return
+
+    def show_external_carousel(self, active: str = "current_game", ensure_playable: bool = False):
+        """Show the public-facing 3-tile game carousel on the external viewer."""
+        self.external_gsv_preferred = True
+        self.cancel_viewer_return()
+        if ensure_playable:
+            self.ensure_external_playable_selection()
+        selected = self.selected_game.get()
+        active_id = self.resolve_external_carousel_active_id(active)
+        items = self.external_carousel_items()
+        payload = {
+            "active": active_id,
+            "selected_game": selected,
+            "background_path": self._carousel_background_path(selected if selected in self.external_playable_game_names() else None),
+            "items": items,
+        }
+        try:
+            self.viewer.show_carousel(payload)
+        except Exception as e:
+            self.log(f"External carousel show error: {e}")
+        active_item = next((item for item in items if item.get("id") == active_id), None)
+        if active_item:
+            self.play_external_carousel_preview(str(active_item.get("preview_action", "")))
+
+    def handle_external_menu_action(self, action: str):
+        """Handle an action requested by the external viewer carousel."""
+        action_raw = (action or "").strip()
+        action = action_raw.lower()
+        if not action:
+            return
+
+        if action in ("laptop_active", "set_laptop", "laptop"):
+            self.external_gsv_preferred = False
+            self.log("External carousel: Laptop active / GSV preference cleared")
+            return
+
+        self.external_gsv_preferred = True
+
+        if action.startswith("preview_game|") or action.startswith("preview_non_game|"):
+            # Preview commands are sent when the center GSV tile changes. These are
+            # audio/background-selection cues only and should not start a game.
+            if self.host_state not in (HostState.GAME_RUNNING, HostState.GAME_PAUSED, HostState.COUNTDOWN, HostState.GAME_SETUP):
+                self.play_external_carousel_preview(action_raw)
+            return
+
+        if self.host_state in (HostState.GAME_RUNNING, HostState.GAME_PAUSED, HostState.COUNTDOWN, HostState.GAME_SETUP):
+            self.log(f"External carousel action blocked during {self.host_state.name}: {action}")
+            return
+
+        if action in ("show_carousel", "gsv_show", "show_gsv"):
+            self.cancel_viewer_return()
+            self.ensure_external_playable_selection()
+            self.show_external_carousel(active="current_game", ensure_playable=True)
+            self.log("External carousel: Show requested")
+            return
+
+        if action.startswith("game|"):
+            requested_game_name = action_raw.split("|", 1)[1]
+            playable_names = self.external_playable_game_names()
+            game_name = next((name for name in playable_names if name.lower() == requested_game_name.lower()), None)
+            if game_name is None:
+                self.log(f"External carousel: Unknown game tile action: {requested_game_name}")
+                return
+            self.cancel_viewer_return()
+            self.selected_game.set(game_name)
+            self.current_intro_index = -1
+            self.final_results_active = False
+            self.show_selected_game_splash(force_plain=True)
+            self.log(f"External carousel: Start game tile -> {game_name}")
+            self.on_start_game()
+            return
+
+        if action == "home":
+            self.cancel_viewer_return()
+            self.selected_game.set("Splash")
+            self.current_intro_index = -1
+            self.show_external_carousel(active="home", ensure_playable=False)
+            self.log("External carousel: Home")
+            return
+
+        if action == "previous_game":
+            self.cancel_viewer_return()
+            self.move_external_game_selection(-1)
+            self.show_external_carousel(active="current_game", ensure_playable=True)
+            return
+
+        if action == "next_game":
+            self.cancel_viewer_return()
+            self.move_external_game_selection(1)
+            self.show_external_carousel(active="current_game", ensure_playable=True)
+            return
+
+        if action == "start_game":
+            self.cancel_viewer_return()
+            self.ensure_external_playable_selection()
+            self.show_selected_game_splash(force_plain=True)
+            self.log("External carousel: Start Game")
+            self.on_start_game()
+            return
+
+        if action == "score":
+            self.cancel_viewer_return()
+            self.log("External carousel: Score")
+            self.on_view_scoreboard()
+            return
+
+        if action == "menu":
+            self.cancel_viewer_return()
+            self.log("External carousel: Menu placeholder")
+            try:
+                self.viewer.show_menu_placeholder()
+            except Exception:
+                pass
+            return
+
+        self.log(f"Unknown external carousel action: {action}")
+
+    def poll_console_commands(self):
+        """Poll commands sent back from the external viewer carousel."""
+        try:
+            if os.path.exists(self.console_command_file):
+                with open(self.console_command_file, "r", encoding="utf-8") as f:
+                    cmd = f.read().strip()
+                try:
+                    os.remove(self.console_command_file)
+                except Exception:
+                    pass
+                if cmd:
+                    if cmd.startswith("EXTERNAL_MENU|"):
+                        self.handle_external_menu_action(cmd.split("|", 1)[1])
+                    else:
+                        self.log(f"Unknown console command file payload: {cmd}")
+        except Exception as e:
+            self.log(f"Console command poll error: {e}")
+        self.root.after(100, self.poll_console_commands)
 
     # =========================================================================
     # SCOREBOARD METHODS
@@ -5930,8 +6288,9 @@ class PixelChallengeConsole:
         if self.dmx:
             self.dmx.apply_scene("warm_amber")
             self.refresh_dmx_fixture_cards()
-        self.set_state(HostState.IDLE, "Returned to splash after results screen")
-        self.show_selected_game_splash()
+        self.set_state(HostState.IDLE, "Returned to external carousel after results screen")
+        self.move_external_game_selection(1)
+        self.show_external_carousel(active="next_game", ensure_playable=True)
         # Re-kick attract if AUTO is on
         if self.auto_enabled.get():
             self.attract.start_theme(self, self.current_theme_name())
@@ -7660,7 +8019,7 @@ class PixelChallengeConsole:
                 if os.path.exists(ready_image):
                     self.viewer.show_image(ready_image)
                 else:
-                    self.show_selected_game_splash()
+                    self.show_selected_game_splash(force_plain=True)
         
         # Start game in SETUP phase (game handles color selection)
         # Pass the selected mode to the game.  Global/Splash config is applied
@@ -7831,7 +8190,7 @@ class PixelChallengeConsole:
             self.dmx.apply_scene("warm_amber")
             self.refresh_dmx_fixture_cards()
         self.attract.start_theme(self, self.current_theme_name())
-        self.show_selected_game_splash()
+        self.return_to_external_frontend_or_splash(active="next_game")
         
         # Restore animate if it was on before
         self._restore_attract_if_needed()
@@ -9323,7 +9682,7 @@ class PixelChallengeConsole:
         return tuple(choices)
 
     def _splash_soundtrack_choices(self):
-        return ("default", "main", "dot_dash", "pixel_pop", "surround", "ascend", "off")
+        return ("default", "main", "dot_dash", "pixel_pop", "surround", "ascend", "chomp_chase", "off")
 
     def _known_audio_key_choices(self):
         keys = ["none", "off"]

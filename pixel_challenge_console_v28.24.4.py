@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v28.20.1
+Pixel Challenge Host Console v28.20.5
 
 """
 
@@ -19,6 +19,7 @@ import traceback
 import copy
 import re
 import socket
+import struct
 import ipaddress
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -34,7 +35,7 @@ from games.base import PlayerConfig
 from sla import SLAStore, SLACalibration
 from dmx_editor import DMXLightingEditor
 
-VERSION_LABEL = "v28.20.1"
+VERSION_LABEL = "v28.24.4"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 # Project root is resolved from this file so the repo can live in one clean
@@ -49,6 +50,7 @@ def project_path(*parts):
 
 DEFAULT_FALCON_IP = "192.168.2.113"
 DEFAULT_PIXEL_SIMULATOR_IP = ""
+PIXEL_SIMULATOR_UDP_PORT = 5568
 FALCON_DISCOVERY_HOST_HINTS = ("Falcon_Player_F16V5_EA7F", "Falcon_Player", "F16V5", "Falcon")
 # Prefix is intentionally weak-scored because Falcon Player uses a locally administered MAC.
 FALCON_DISCOVERY_MAC_PREFIXES = ("02:fe",)
@@ -57,6 +59,8 @@ PIXELS_PER_LANE = DEFAULT_PIXELS_PER_LANE  # legacy alias; use saved setup value
 ASSIGNMENTS_FILE = project_path("controller_assignments.json")
 SCORE_HISTORY_FILE = project_path("score_history.json")
 SCOREBOARD_DATA_FILE = project_path("scoreboard_data.json")
+CONSOLE_COMMAND_FILE = project_path("console_command.txt")
+EXTERNAL_CAROUSEL_CONFIG_FILE = project_path("external_carousel_config.json")
 ASSETS_DIR = project_path("assets")
 SETTINGS_FILE = project_path("attract_theme_maps.json")
 GAMES_ROOT = project_path("games")
@@ -327,6 +331,17 @@ class ViewerService:
     def show_final_results(self):
         self._write("SHOW_SCOREBOARD")
 
+    def show_carousel(self, payload: dict):
+        """Show the external-screen Wii Remote PNG-tile carousel overlay."""
+        try:
+            body = json.dumps(payload or {}, separators=(",", ":"))
+        except Exception:
+            body = "{}"
+        self._write(f"SHOW_CAROUSEL|{body}")
+
+    def show_menu_placeholder(self):
+        self._write("SHOW_MENU_PLACEHOLDER")
+
     def show_countdown(self, number: int):
         """Show countdown image (3, 2, 1) or 'GO' (0)"""
         if number == 0:
@@ -336,7 +351,7 @@ class ViewerService:
 
     def show_game_active(self):
         """Tell viewer game is now active"""
-        self._write(f"SHOW_IMAGE|{ASSETS_DIR}/He_Has_Risen.png")
+        self._write(f"SHOW_IMAGE|{ASSETS_DIR}/gameplay_image.png")
 
     def show_select_colors(self, image_path: str = None):
         """Show select-colors instruction screen, optionally with a custom help card."""
@@ -553,6 +568,84 @@ class SoundVisualizerEngine:
         return self.status
 
 
+class E131SimulatorMirror:
+    """Small raw UDP E1.31 sender used only for the Pixel Challenge simulator mirror.
+
+    The normal Falcon output still uses python-sacn.  This simulator mirror is
+    intentionally independent so local same-laptop simulator mode keeps working
+    when the laptop is offline, Wi-Fi is off, Ethernet is unplugged, or the
+    Falcon is not reachable.  The simulator only needs the standard E1.31
+    fields below.
+    """
+
+    ACN_PACKET_ID = b"ASC-E1.17\x00\x00\x00"
+    DMX_OFFSET = 126
+    DMX_LEN = 512
+
+    def __init__(self, destination: str, port: int = PIXEL_SIMULATOR_UDP_PORT,
+                 include_dmx: bool = False, dmx_universe: int | None = None):
+        self.destination = (destination or "").strip()
+        self.port = int(port)
+        self.include_dmx = bool(include_dmx)
+        self.dmx_universe = dmx_universe
+        self.sock = None
+        self.started = False
+        self.sequence = 0
+
+    def start(self):
+        if self.started:
+            return
+        if not self.destination:
+            raise ValueError("Pixel simulator mirror destination IP is blank")
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # UDP localhost still works with no network adapter connected. Broadcast
+        # is harmless here and keeps future diagnostic modes from needing a
+        # different socket.
+        try:
+            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        except Exception:
+            pass
+        self.started = True
+
+    def stop(self):
+        try:
+            if self.sock:
+                self.sock.close()
+        except Exception:
+            pass
+        self.sock = None
+        self.started = False
+
+    def should_send_universe(self, universe: int) -> bool:
+        if 1 <= int(universe) <= 8:
+            return True
+        return bool(self.include_dmx and self.dmx_universe and int(universe) == int(self.dmx_universe))
+
+    def _make_packet(self, universe: int, dmx_data: bytes) -> bytes:
+        frame = bytes(dmx_data or b"")[:self.DMX_LEN]
+        if len(frame) < self.DMX_LEN:
+            frame += bytes(self.DMX_LEN - len(frame))
+
+        packet = bytearray(self.DMX_OFFSET + self.DMX_LEN)
+        packet[4:16] = self.ACN_PACKET_ID
+
+        # The simulator parser reads these canonical E1.31 positions:
+        # sequence at 111, universe at 113..114, property count at 123..124,
+        # and DMX bytes beginning at 126.
+        self.sequence = (self.sequence + 1) & 0xFF
+        packet[111] = self.sequence
+        packet[113:115] = struct.pack(">H", int(universe))
+        packet[123:125] = struct.pack(">H", self.DMX_LEN + 1)  # DMX start code + 512 slots
+        packet[self.DMX_OFFSET:self.DMX_OFFSET + self.DMX_LEN] = frame
+        return bytes(packet)
+
+    def send_frame(self, universe: int, dmx_data: bytes):
+        if not self.started or not self.sock or not self.should_send_universe(universe):
+            return
+        packet = self._make_packet(universe, dmx_data)
+        self.sock.sendto(packet, (self.destination, self.port))
+
+
 class FalconService:
     def __init__(self, falcon_ip: str, pixels_per_lane: int = 100, dmx_universe: int = None, playfield_inverted: bool = False,
                  simulator_enabled: bool = False, simulator_ip: str = "", simulator_include_dmx: bool = False):
@@ -642,13 +735,20 @@ class FalconService:
         except Exception as e:
             print(f"FalconService start error: {e}")
 
-        # Optional second unicast target for a portable Windows visualizer.
-        # This intentionally does not replace the Falcon path; it mirrors it.
+        # Optional second unicast target for the portable simulator.
+        # v28.20.2: this uses a raw UDP E1.31 mirror instead of a second
+        # python-sacn sender. That keeps same-laptop 127.0.0.1 simulator mode
+        # working even when the laptop is fully offline and no Wi-Fi/Ethernet
+        # route is available.
         if self.simulator_enabled and self.simulator_ip:
             try:
-                self.sim_sender = sacn.sACNsender(source_name="PixelChallengeSimulatorMirror")
+                self.sim_sender = E131SimulatorMirror(
+                    self.simulator_ip,
+                    port=PIXEL_SIMULATOR_UDP_PORT,
+                    include_dmx=self.simulator_include_dmx,
+                    dmx_universe=self.dmx_universe,
+                )
                 self.sim_sender.start()
-                self._activate_outputs(self.sim_sender, self.simulator_ip, include_dmx=self.simulator_include_dmx)
                 self.sim_started = True
             except Exception as e:
                 self.sim_sender = None
@@ -656,19 +756,32 @@ class FalconService:
                 print(f"Pixel simulator mirror start error: {e}")
 
     def stop(self):
-        for sender, is_started in ((self.sender, self.started), (self.sim_sender, self.sim_started)):
-            if sender is not None and is_started:
-                try:
-                    for universe in range(1, 9):
-                        sender[universe].dmx_data = bytes(512)
-                    if self.dmx_universe:
-                        try:
-                            sender[self.dmx_universe].dmx_data = bytes(512)
-                        except Exception:
-                            pass
-                    sender.stop()
-                except Exception:
-                    pass
+        # Stop the physical Falcon sender first.
+        if self.sender is not None and self.started:
+            try:
+                for universe in range(1, 9):
+                    self.sender[universe].dmx_data = bytes(512)
+                if self.dmx_universe:
+                    try:
+                        self.sender[self.dmx_universe].dmx_data = bytes(512)
+                    except Exception:
+                        pass
+                self.sender.stop()
+            except Exception:
+                pass
+
+        # Stop the independent simulator mirror. It is not a python-sacn sender,
+        # so blank it using send_frame() and then close the raw UDP socket.
+        if self.sim_sender is not None and self.sim_started:
+            try:
+                for universe in range(1, 9):
+                    self.sim_sender.send_frame(universe, bytes(512))
+                if self.dmx_universe:
+                    self.sim_sender.send_frame(self.dmx_universe, bytes(512))
+                self.sim_sender.stop()
+            except Exception:
+                pass
+
         self.started = False
         self.sim_started = False
 
@@ -739,7 +852,8 @@ class FalconService:
                 pass
         if self.sim_sender and self.sim_started:
             try:
-                self.sim_sender[universe].dmx_data = frame
+                # Raw simulator mirror is independent of Falcon/network reachability.
+                self.sim_sender.send_frame(universe, frame)
             except Exception:
                 pass
 
@@ -2956,6 +3070,11 @@ class PixelChallengeConsole:
         self.write_startup_log()
 
         self.viewer = ViewerService(project_path("viewer_command.txt"))
+        self.console_command_file = CONSOLE_COMMAND_FILE
+        # True when the Wii Menu Wand / public external front-end should be restored
+        # automatically after operator-driven returns such as STOP -> splash.
+        # Gameplay/setup still hides the carousel normally.
+        self.external_gsv_preferred = True
         self.global_game_config = self.load_global_game_config()
         self.controller_rumble = self._normalize_controller_rumble_config(
             self.global_game_config.get("controller_rumble")
@@ -3034,6 +3153,7 @@ class PixelChallengeConsole:
         self.init_joysticks()
         self.root.after(16, self.poll_joysticks)
         self.root.after(self.current_animation_interval_ms(), self.animation_tick)
+        self.root.after(100, self.poll_console_commands)
 
         self.set_state(HostState.IDLE, "System ready.")
         self.update_auto_button()
@@ -3041,7 +3161,7 @@ class PixelChallengeConsole:
         self.update_lanes_test_button()
         self.update_reassign_button()
         self.update_mode_button()
-        self.show_selected_game_splash()
+        self.show_external_carousel(active="next_game", ensure_playable=True)
 
     def write_startup_log(self):
         header = f"""
@@ -3675,6 +3795,19 @@ class PixelChallengeConsole:
             "game_over": project_path("assets/audio/ascend/as_game_over.wav"),
             "winner": project_path("assets/audio/ascend/as_winner.wav"),
 
+
+            # Chomp Chase sounds
+            "cc_ready": project_path("assets/audio/chomp_chase/cc_ready.wav"),
+            "cc_dot": project_path("assets/audio/chomp_chase/cc_dot.wav"),
+            "cc_power": project_path("assets/audio/chomp_chase/cc_power.wav"),
+            "cc_ghost_eat": project_path("assets/audio/chomp_chase/cc_ghost_eat.wav"),
+            "cc_player_hit": project_path("assets/audio/chomp_chase/cc_player_hit.wav"),
+            "cc_fruit": project_path("assets/audio/chomp_chase/cc_fruit.wav"),
+            "cc_round_start": project_path("assets/audio/chomp_chase/cc_round_start.wav"),
+            "cc_round_clear": project_path("assets/audio/chomp_chase/cc_round_clear.wav"),
+            "cc_game_over": project_path("assets/audio/chomp_chase/cc_game_over.wav"),
+            "cc_music_gameplay": project_path("assets/audio/chomp_chase/cc_music_gameplay.wav"),
+
             # Shared sounds
             "countdown_tick": project_path("assets/audio/shared/countdown_tick.wav"),
             "countdown_go": project_path("assets/audio/shared/countdown_go.wav"),
@@ -3693,6 +3826,7 @@ class PixelChallengeConsole:
             "splash_music_pixel_pop": project_path("assets/audio/splash/splash_music_pixel_pop.ogg"),
             "splash_music_surround": project_path("assets/audio/splash/splash_music_surround.ogg"),
             "splash_music_ascend": project_path("assets/audio/splash/splash_music_ascend.ogg"),
+            "splash_music_chomp_chase": project_path("assets/audio/chomp_chase/cc_music_gameplay.wav"),
 
         }
 
@@ -5695,9 +5829,19 @@ class PixelChallengeConsole:
                 pass
             self.viewer_return_after_id = None
 
-    def show_selected_game_splash(self):
+    def show_selected_game_splash(self, force_plain: bool = False):
         self.cancel_viewer_return()
         self.current_intro_index = -1
+
+        # If the Wii/GSV front-end owns the external screen and we are safely idle,
+        # restore the tile carousel instead of leaving the viewer on a plain full-screen
+        # splash. This fixes STOP -> game splash -> no way back to tiles.
+        if (not force_plain
+                and getattr(self, "external_gsv_preferred", False)
+                and self.host_state not in (HostState.GAME_RUNNING, HostState.GAME_PAUSED, HostState.COUNTDOWN, HostState.GAME_SETUP, HostState.CHECKIN_OPEN)):
+            self.show_external_carousel(active="next_game", ensure_playable=True)
+            return
+
         game = self.current_game()
         if game:
             splash_path = game.get_splash_image_path()
@@ -5710,6 +5854,13 @@ class PixelChallengeConsole:
         # Start splash background music for the selected game
         self._play_splash_music()
 
+    def return_to_external_frontend_or_splash(self, active: str = "next_game"):
+        """Return the external viewer to whichever front-end currently owns it."""
+        if getattr(self, "external_gsv_preferred", False):
+            self.show_external_carousel(active=active, ensure_playable=True)
+        else:
+            self.show_selected_game_splash(force_plain=True)
+
     def _play_splash_music(self):
         """Play background music for the current splash screen."""
         # Map game names to their splash music keys
@@ -5719,12 +5870,191 @@ class PixelChallengeConsole:
             "Pixel Pop": "splash_music_pixel_pop",
             "Surround": "splash_music_surround",
             "Ascend": "splash_music_ascend",
-            "Chomp Chase": "splash_music_main",
+            "Chomp Chase": "splash_music_chomp_chase",
         }
         game_name = self.selected_game.get()
         music_key = splash_music_map.get(game_name, "splash_music_main")
         self.play_sound(music_key)
 
+
+    # =========================================================================
+    # EXTERNAL VIEWER CAROUSEL / WII MENU WAND FOUNDATION (v28.24.4)
+    # =========================================================================
+    def load_external_carousel_config(self):
+        """Load optional external carousel background behavior."""
+        default = {
+            "background_mode": "selected_game_splash",
+            "custom_background_path": "assets/external_carousel_background.png",
+            "scoreboard_return_seconds": 30,
+        }
+        try:
+            if os.path.exists(EXTERNAL_CAROUSEL_CONFIG_FILE):
+                with open(EXTERNAL_CAROUSEL_CONFIG_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if isinstance(data, dict):
+                    default.update(data)
+        except Exception as e:
+            self.log(f"External carousel config read error: {e}")
+        return default
+
+    def external_playable_game_names(self):
+        """Games shown by Previous/Next Game. Home handles the Splash screen."""
+        return [name for name in self.games.list_names() if name != "Splash"]
+
+    def ensure_external_playable_selection(self):
+        names = self.external_playable_game_names()
+        if not names:
+            return None
+        if self.selected_game.get() not in names:
+            self.selected_game.set(names[0])
+        return self.selected_game.get()
+
+    def move_external_game_selection(self, delta: int, ensure_playable: bool = True):
+        names = self.external_playable_game_names()
+        if not names:
+            return None
+        current = self.selected_game.get()
+        if current not in names:
+            idx = 0 if delta >= 0 else len(names) - 1
+        else:
+            idx = (names.index(current) + delta) % len(names)
+        self.selected_game.set(names[idx])
+        self.current_intro_index = -1
+        if ensure_playable:
+            self.final_results_active = False
+        self.log(f"External carousel game selection: {self.selected_game.get()}")
+        return self.selected_game.get()
+
+    def _carousel_background_path(self):
+        cfg = self.load_external_carousel_config()
+        mode = str(cfg.get("background_mode", "selected_game_splash")).strip().lower()
+        if mode in ("custom", "custom_carousel_background", "static_default_background"):
+            custom_path = str(cfg.get("custom_background_path", "")).strip()
+            if custom_path:
+                if not os.path.isabs(custom_path):
+                    custom_path = project_path(custom_path)
+                if os.path.exists(custom_path):
+                    return custom_path
+        game = self.current_game()
+        if game:
+            splash_path = game.get_splash_image_path()
+            if os.path.exists(splash_path):
+                return splash_path
+        return project_path("assets", "pixel_challenge_splash_final.png")
+
+    def show_external_carousel(self, active: str = "next_game", ensure_playable: bool = False):
+        """Show the public-facing 3-tile carousel on the external viewer."""
+        self.external_gsv_preferred = True
+        self.cancel_viewer_return()
+        if ensure_playable:
+            self.ensure_external_playable_selection()
+        selected = self.selected_game.get()
+        payload = {
+            "active": active or "next_game",
+            "selected_game": selected,
+            "background_path": self._carousel_background_path(),
+            "items": [
+                {"id": "home", "label": "HOME"},
+                {"id": "previous_game", "label": "PREVIOUS GAME"},
+                {"id": "next_game", "label": "NEXT GAME"},
+                {"id": "start_game", "label": "START GAME"},
+                {"id": "score", "label": "SCORE"},
+                {"id": "menu", "label": "MENU"},
+            ],
+        }
+        try:
+            self.viewer.show_carousel(payload)
+        except Exception as e:
+            self.log(f"External carousel show error: {e}")
+        self._play_splash_music()
+
+    def handle_external_menu_action(self, action: str):
+        """Handle an action requested by the external viewer carousel."""
+        action = (action or "").strip().lower()
+        if not action:
+            return
+
+        if action in ("laptop_active", "set_laptop", "laptop"):
+            self.external_gsv_preferred = False
+            self.log("External carousel: Laptop active / GSV preference cleared")
+            return
+
+        self.external_gsv_preferred = True
+
+        if self.host_state in (HostState.GAME_RUNNING, HostState.GAME_PAUSED, HostState.COUNTDOWN, HostState.GAME_SETUP):
+            self.log(f"External carousel action blocked during {self.host_state.name}: {action}")
+            return
+
+        if action in ("show_carousel", "gsv_show", "show_gsv"):
+            self.cancel_viewer_return()
+            self.ensure_external_playable_selection()
+            self.show_external_carousel(active="next_game", ensure_playable=True)
+            self.log("External carousel: Show requested")
+            return
+
+        if action == "home":
+            self.cancel_viewer_return()
+            self.selected_game.set("Splash")
+            self.current_intro_index = -1
+            self.show_external_carousel(active="home", ensure_playable=False)
+            self.log("External carousel: Home")
+            return
+
+        if action == "previous_game":
+            self.cancel_viewer_return()
+            self.move_external_game_selection(-1)
+            self.show_external_carousel(active="previous_game", ensure_playable=True)
+            return
+
+        if action == "next_game":
+            self.cancel_viewer_return()
+            self.move_external_game_selection(1)
+            self.show_external_carousel(active="next_game", ensure_playable=True)
+            return
+
+        if action == "start_game":
+            self.cancel_viewer_return()
+            self.ensure_external_playable_selection()
+            self.show_selected_game_splash(force_plain=True)
+            self.log("External carousel: Start Game")
+            self.on_start_game()
+            return
+
+        if action == "score":
+            self.cancel_viewer_return()
+            self.log("External carousel: Score")
+            self.on_view_scoreboard()
+            return
+
+        if action == "menu":
+            self.cancel_viewer_return()
+            self.log("External carousel: Menu placeholder")
+            try:
+                self.viewer.show_menu_placeholder()
+            except Exception:
+                pass
+            return
+
+        self.log(f"Unknown external carousel action: {action}")
+
+    def poll_console_commands(self):
+        """Poll commands sent back from the external viewer carousel."""
+        try:
+            if os.path.exists(self.console_command_file):
+                with open(self.console_command_file, "r", encoding="utf-8") as f:
+                    cmd = f.read().strip()
+                try:
+                    os.remove(self.console_command_file)
+                except Exception:
+                    pass
+                if cmd:
+                    if cmd.startswith("EXTERNAL_MENU|"):
+                        self.handle_external_menu_action(cmd.split("|", 1)[1])
+                    else:
+                        self.log(f"Unknown console command file payload: {cmd}")
+        except Exception as e:
+            self.log(f"Console command poll error: {e}")
+        self.root.after(100, self.poll_console_commands)
 
     # =========================================================================
     # SCOREBOARD METHODS
@@ -5829,8 +6159,9 @@ class PixelChallengeConsole:
         if self.dmx:
             self.dmx.apply_scene("warm_amber")
             self.refresh_dmx_fixture_cards()
-        self.set_state(HostState.IDLE, "Returned to splash after results screen")
-        self.show_selected_game_splash()
+        self.set_state(HostState.IDLE, "Returned to external carousel after results screen")
+        self.move_external_game_selection(1)
+        self.show_external_carousel(active="next_game", ensure_playable=True)
         # Re-kick attract if AUTO is on
         if self.auto_enabled.get():
             self.attract.start_theme(self, self.current_theme_name())
@@ -7559,7 +7890,7 @@ class PixelChallengeConsole:
                 if os.path.exists(ready_image):
                     self.viewer.show_image(ready_image)
                 else:
-                    self.show_selected_game_splash()
+                    self.show_selected_game_splash(force_plain=True)
         
         # Start game in SETUP phase (game handles color selection)
         # Pass the selected mode to the game.  Global/Splash config is applied
@@ -7730,7 +8061,7 @@ class PixelChallengeConsole:
             self.dmx.apply_scene("warm_amber")
             self.refresh_dmx_fixture_cards()
         self.attract.start_theme(self, self.current_theme_name())
-        self.show_selected_game_splash()
+        self.return_to_external_frontend_or_splash(active="next_game")
         
         # Restore animate if it was on before
         self._restore_attract_if_needed()
@@ -9222,7 +9553,7 @@ class PixelChallengeConsole:
         return tuple(choices)
 
     def _splash_soundtrack_choices(self):
-        return ("default", "main", "dot_dash", "pixel_pop", "surround", "ascend", "off")
+        return ("default", "main", "dot_dash", "pixel_pop", "surround", "ascend", "chomp_chase", "off")
 
     def _known_audio_key_choices(self):
         keys = ["none", "off"]

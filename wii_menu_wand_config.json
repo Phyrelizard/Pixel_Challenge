@@ -1,0 +1,23 @@
+{
+  "device_name": "Nintendo Wii Remote",
+  "start_mode": "external",
+  "gsv_input_file": "gsv_input_command.txt",
+  "console_command_file": "console_command.txt",
+  "show_carousel_on_external_mode": true,
+  "state_file": "wii_menu_wand_state.json",
+  "gsv_status_file": "gsv_status.json",
+  "log_file": "logs/wii_menu_wand.log",
+  "debounce_seconds": 0.16,
+  "enable_laptop_active_rumble": true,
+  "rumble_ms": 140,
+  "notes": {
+    "BTN_SOUTH": "Wii A button toggles laptop/external active mode.",
+    "BTN_EAST": "Wii B trigger release selects the active GSV tile when external mode is active.",
+    "KEY_LEFT_RIGHT": "D-pad left/right scrolls the GSV carousel when external mode is active.",
+    "BTN_MODE": "Wii Home button is reserved for later.",
+    "A_EXTERNAL_SHOWS_GSV": "When A toggles into external mode, the wand asks the console to show the GSV carousel.",
+    "A_REFRESH_EXTERNAL": "If the wand is already in EXTERNAL mode but the viewer is not showing the GSV carousel, A asks the console to show the GSV instead of switching to LAPTOP.",
+    "A_LAPTOP_NOTIFY": "When A toggles to laptop mode, the wand notifies the console so STOP/idle returns can stay plain if the public GSV is no longer preferred.",
+    "A_EXTERNAL_LOCAL_POKE": "When A requests external mode, the wand also writes GSV_SHOW to the viewer-side command file for faster recovery from plain splash/image states."
+  }
+}

@@ -1,6 +1,8 @@
 import json
 import os
+import shutil
 import subprocess
+import time
 import tkinter as tk
 from PIL import Image, ImageTk, ImageEnhance
 
@@ -23,7 +25,10 @@ class PixelChallengeViewer:
         self.command_file = os.path.join(self.app_dir, "viewer_command.txt")
         self.scoreboard_file = os.path.join(self.app_dir, "scoreboard_data.json")
         self.console_command_file = os.path.join(self.app_dir, "console_command.txt")
+        self.gsv_input_file = os.path.join(self.app_dir, "gsv_input_command.txt")
+        self.gsv_status_file = os.path.join(self.app_dir, "gsv_status.json")
         self.tile_dir = os.path.join(self.assets_dir, "ui", "tiles")
+        self.carousel_scroll_sound_path = os.path.join(self.assets_dir, "audio", "gsv_whoosh.wav")
 
         self.video_process = None
         self.current_overlay = None
@@ -38,9 +43,13 @@ class PixelChallengeViewer:
         self.carousel_active_index = 0
         self.carousel_canvas = None
         self.carousel_bg_photo = None
+        self.carousel_bg_cache = {}
         self.carousel_tile_photos = []
         self.carousel_animating = False
+        self.carousel_pending_scrolls = []
         self.carousel_last_payload = {}
+        self.carousel_last_preview_action = None
+        self.carousel_last_scroll_sound_at = 0.0
 
         # scoreboard state
         self.scoreboard_canvas = None
@@ -64,12 +73,29 @@ class PixelChallengeViewer:
 
         self.show_splash()
         self.root.after(250, self.poll_commands)
+        self.root.after(120, self.poll_gsv_input_commands)
 
     # ---------- lifecycle ----------
     def exit_viewer(self, event=None):
         self.stop_scoreboard_poll()
         self.stop_video_if_running()
         self.root.destroy()
+
+    def write_gsv_status(self):
+        """Best-effort status file so the Wii Menu Wand knows whether tiles are visible."""
+        try:
+            payload = {
+                "mode": self.current_mode,
+                "carousel_visible": self.current_mode == "carousel",
+                "updated_at": time.time(),
+                "image_path": self.current_image_path or "",
+            }
+            tmp = self.gsv_status_file + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2)
+            os.replace(tmp, self.gsv_status_file)
+        except Exception:
+            pass
 
     def stop_video_if_running(self):
         if self.video_process and self.video_process.poll() is None:
@@ -105,8 +131,10 @@ class PixelChallengeViewer:
             self.current_overlay = None
         self.carousel_canvas = None
         self.carousel_bg_photo = None
+        self.carousel_bg_cache = {}
         self.carousel_tile_photos = []
         self.carousel_animating = False
+        self.carousel_pending_scrolls = []
 
     def stop_scoreboard_poll(self):
         if self.scoreboard_poll_job is not None:
@@ -137,6 +165,7 @@ class PixelChallengeViewer:
             fitted = self.fit_image_to_screen(image)
             self.current_photo = ImageTk.PhotoImage(fitted)
             self.image_label.configure(image=self.current_photo)
+            self.write_gsv_status()
         except Exception as e:
             self.show_message("SPLASH ERROR", str(e))
 
@@ -149,6 +178,7 @@ class PixelChallengeViewer:
         black = Image.new("RGB", (self.screen_w, self.screen_h), "black")
         self.current_photo = ImageTk.PhotoImage(black)
         self.image_label.configure(image=self.current_photo)
+        self.write_gsv_status()
 
     def show_image(self, image_path: str):
         self.clear_scoreboard_canvas()
@@ -165,6 +195,7 @@ class PixelChallengeViewer:
             fitted = self.fit_image_to_screen(image)
             self.current_photo = ImageTk.PhotoImage(fitted)
             self.image_label.configure(image=self.current_photo)
+            self.write_gsv_status()
         except Exception as e:
             self.show_message("IMAGE ERROR", str(e))
 
@@ -199,9 +230,10 @@ class PixelChallengeViewer:
                 width=self.screen_w - 200,
             )
         self.current_overlay = overlay
+        self.write_gsv_status()
 
     # ---------- external carousel / Wii menu-wand overlay ----------
-    def _load_tile_image(self, item_id: str, active: bool) -> Image.Image:
+    def _load_tile_image(self, item_id: str, active: bool, label: str | None = None) -> Image.Image:
         state = "active" if active else "inactive"
         path = os.path.join(self.tile_dir, f"{item_id}_{state}.png")
         if os.path.exists(path):
@@ -209,8 +241,7 @@ class PixelChallengeViewer:
                 return Image.open(path).convert("RGBA")
             except Exception:
                 pass
-        # Fallback if artwork is missing. Real PNG tile art can replace these files.
-        label = item_id.replace("_", " ").upper()
+        label = (label or item_id.replace("_", " ")).upper()
         w, h = (620, 280) if active else (520, 230)
         img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
         from PIL import ImageDraw, ImageFont
@@ -245,12 +276,83 @@ class PixelChallengeViewer:
         fitted = self.fit_image_to_screen(image)
         return ImageTk.PhotoImage(fitted)
 
+    def _carousel_item_background_path(self, index: int | None = None):
+        if not self.carousel_items:
+            return self.carousel_last_payload.get("background_path") if self.carousel_last_payload else self.splash_path
+        if index is None:
+            index = self.carousel_active_index
+        try:
+            item = self.carousel_items[index % len(self.carousel_items)]
+            return item.get("background_path") or self.carousel_last_payload.get("background_path") or self.splash_path
+        except Exception:
+            return self.carousel_last_payload.get("background_path") if self.carousel_last_payload else self.splash_path
+
+    def _get_carousel_background_photo(self, background_path: str | None):
+        path = background_path or self.splash_path
+        if path not in self.carousel_bg_cache:
+            self.carousel_bg_cache[path] = self._fit_background_photo(path)
+        return self.carousel_bg_cache[path]
+
+    def play_carousel_scroll_sound(self):
+        """Play the short GSV tile-move whoosh sound without blocking animation."""
+        now = time.time()
+        if now - self.carousel_last_scroll_sound_at < 0.07:
+            return
+        self.carousel_last_scroll_sound_at = now
+        path = self.carousel_scroll_sound_path
+        if not os.path.exists(path):
+            return
+        try:
+            player = None
+            for candidate in ("paplay", "aplay", "ffplay"):
+                found = shutil.which(candidate)
+                if found:
+                    player = candidate
+                    break
+            if player == "paplay":
+                subprocess.Popen(["paplay", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            elif player == "aplay":
+                subprocess.Popen(["aplay", "-q", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            elif player == "ffplay":
+                subprocess.Popen(["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
+    def _active_carousel_item(self):
+        if not self.carousel_items:
+            return None
+        try:
+            return self.carousel_items[self.carousel_active_index % len(self.carousel_items)]
+        except Exception:
+            return None
+
+    def _notify_carousel_preview(self):
+        """Tell the console which tile is centered so it can play preview audio."""
+        item = self._active_carousel_item()
+        if not item:
+            return
+        preview_action = str(item.get("preview_action", "")).strip()
+        if not preview_action and str(item.get("action", "")).startswith("game|"):
+            preview_action = "preview_game|" + str(item.get("action", "")).split("|", 1)[1]
+        if not preview_action or preview_action == self.carousel_last_preview_action:
+            return
+        self.carousel_last_preview_action = preview_action
+        try:
+            with open(self.console_command_file, "w", encoding="utf-8") as f:
+                f.write(f"EXTERNAL_MENU|{preview_action}\n")
+        except Exception:
+            pass
+
     def show_carousel(self, payload: dict | None = None):
         payload = payload or {}
         self.stop_video_if_running()
         self.clear_scoreboard_canvas()
         self.clear_overlay()
         self.current_mode = "carousel"
+        self.write_gsv_status()
+        self.carousel_pending_scrolls = []
+        self.carousel_bg_cache = {}
+        self.carousel_last_preview_action = None
         self.carousel_last_payload = payload
         self.carousel_items = payload.get("items") or [
             {"id": "home", "label": "HOME"},
@@ -262,26 +364,20 @@ class PixelChallengeViewer:
         ]
         if not self.carousel_items:
             return
-        active = str(payload.get("active", "next_game"))
+        active = str(payload.get("active", "current_game"))
         ids = [str(item.get("id", "")) for item in self.carousel_items]
         self.carousel_active_index = ids.index(active) if active in ids else 0
 
-        canvas = tk.Canvas(
-            self.image_label,
-            width=self.screen_w,
-            height=self.screen_h,
-            bg="black",
-            highlightthickness=0,
-            bd=0,
-        )
+        canvas = tk.Canvas(self.image_label, width=self.screen_w, height=self.screen_h, bg="black", highlightthickness=0, bd=0)
         canvas.place(x=0, y=0)
         self.current_overlay = canvas
         self.carousel_canvas = canvas
         canvas.bind("<ButtonRelease-1>", self._carousel_mouse_release)
         canvas.focus_set()
 
-        self.carousel_bg_photo = self._fit_background_photo(payload.get("background_path"))
+        self.carousel_bg_photo = self._get_carousel_background_photo(self._carousel_item_background_path())
         self._draw_carousel_frame(0.0, 0)
+        self._notify_carousel_preview()
 
     def _draw_carousel_frame(self, t: float = 0.0, direction: int = 0):
         if self.carousel_canvas is None or not self.carousel_items:
@@ -289,31 +385,21 @@ class PixelChallengeViewer:
         c = self.carousel_canvas
         c.delete("all")
         self.carousel_tile_photos = []
+        self.carousel_bg_photo = self._get_carousel_background_photo(self._carousel_item_background_path())
         c.create_image(self.screen_w // 2, self.screen_h // 2, image=self.carousel_bg_photo)
 
-        # Darken the mid-band just enough for tile legibility while leaving splash art visible.
-        band_top = int(self.screen_h * 0.34)
-        band_bottom = int(self.screen_h * 0.66)
+        # Keep the tile carousel low so it does not cover game-title artwork.
+        band_top = int(self.screen_h * 0.70)
+        band_bottom = self.screen_h
         c.create_rectangle(0, band_top, self.screen_w, band_bottom, fill="#000000", stipple="gray50", outline="")
-
-        selected_game = self.carousel_last_payload.get("selected_game", "")
-        if selected_game:
-            c.create_text(
-                self.screen_w // 2,
-                int(self.screen_h * 0.22),
-                text=selected_game,
-                fill="#f8f7ff",
-                font=("Arial", 38, "bold"),
-            )
 
         n = len(self.carousel_items)
         center_x = self.screen_w / 2
-        center_y = self.screen_h / 2
+        center_y = self.screen_h * 0.84
         spacing = min(520, self.screen_w * 0.27)
         active_w = int(self.screen_w * 0.33)
         inactive_w = int(self.screen_w * 0.235)
 
-        # Draw in back-to-front order so the center tile lands on top.
         candidates = []
         for raw_offset in (-2, -1, 0, 1, 2):
             idx = (self.carousel_active_index + raw_offset) % n
@@ -328,7 +414,11 @@ class PixelChallengeViewer:
             target_w = int(inactive_w + (active_w - inactive_w) * focus)
             alpha = 0.58 + 0.42 * focus
             active = focus > 0.55
-            tile = self._load_tile_image(str(self.carousel_items[idx].get("id", "tile")), active)
+            tile = self._load_tile_image(
+                str(self.carousel_items[idx].get("id", "tile")),
+                active,
+                str(self.carousel_items[idx].get("label", self.carousel_items[idx].get("id", "tile"))),
+            )
             ratio = target_w / max(1, tile.width)
             target_h = max(1, int(tile.height * ratio))
             tile = tile.resize((target_w, target_h), Image.LANCZOS)
@@ -336,20 +426,29 @@ class PixelChallengeViewer:
             photo = ImageTk.PhotoImage(tile)
             self.carousel_tile_photos.append(photo)
             x = center_x + (offset * spacing)
-            y = center_y + (abs(offset) * 18)
+            y = center_y + (abs(offset) * 12)
             c.create_image(int(x), int(y), image=photo)
 
+    def _run_next_pending_scroll(self):
+        if self.carousel_pending_scrolls and self.current_mode == "carousel" and not self.carousel_animating:
+            direction = self.carousel_pending_scrolls.pop(0)
+            self.root.after(1, lambda: self.carousel_scroll(direction))
+
     def carousel_scroll(self, direction: int):
-        if self.current_mode != "carousel" or self.carousel_animating or not self.carousel_items:
+        if self.current_mode != "carousel" or not self.carousel_items:
             return
         direction = 1 if direction > 0 else -1
-        frames = 12
-        delay_ms = 18
+        if self.carousel_animating:
+            if len(self.carousel_pending_scrolls) < 6:
+                self.carousel_pending_scrolls.append(direction)
+            return
+        frames = 10
+        delay_ms = 15
         self.carousel_animating = True
+        self.play_carousel_scroll_sound()
 
         def step(frame: int):
             t = frame / frames
-            # Smoothstep easing.
             eased = t * t * (3 - 2 * t)
             self._draw_carousel_frame(eased, direction)
             if frame < frames:
@@ -358,12 +457,13 @@ class PixelChallengeViewer:
                 self.carousel_active_index = (self.carousel_active_index + direction) % len(self.carousel_items)
                 self.carousel_animating = False
                 self._draw_carousel_frame(0.0, 0)
+                self._notify_carousel_preview()
+                self._run_next_pending_scroll()
         step(0)
 
     def _carousel_mouse_release(self, event=None):
         if self.current_mode != "carousel" or self.carousel_animating:
             return
-        # Center tile click selects. Side clicks scroll toward that side.
         if event is not None:
             if event.x < self.screen_w * 0.34:
                 self.carousel_scroll(-1)
@@ -377,7 +477,7 @@ class PixelChallengeViewer:
         if self.current_mode != "carousel" or self.carousel_animating or not self.carousel_items:
             return
         item = self.carousel_items[self.carousel_active_index]
-        action = str(item.get("id", "")).strip()
+        action = str(item.get("action", item.get("id", ""))).strip()
         if not action:
             return
         try:
@@ -391,7 +491,7 @@ class PixelChallengeViewer:
         self.clear_scoreboard_canvas()
         self.clear_overlay()
         self.current_mode = "menu_placeholder"
-        bg = self._fit_background_photo(self.carousel_last_payload.get("background_path") if self.carousel_last_payload else self.splash_path)
+        bg = self._fit_background_photo(self._carousel_item_background_path() if self.carousel_last_payload else self.splash_path)
         canvas = tk.Canvas(self.image_label, width=self.screen_w, height=self.screen_h, bg="black", highlightthickness=0, bd=0)
         canvas.place(x=0, y=0)
         self.current_overlay = canvas
@@ -400,6 +500,72 @@ class PixelChallengeViewer:
         canvas.create_rectangle(260, 230, self.screen_w - 260, self.screen_h - 230, fill="#061028", outline="#ffd84d", width=5)
         canvas.create_text(self.screen_w // 2, self.screen_h // 2 - 35, text="MENU", fill="#ffd84d", font=("Arial", 56, "bold"))
         canvas.create_text(self.screen_w // 2, self.screen_h // 2 + 40, text="Placeholder for future development", fill="white", font=("Arial", 28, "bold"))
+        self.write_gsv_status()
+
+
+    def poll_gsv_input_commands(self):
+        """Poll Wii Menu Wand / GSV input commands without touching console-owned viewer_command.txt."""
+        try:
+            if os.path.exists(self.gsv_input_file):
+                with open(self.gsv_input_file, "r", encoding="utf-8") as f:
+                    lines = [line.strip() for line in f.readlines() if line.strip()]
+                try:
+                    os.remove(self.gsv_input_file)
+                except Exception:
+                    pass
+
+                for cmd in lines:
+                    self.handle_gsv_input_command(cmd)
+        except Exception:
+            pass
+
+        self.root.after(60, self.poll_gsv_input_commands)
+
+    def handle_gsv_input_command(self, cmd: str):
+        """Handle local GSV commands from the Wii Menu Wand service."""
+        cmd = (cmd or "").strip()
+        if not cmd:
+            return
+
+        if cmd == "GSV_SHOW":
+            if self.current_mode != "carousel":
+                try:
+                    with open(self.console_command_file, "w", encoding="utf-8") as f:
+                        f.write("EXTERNAL_MENU|show_carousel\n")
+                except Exception:
+                    pass
+                if self.carousel_last_payload:
+                    self.show_carousel(self.carousel_last_payload)
+            return
+
+        if cmd.startswith("GSV_SCROLL|"):
+            try:
+                direction = int(cmd.split("|", 1)[1].strip())
+            except Exception:
+                direction = 0
+            if self.current_mode != "carousel":
+                try:
+                    with open(self.console_command_file, "w", encoding="utf-8") as f:
+                        f.write("EXTERNAL_MENU|show_carousel\n")
+                except Exception:
+                    pass
+                return
+            if direction < 0:
+                self.carousel_scroll(-1)
+            elif direction > 0:
+                self.carousel_scroll(1)
+            return
+
+        if cmd == "GSV_SELECT":
+            if self.current_mode != "carousel":
+                try:
+                    with open(self.console_command_file, "w", encoding="utf-8") as f:
+                        f.write("EXTERNAL_MENU|show_carousel\n")
+                except Exception:
+                    pass
+                return
+            self.activate_current_tile()
+            return
 
     # ---------- video ----------
     def play_video(self, video_path: str):
@@ -415,8 +581,9 @@ class PixelChallengeViewer:
             self.clear_overlay()
 
             self.video_active = True
-            self.current_mode = "video"
             self.show_black()
+            self.current_mode = "video"
+            self.write_gsv_status()
             self.root.update_idletasks()
 
             # Hide Tk window so the video player is in front.
@@ -464,10 +631,11 @@ class PixelChallengeViewer:
     def show_scoreboard(self):
         self.stop_video_if_running()
         self.clear_overlay()
-        self.current_mode = "scoreboard"
 
         # keep base black image
         self.show_black()
+        self.current_mode = "scoreboard"
+        self.write_gsv_status()
 
         self.scoreboard_canvas = tk.Canvas(
             self.image_label,

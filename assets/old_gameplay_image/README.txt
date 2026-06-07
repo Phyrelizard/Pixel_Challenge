@@ -1,0 +1,1 @@
+To port these images back to rotation to be used display on the player's monitor during an active game, rename the image to 'gameplay_image.png' and Place in asset folder.
