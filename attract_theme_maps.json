@@ -13,10 +13,10 @@
     "Ice Burst": 8,
     "Galaxy Wave": 10,
     "Lane Chase RL": 3,
-    "Sound Visualizer": 4
+    "Sound Visualizer": 10
   },
   "selected_themes": [
-    "Sound Visualizer"
+    "Ember Glow"
   ],
   "flame_theme_tuning": {
     "Candle Flame": {
@@ -52,11 +52,11 @@
   },
   "sound_visualizer_tuning": {
     "direction": "Center Out",
-    "input_mode": "Stereo",
+    "input_mode": "Auto",
     "stereo_mapping": "Player Pair Stereo",
     "lab_mirror": "Mirror Player 1 to All",
     "peak_mode": "Floating",
-    "sensitivity": 85,
+    "sensitivity": 80,
     "noise_gate": 75,
     "smoothing": 20,
     "peak_hold": 0
@@ -65,11 +65,11 @@
   "sound_visualizer_profiles": {
     "Internal Mic": {
       "direction": "Center Out",
-      "input_mode": "Stereo",
+      "input_mode": "Auto",
       "stereo_mapping": "Player Pair Stereo",
       "lab_mirror": "Mirror Player 1 to All",
       "peak_mode": "Floating",
-      "sensitivity": 85,
+      "sensitivity": 80,
       "noise_gate": 75,
       "smoothing": 20,
       "peak_hold": 0
@@ -94,10 +94,10 @@
   "sash_mixer_height": null,
   "falcon_brightness": 10,
   "gameplay_brightness": 20,
-  "music_volume": 12,
+  "music_volume": 6,
   "sfx_volume": 28,
   "voice_volume": 50,
-  "master_volume": 7,
+  "master_volume": 0,
   "falcon_ip": "192.168.2.25",
   "pixels_per_lane": 143,
   "pixel_sim_enabled": true,
@@ -118,9 +118,9 @@
   "backup_restore": true,
   "apply_reboot": true,
   "debug_logging": true,
-  "setup_geometry": "1244x922+132+32",
+  "setup_geometry": "1288x1004+201+74",
   "game_mode": 1,
-  "window_geometry": "1854x1011+52+20",
+  "window_geometry": "1854x1011+66+32",
   "dmx_universe": 9,
   "dmx_num_fixtures": 4,
   "dmx_channels_per_fixture": 8,

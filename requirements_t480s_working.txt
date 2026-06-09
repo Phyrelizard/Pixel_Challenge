@@ -14,3 +14,6 @@ wheel==0.47.0
 
 # Optional: live microphone input for Sound Visualizer
 sounddevice>=0.5.1
+
+# Wii Remote menu wand input
+evdev>=1.9.3

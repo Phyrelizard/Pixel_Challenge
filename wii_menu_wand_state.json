@@ -1,6 +1,9 @@
 {
-  "mode": "external",
-  "updated_at": 1780820212.2098634,
+  "mode": "laptop",
+  "updated_at": 1781004315.2942424,
   "device": "/dev/input/event20",
-  "device_name": "Nintendo Wii Remote"
+  "device_name": "Nintendo Wii Remote",
+  "ir_device": "/dev/input/event19",
+  "ir_device_name": "Nintendo Wii Remote IR",
+  "ir_mouse_enabled": true
 }

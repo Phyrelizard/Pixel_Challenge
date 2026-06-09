@@ -50,3 +50,15 @@ if ! pgrep -f '[p]ixel_challenge_console_v[0-9].*\.py' >/dev/null 2>&1; then
 else
     echo "$(date): Console already running." >> "$LOG_DIR/manual_start.log"
 fi
+
+# Start Wii Remote Menu Wand supervisor last. This does not wake the remote by
+# itself, but it keeps Bluetooth ready and reconnects when the Wii Remote is
+# awakened with 1+2 or SYNC.
+if [ "${PIXEL_WII_WAND_AUTOSTART:-1}" != "0" ]; then
+    if ! pgrep -f '[s]tart_wii_menu_wand.sh .*--autostart' >/dev/null 2>&1        && ! pgrep -f '[t]ools/wii_menu_wand.py' >/dev/null 2>&1; then
+        echo "$(date): Starting Wii Menu Wand autolink supervisor..." >> "$LOG_DIR/manual_start.log"
+        nohup "$APP_DIR/start_wii_menu_wand.sh" --autostart >> "$LOG_DIR/wii_menu_wand_launcher.log" 2>&1 &
+    else
+        echo "$(date): Wii Menu Wand already running." >> "$LOG_DIR/manual_start.log"
+    fi
+fi
