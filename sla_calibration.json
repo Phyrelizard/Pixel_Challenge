@@ -463,8 +463,8 @@
     }
   },
   "pixel_pop": {
-    "sample_count": 169,
-    "last_calibrated": 1780554622.651137,
+    "sample_count": 175,
+    "last_calibrated": 1781239912.9648848,
     "reaction_times_ms": [],
     "accuracies": [
       0.211,
@@ -635,13 +635,19 @@
       0.0,
       0.0,
       0.0,
-      0.913
+      0.913,
+      0.0,
+      0.0,
+      0.522,
+      0.0,
+      0.333,
+      0.0
     ],
     "thresholds": {
       "reaction_expert_ms": 300,
       "reaction_beginner_ms": 1000,
-      "accuracy_expert": 0.9233,
-      "accuracy_beginner": 0.024900000000000002
+      "accuracy_expert": 0.923,
+      "accuracy_beginner": 0.018000000000000044
     },
     "defaults": {
       "reaction_expert_ms": 300,

@@ -1,0 +1,6 @@
+pixel_challenge_console_v28.26.11.py
+pixel_challenge_viewer.py
+tools/wii_menu_wand.py
+CHANGELOG.md
+READMEs/README_v28.26.11_rollback_to_28268_stable_focus.txt
+PATCH_FILE_LIST_v28.26.11.txt

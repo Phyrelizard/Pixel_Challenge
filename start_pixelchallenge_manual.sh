@@ -51,6 +51,17 @@ else
     echo "$(date): Console already running." >> "$LOG_DIR/manual_start.log"
 fi
 
+
+# Start Phone Touchpad Remote for the laptop-console mouse test/control path.
+if [ "${PIXEL_PHONE_TOUCHPAD_AUTOSTART:-1}" != "0" ]; then
+    if ! pgrep -f '[t]ools/phone_touchpad_remote.py' >/dev/null 2>&1; then
+        echo "$(date): Starting Phone Touchpad Remote..." >> "$LOG_DIR/manual_start.log"
+        nohup "$APP_DIR/start_phone_touchpad_remote.sh" >> "$LOG_DIR/phone_touchpad_remote_launcher.log" 2>&1 &
+    else
+        echo "$(date): Phone Touchpad Remote already running." >> "$LOG_DIR/manual_start.log"
+    fi
+fi
+
 # Start Wii Remote Menu Wand supervisor last. This does not wake the remote by
 # itself, but it keeps Bluetooth ready and reconnects when the Wii Remote is
 # awakened with 1+2 or SYNC.

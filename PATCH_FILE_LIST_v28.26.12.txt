@@ -1,0 +1,5 @@
+pixel_challenge_console_v28.26.12.py
+tools/wii_menu_wand.py
+CHANGELOG.md
+READMEs/README_v28.26.12_rollback_28267_home_external_return.txt
+PATCH_FILE_LIST_v28.26.12.txt

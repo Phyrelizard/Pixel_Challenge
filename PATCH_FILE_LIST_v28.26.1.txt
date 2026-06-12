@@ -1,0 +1,5 @@
+pixel_challenge_console_v28.26.1.py
+pixel_challenge_viewer.py
+READMEs/README_v28.26.1_preserve_splash_hide_tiles.txt
+PATCH_FILE_LIST_v28.26.1.txt
+CHANGELOG.md

@@ -1,0 +1,12 @@
+pixel_challenge_console_v28.26.6.py
+tools/wii_menu_wand.py
+CHANGELOG.md
+READMEs/README_v28.26.6_external_return_wii_resync.txt
+
+Install:
+1. Extract this patch into ~/pixel_challenge, preserving paths.
+2. chmod +x start_console.sh start_viewer.sh start_pixelchallenge_manual.sh start_phone_touchpad_remote.sh stop_pixelchallenge_all.sh start_wii_menu_wand.sh
+3. ./start_pixelchallenge_manual.sh
+
+Expected startup:
+CONSOLE START - v28.26.6

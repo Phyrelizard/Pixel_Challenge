@@ -1,0 +1,17 @@
+Pixel Challenge v28.26.9 - gameplay A-toggle queue + stable mouse target banner
+
+Install by extracting into the project root, preserving paths.
+
+Included files:
+- pixel_challenge_console_v28.26.9.py
+- pixel_challenge_viewer.py
+- tools/wii_menu_wand.py
+- CHANGELOG.md
+
+After extracting:
+  cd ~/pixel_challenge
+  chmod +x start_console.sh start_viewer.sh start_pixelchallenge_manual.sh start_phone_touchpad_remote.sh stop_pixelchallenge_all.sh start_wii_menu_wand.sh
+  ./start_pixelchallenge_manual.sh
+
+Expected startup:
+  CONSOLE START - v28.26.9

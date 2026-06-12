@@ -1,0 +1,18 @@
+Pixel Challenge v28.26.2 patch files
+====================================
+
+pixel_challenge_console_v28.26.2.py
+pixel_challenge_viewer.py
+requirements_t480s_working.txt
+start_console.sh
+start_viewer.sh
+start_pixelchallenge_manual.sh
+start_console_desktop.sh
+start_phone_touchpad_remote.sh
+stop_pixelchallenge_all.sh
+tools/phone_touchpad_remote.py
+CHANGELOG.md
+READMEs/README_v28.26.2_preserve_music_hide_tiles.txt
+
+Primary fix:
+- Hiding the external GSV/carousel tiles when laptop-console control becomes active no longer stops the current preview/splash music.

@@ -1,0 +1,10 @@
+pixel_challenge_console_v28.26.7.py
+CHANGELOG.md
+READMEs/README_v28.26.7_configurable_results_timeout.txt
+
+Install by extracting into the Pixel Challenge project root.
+The launcher sorts console versions and should automatically start:
+  pixel_challenge_console_v28.26.7.py
+
+Expected startup:
+  CONSOLE START - v28.26.7

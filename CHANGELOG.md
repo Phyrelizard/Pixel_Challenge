@@ -1,4 +1,58 @@
+## v28.26.13 - Check-In keeps laptop focus
+
+- Based on v28.26.12.
+- Fixed a focus regression where clicking Check-In from laptop/console control could immediately fall back to external/GSV control.
+- Opening Check-In now explicitly keeps the mouse target on the laptop/console and asks the Wii menu wand to stay in laptop mode.
+- Wii menu wand now refreshes its state heartbeat while running so the console header does not time out and falsely show EXTERNAL during a long laptop-control session.
+
+## v28.26.12 - v28.26.7 rollback baseline with home boot and external return
+
+- Rebased from the stable v28.26.7 behavior set.
+- Fresh boot/reboot now starts on the Pixel Challenge Home/Splash screen instead of the first playable game tile.
+- Preserves Wii focus rumble behavior: one pulse for LAPTOP/console control, two pulses for EXTERNAL/GSV control.
+- After a completed game and expired results screen, the external monitor is forced active with the next game queued, even if laptop control was active during gameplay.
+
+## v28.26.7 - Configurable results timeout
+
+- Added Splash / Global Config entry for Scoreboard / Final Results timeout.
+- Timeout is stored in `games/global.config.json` as `scoreboard_return_seconds`.
+- Safe range is 3-300 seconds; default remains 30 seconds.
+- Final Results and manual Scoreboard display now use the configured timeout instead of a hardwired 30 seconds.
+
+## v28.26.6 - External return / Wii control resync
+
+- Fixed post-game/results return where the console could show EXTERNAL target while the Wii helper remained in LAPTOP mouse mode.
+- Added a console-to-Wii command file so the console can force the Wii helper back to EXTERNAL mode after the final results timeout.
+- Added two short rumble pulses when Wii control switches to EXTERNAL mode.
+- Preserved the existing single rumble pulse for LAPTOP mode.
+
+
+## v28.26.5 - Splash selection / GSV preservation fix
+
+- Fixed console GAME dropdown selection of Splash being silently coerced to Dot Dash when the GSV/external carousel owned the viewer.
+- Returning to the external front-end now preserves Splash as the Pixel Challenge home artwork/config target instead of forcing the first playable game tile.
+- GSV show/trigger paths now keep Splash on the Home tile unless a playable game is intentionally selected.
+
 # Pixel Challenge Changelog
+
+## v28.26.2 - Preserve carousel preview music when hiding tiles
+- Bumped console to v28.26.2.
+- Fixed laptop-console active behavior so hiding the external GSV/carousel tiles no longer stops the current splash/preview music.
+- The external viewer now keeps showing the same splash/artwork and keeps playing the same music while only the tile overlay disappears.
+- When external/GSV control is reactivated, the tiles return and normal carousel preview behavior resumes.
+
+## v28.26.1 - Preserve external splash while hiding GSV tiles
+- Bumped console to v28.26.1.
+- Changed the laptop-console active behavior so it hides only the external GSV/carousel tile overlay.
+- The viewer now keeps the current carousel splash/artwork visible instead of going black when the external screen is not active.
+- Added a viewer command, HIDE_CAROUSEL_TILES, for hiding tiles without changing the underlying splash image.
+
+## v28.26.0 - Phone touchpad remote and active-screen indicator
+- Bumped console to v28.26.0.
+- Added a phone touchpad remote web server for the laptop-console mouse path.
+- Added a top-bar MOUSE TARGET indicator so laptop-console active state is obvious for phone touchpad and Wii Remote laptop mode.
+- When laptop-console control becomes active, the external GSV carousel tiles are hidden from the viewer.
+- Added launch/stop scripts and dependency notes for the phone touchpad remote.
 
 
 ## v28.23.0 rebased from stable v28.20.5.

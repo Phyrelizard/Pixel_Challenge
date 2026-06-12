@@ -1,0 +1,5 @@
+pixel_challenge_console_v28.26.10.py
+tools/wii_menu_wand.py
+READMEs/README_v28.26.10_stable_focus_command_split.txt
+PATCH_FILE_LIST_v28.26.10.txt
+CHANGELOG.md

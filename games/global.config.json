@@ -1,6 +1,7 @@
 {
   "difficulty": "normal",
   "show_scoreboard": true,
+  "scoreboard_return_seconds": 10,
   "sound_pack": "default",
   "invert_playfield": true,
   "sla": {
@@ -36,8 +37,7 @@
     "enabled": true,
     "active_games": [
       "dot_dash",
-      "ascend",
-      "chomp_chase"
+      "ascend"
     ],
     "xbox_profile_enabled": true,
     "xbox": {

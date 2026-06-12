@@ -763,6 +763,86 @@
           ]
         }
       }
+    },
+    {
+      "session_id": "2026-06-12_02-13-58",
+      "timestamp": 1781255823.4345136,
+      "players": {
+        "1": {
+          "games_played": 1,
+          "final_sla": 1,
+          "samples": [
+            {
+              "game_key": "dot_dash",
+              "timestamp": 1781255784.3262286,
+              "metrics": {
+                "accuracy": 1.0,
+                "reaction_time_sec": 1.272,
+                "completion_time_sec": 50.0,
+                "score": 0
+              },
+              "calculated_sla": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "session_id": "2026-06-12_03-31-18",
+      "timestamp": 1781260658.8548532,
+      "players": {
+        "1": {
+          "games_played": 1,
+          "final_sla": 1,
+          "samples": [
+            {
+              "game_key": "dot_dash",
+              "timestamp": 1781260391.8453367,
+              "metrics": {
+                "accuracy": 0.0,
+                "reaction_time_sec": 0.0,
+                "completion_time_sec": 50.0,
+                "score": 0
+              },
+              "calculated_sla": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "session_id": "2026-06-12_03-57-48",
+      "timestamp": 1781262140.3393555,
+      "players": {
+        "1": {
+          "games_played": 2,
+          "final_sla": 2,
+          "samples": [
+            {
+              "game_key": "dot_dash",
+              "timestamp": 1781261985.5126028,
+              "metrics": {
+                "accuracy": 1.0,
+                "reaction_time_sec": 3.324,
+                "completion_time_sec": 50.0,
+                "score": 0
+              },
+              "calculated_sla": 1
+            },
+            {
+              "game_key": "pixel_pop",
+              "timestamp": 1781262072.1035855,
+              "metrics": {
+                "accuracy": 0.0,
+                "reaction_time_sec": 0.0,
+                "completion_time_sec": null,
+                "score": -50
+              },
+              "calculated_sla": 3
+            }
+          ]
+        }
+      }
     }
   ]
 }

@@ -17,3 +17,7 @@ sounddevice>=0.5.1
 
 # Wii Remote menu wand input
 evdev>=1.9.3
+
+# Phone touchpad remote web server / mouse control
+aiohttp>=3.9
+pynput>=1.7

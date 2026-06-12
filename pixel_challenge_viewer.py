@@ -37,6 +37,10 @@ class PixelChallengeViewer:
         self.current_mode = "splash"  # splash | image | black | message | scoreboard | video | carousel
         self.current_photo = None
         self.current_image_path = None
+        # Last full-screen artwork that existed before a carousel overlay was shown.
+        # Used so hiding tiles preserves gameplay/splash art instead of reverting
+        # to the centered carousel tile background.
+        self.pre_carousel_image_path = None
 
         # External carousel/menu-wand state
         self.carousel_items = []
@@ -347,6 +351,11 @@ class PixelChallengeViewer:
         payload = payload or {}
         self.stop_video_if_running()
         self.clear_scoreboard_canvas()
+        # Preserve the full-screen artwork that was already on the viewer.
+        # During gameplay this is assets/gameplay_image.png; when tiles are later
+        # hidden, that exact artwork should remain visible.
+        if self.current_mode != "carousel" and self.current_image_path:
+            self.pre_carousel_image_path = self.current_image_path
         self.clear_overlay()
         self.current_mode = "carousel"
         self.write_gsv_status()
@@ -378,6 +387,26 @@ class PixelChallengeViewer:
         self.carousel_bg_photo = self._get_carousel_background_photo(self._carousel_item_background_path())
         self._draw_carousel_frame(0.0, 0)
         self._notify_carousel_preview()
+
+    def hide_carousel_tiles_keep_background(self):
+        """Hide only the GSV/carousel tile overlay while keeping splash/artwork visible.
+
+        The carousel normally draws its own background on the overlay canvas. When
+        laptop-console control becomes active, we want the public viewer to keep
+        showing that splash/artwork but remove only the tile band.
+        """
+        if self.current_mode == "carousel" or self.carousel_canvas is not None:
+            background_path = self.pre_carousel_image_path or self.current_image_path or self._carousel_item_background_path()
+            if background_path and os.path.exists(background_path):
+                self.show_image(background_path)
+            else:
+                self.show_splash()
+            return
+
+        # If tiles are not currently up, do not change the current viewer image.
+        if self.carousel_canvas is not None:
+            self.clear_overlay()
+        self.write_gsv_status()
 
     def _draw_carousel_frame(self, t: float = 0.0, direction: int = 0):
         if self.carousel_canvas is None or not self.carousel_items:
@@ -529,13 +558,14 @@ class PixelChallengeViewer:
 
         if cmd == "GSV_SHOW":
             if self.current_mode != "carousel":
+                # Ask the console to decide whether tiles should appear. During
+                # gameplay, focus changes should keep gameplay art visible and
+                # suppress automatic tile restoration.
                 try:
                     with open(self.console_command_file, "w", encoding="utf-8") as f:
                         f.write("EXTERNAL_MENU|show_carousel\n")
                 except Exception:
                     pass
-                if self.carousel_last_payload:
-                    self.show_carousel(self.carousel_last_payload)
             return
 
         if cmd.startswith("GSV_SCROLL|"):
@@ -558,9 +588,12 @@ class PixelChallengeViewer:
 
         if cmd == "GSV_SELECT":
             if self.current_mode != "carousel":
+                # A trigger/select press while the tiles are hidden is an explicit
+                # request to bring the tiles back. The console allows this even
+                # during gameplay, unlike automatic focus-toggle restoration.
                 try:
                     with open(self.console_command_file, "w", encoding="utf-8") as f:
-                        f.write("EXTERNAL_MENU|show_carousel\n")
+                        f.write("EXTERNAL_MENU|show_carousel_trigger\n")
                 except Exception:
                     pass
                 return
@@ -1018,6 +1051,13 @@ class PixelChallengeViewer:
             self.root.deiconify()
             self.root.lift()
             self.show_black()
+            return
+
+        if cmd == "HIDE_CAROUSEL_TILES":
+            self.stop_video_if_running()
+            self.root.deiconify()
+            self.root.lift()
+            self.hide_carousel_tiles_keep_background()
             return
 
         if cmd == "SHOW_SCOREBOARD":

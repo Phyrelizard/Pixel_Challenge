@@ -33,6 +33,7 @@ DEFAULT_CONFIG = {
     "start_mode": "external",
     "gsv_input_file": "gsv_input_command.txt",
     "console_command_file": "console_command.txt",
+    "command_file": "wii_menu_wand_command.json",
     "show_carousel_on_external_mode": True,
     "state_file": "wii_menu_wand_state.json",
     "gsv_status_file": "gsv_status.json",
@@ -40,6 +41,9 @@ DEFAULT_CONFIG = {
     "debounce_seconds": 0.16,
     "enable_laptop_active_rumble": True,
     "rumble_ms": 140,
+    "enable_external_active_rumble": True,
+    "external_rumble_ms": 110,
+    "external_rumble_gap_ms": 90,
 
     # IR mouse configuration. The Wii IR driver reports ABS_HAT0/1 X/Y values.
     # 1023 generally means that IR point is missing/off-camera.
@@ -282,8 +286,10 @@ def try_rumble(dev, ecodes, ff, length_ms: int, logger: Logger):
 
 def create_virtual_mouse(UInput, ecodes, logger: Logger):
     try:
+        # v28.26.4: Include REL_WHEEL so Wii D-pad up/down can scroll
+        # setup dialogs/windows while in laptop mouse mode.
         cap = {
-            ecodes.EV_REL: [ecodes.REL_X, ecodes.REL_Y],
+            ecodes.EV_REL: [ecodes.REL_X, ecodes.REL_Y, ecodes.REL_WHEEL],
             ecodes.EV_KEY: [ecodes.BTN_LEFT],
         }
         ui = UInput(cap, name="Pixel Challenge Wii IR Mouse", version=1)
@@ -335,6 +341,7 @@ def main():
 
     gsv_input_path = app_dir / str(cfg.get("gsv_input_file", "gsv_input_command.txt"))
     console_command_path = app_dir / str(cfg.get("console_command_file", "console_command.txt"))
+    control_command_path = app_dir / str(cfg.get("command_file", "wii_menu_wand_command.json"))
     state_path = app_dir / str(cfg.get("state_file", "wii_menu_wand_state.json"))
     gsv_status_path = app_dir / str(cfg.get("gsv_status_file", "gsv_status.json"))
     debounce = float(cfg.get("debounce_seconds", 0.16) or 0.16)
@@ -560,6 +567,14 @@ def main():
         mouse.syn()
         clamp_console_mouse_if_needed(force=False)
 
+    def mouse_scroll(clicks: int):
+        if not mouse or clicks == 0:
+            return
+        # Linux REL_WHEEL convention: positive is scroll up, negative is scroll down.
+        mouse.write(ecodes.EV_REL, ecodes.REL_WHEEL, int(clicks))
+        mouse.syn()
+        logger.log(f"Mouse <- scroll {clicks}")
+
     def mouse_move_absolute(x: float, y: float):
         if not xdotool_path:
             return
@@ -626,11 +641,75 @@ def main():
             pass
         return str(status.get("mode", "")).lower() == "carousel" or bool(status.get("carousel_visible", False))
 
+    def rumble_external_active():
+        """Two short pulses when control returns to the external/GSV screen."""
+        if not bool(cfg.get("enable_external_active_rumble", True)):
+            return
+        length = int(cfg.get("external_rumble_ms", 110) or 110)
+        gap = max(0.0, float(cfg.get("external_rumble_gap_ms", 90) or 90) / 1000.0)
+        try_rumble(dev, ecodes, ff, length, logger)
+        if gap > 0:
+            time.sleep(gap)
+        try_rumble(dev, ecodes, ff, length, logger)
+
+    def write_wand_state():
+        """Publish the current Wii target mode so the console header does not time out.
+
+        v28.26.13: The previous state file was only refreshed when A changed
+        modes.  If the operator stayed in laptop mode for more than the console's
+        recency window, the banner could fall back to EXTERNAL even though the
+        Wii helper was still controlling the laptop.
+        """
+        write_wand_state()
+
+    def poll_console_control_command():
+        """Accept one-shot mode commands from the Pixel Challenge console.
+
+        v28.26.6: after gameplay/results, the console may return the viewer to
+        the GSV carousel while the Wii helper is still in laptop mouse mode. This
+        command channel lets the console re-sync the real Wii control mode.
+        """
+        try:
+            if not control_command_path.exists():
+                return
+            raw = control_command_path.read_text(encoding="utf-8").strip()
+            try:
+                control_command_path.unlink()
+            except Exception:
+                pass
+            if not raw:
+                return
+            try:
+                payload = json.loads(raw)
+            except Exception:
+                payload = {"command": raw}
+            command = str(payload.get("command", "")).strip().lower()
+            if command in ("set_mode", "mode"):
+                requested = str(payload.get("mode", "")).strip().lower()
+                if requested in ("external", "laptop"):
+                    was_mode = mode
+                    set_mode(requested)
+                    # If the console explicitly requested a focus mode and the
+                    # helper was already there, still honor the requested rumble
+                    # confirmation.  EXTERNAL is two pulses; LAPTOP is one pulse.
+                    rumble_hint = str(payload.get("rumble", "")).lower()
+                    if requested == "external" and was_mode == "external" and rumble_hint == "double":
+                        rumble_external_active()
+                    elif requested == "laptop" and was_mode == "laptop" and rumble_hint in ("single", "one", "1"):
+                        if bool(cfg.get("enable_laptop_active_rumble", True)):
+                            try_rumble(dev, ecodes, ff, int(cfg.get("rumble_ms", 140)), logger)
+                    logger.log(f"Console control command -> mode {requested.upper()} ({payload.get('reason', '')})")
+                    return
+            logger.log(f"Unknown console control command: {raw[:200]}")
+        except Exception as e:
+            logger.log(f"Console control command error: {e}")
+
     def set_mode(new_mode: str):
         nonlocal mode, last_centroid
         if new_mode == "external":
             mouse_button_up()
-        if new_mode != mode:
+        changed = (new_mode != mode)
+        if changed:
             last_centroid = None
         mode = new_mode
         safe_write_json(state_path, {
@@ -643,6 +722,8 @@ def main():
             "ir_mouse_enabled": bool(mouse),
         })
         logger.log(f"Mode -> {mode.upper()}")
+        if changed and mode == "external":
+            rumble_external_active()
         if mode == "external" and bool(cfg.get("show_carousel_on_external_mode", True)):
             request_show_carousel("mode external")
         elif mode == "laptop":
@@ -802,6 +883,8 @@ def main():
     if ir_mouse_mode == "absolute" and not xdotool_path:
         logger.log("IR absolute mode needs xdotool: sudo apt install xdotool")
 
+    last_state_heartbeat = 0.0
+
     while RUNNING:
         try:
             # Retry IR device discovery if it was unavailable at startup.
@@ -809,6 +892,10 @@ def main():
             if now - last_config_check > 0.5:
                 last_config_check = now
                 reload_runtime_config_if_changed(force=False)
+                poll_console_control_command()
+            if now - last_state_heartbeat > 1.0:
+                last_state_heartbeat = now
+                write_wand_state()
             if bool(cfg.get("ir_mouse_enabled", True)) and ir_dev is None and now - last_ir_retry > 3.0:
                 last_ir_retry = now
                 ir_dev = find_ir_device(InputDevice, list_devices, str(cfg.get("ir_device_name", "Nintendo Wii Remote IR")), logger)
@@ -849,14 +936,14 @@ def main():
                         last_press_time[code] = tnow
 
                         if code == BTN_SOUTH:
+                            # v28.26.4: A is always the screen-focus toggle.
+                            # Do not treat A as a carousel refresh when tiles are hidden,
+                            # because during gameplay that prevented returning to laptop
+                            # mouse control and made console dialogs unreachable.
                             if mode == "external":
-                                if not viewer_has_carousel_visible():
-                                    request_show_carousel("A refresh external")
-                                    logger.log("Mode -> EXTERNAL (refresh)")
-                                else:
-                                    set_mode("laptop")
-                                    if bool(cfg.get("enable_laptop_active_rumble", True)):
-                                        try_rumble(dev, ecodes, ff, int(cfg.get("rumble_ms", 140)), logger)
+                                set_mode("laptop")
+                                if bool(cfg.get("enable_laptop_active_rumble", True)):
+                                    try_rumble(dev, ecodes, ff, int(cfg.get("rumble_ms", 140)), logger)
                             else:
                                 set_mode("external")
                             continue
@@ -874,12 +961,10 @@ def main():
                                 logger.log("Mouse <- nudge right")
                                 continue
                             if code == KEY_UP:
-                                mouse_move(0, -nudge)
-                                logger.log("Mouse <- nudge up")
+                                mouse_scroll(3)
                                 continue
                             if code == KEY_DOWN:
-                                mouse_move(0, nudge)
-                                logger.log("Mouse <- nudge down")
+                                mouse_scroll(-3)
                                 continue
                             if code == BTN_MODE:
                                 logger.log("Home pressed - reserved in laptop mode")

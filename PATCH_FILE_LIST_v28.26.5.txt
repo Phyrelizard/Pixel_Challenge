@@ -1,0 +1,16 @@
+Pixel Challenge v28.26.5 - Splash selection / GSV preservation fix
+
+Install by extracting into the Pixel Challenge project root, preserving paths.
+
+Included files:
+- pixel_challenge_console_v28.26.5.py
+- CHANGELOG.md
+
+Fixes:
+- Selecting Splash in the console GAME dropdown no longer changes selection to Dot Dash.
+- Splash/global config can be opened again from the console CONFIG button.
+- When GSV/external carousel owns the viewer, Splash stays on the Home tile / Pixel Challenge artwork instead of being coerced to the first playable game.
+- Show/trigger paths preserve Splash unless a playable game tile is intentionally selected.
+
+Expected startup:
+  CONSOLE START - v28.26.5

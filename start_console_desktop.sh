@@ -29,6 +29,14 @@ fi
 echo "Starting Pixel Challenge console..."
 nohup "$APP_DIR/start_console.sh" >> "$LOG_DIR/console.log" 2>&1 &
 
+# Start Phone Touchpad Remote if available.
+if [ "${PIXEL_PHONE_TOUCHPAD_AUTOSTART:-1}" != "0" ] && [ -x "$APP_DIR/start_phone_touchpad_remote.sh" ]; then
+    if ! pgrep -f '[t]ools/phone_touchpad_remote.py' >/dev/null 2>&1; then
+        echo "Starting Phone Touchpad Remote..."
+        nohup "$APP_DIR/start_phone_touchpad_remote.sh" >> "$LOG_DIR/phone_touchpad_remote_launcher.log" 2>&1 &
+    fi
+fi
+
 sleep 5
 
 if pgrep -f '[p]ixel_challenge_console_v[0-9].*\.py' >/dev/null 2>&1; then

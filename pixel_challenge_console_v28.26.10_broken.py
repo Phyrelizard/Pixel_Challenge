@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Pixel Challenge Host Console v28.25.0
+Pixel Challenge Host Console v28.26.10
 
 """
 
@@ -35,7 +35,7 @@ from games.base import PlayerConfig
 from sla import SLAStore, SLACalibration
 from dmx_editor import DMXLightingEditor
 
-VERSION_LABEL = "v28.25.1"
+VERSION_LABEL = "v28.26.10"
 CONSOLE_FILENAME = os.path.basename(__file__)
 
 # Project root is resolved from this file so the repo can live in one clean
@@ -60,8 +60,13 @@ ASSIGNMENTS_FILE = project_path("controller_assignments.json")
 SCORE_HISTORY_FILE = project_path("score_history.json")
 SCOREBOARD_DATA_FILE = project_path("scoreboard_data.json")
 CONSOLE_COMMAND_FILE = project_path("console_command.txt")
+CONSOLE_FOCUS_COMMAND_FILE = project_path("console_focus_command.txt")
 EXTERNAL_CAROUSEL_CONFIG_FILE = project_path("external_carousel_config.json")
 WII_MENU_WAND_CONFIG_FILE = project_path("wii_menu_wand_config.json")
+WII_IR_STATUS_FILE = project_path("wii_ir_status.json")
+WII_MENU_WAND_STATE_FILE = project_path("wii_menu_wand_state.json")
+WII_MENU_WAND_COMMAND_FILE = project_path("wii_menu_wand_command.json")
+PHONE_TOUCHPAD_STATUS_FILE = project_path("phone_touchpad_status.json")
 ASSETS_DIR = project_path("assets")
 SETTINGS_FILE = project_path("attract_theme_maps.json")
 GAMES_ROOT = project_path("games")
@@ -316,6 +321,10 @@ class ViewerService:
 
     def show_black(self):
         self._write("SHOW_BLACK")
+
+    def hide_external_tiles(self):
+        """Hide only the external GSV/carousel tile overlay; keep the current splash/artwork visible."""
+        self._write("HIDE_CAROUSEL_TILES")
 
     def show_image(self, image_path: str):
         self._write(f"SHOW_IMAGE|{image_path}")
@@ -3045,6 +3054,9 @@ class PixelChallengeConsole:
         self.backup_restore = tk.BooleanVar(value=False)
         self.apply_reboot = tk.BooleanVar(value=False)
         self.debug_logging = tk.BooleanVar(value=False)
+        # v28.26.3: console mouse visibility behavior. Ubuntu/GNOME cursor size
+        # is applied from System Setup so the operator can keep the laptop cursor easy to see.
+        self.console_cursor_size_var = tk.IntVar(value=64)
         self.setup_geometry = None
 
         self.setup_window = None
@@ -3056,6 +3068,21 @@ class PixelChallengeConsole:
 
         self.log_file = project_path(f"log_{time.strftime('%Y%m%d')}.log")
         self.viewer_state_file = project_path("viewer_state.json")
+        self.wii_menu_wand_state_file = WII_MENU_WAND_STATE_FILE
+        self.wii_menu_wand_command_file = WII_MENU_WAND_COMMAND_FILE
+        self.phone_touchpad_status_file = PHONE_TOUCHPAD_STATUS_FILE
+
+        # v28.26.0: visible operator feedback for which screen currently owns mouse/menu control.
+        self.input_screen_var = tk.StringVar(value="MOUSE TARGET: EXTERNAL VIEWER / GSV TILES")
+        self.input_screen_mode = "external"
+        self.input_screen_source = "GSV"
+        self.input_screen_last_update = 0.0
+        self.input_screen_pulse = False
+        # v28.26.8: local/physical mouse use on the laptop must override the
+        # public-screen/GSV indicator.  This prevents the top bar from claiming
+        # EXTERNAL while the operator is actually clicking around the console.
+        self.local_mouse_activity_at = 0.0
+        self.local_mouse_activity_last_hide_at = 0.0
 
         self.state_var = tk.StringVar(value=f"STATE: {self.host_state.name}")
 
@@ -3068,10 +3095,12 @@ class PixelChallengeConsole:
         self.sash_mixer_height = None
 
         self.load_settings()
+        self.apply_mouse_behavior_setup(show_popup=False, log_change=False)
         self.write_startup_log()
 
         self.viewer = ViewerService(project_path("viewer_command.txt"))
         self.console_command_file = CONSOLE_COMMAND_FILE
+        self.console_focus_command_file = CONSOLE_FOCUS_COMMAND_FILE
         # True when the Wii Menu Wand / public external front-end should be restored
         # automatically after operator-driven returns such as STOP -> splash.
         # Gameplay/setup still hides the carousel normally.
@@ -3155,6 +3184,14 @@ class PixelChallengeConsole:
         self.root.after(16, self.poll_joysticks)
         self.root.after(self.current_animation_interval_ms(), self.animation_tick)
         self.root.after(100, self.poll_console_commands)
+        self.root.after(250, self.refresh_input_screen_indicator)
+        # v28.26.8: any direct mouse use on the laptop console makes the laptop
+        # the active target from the operator's point of view.
+        self.root.bind_all("<Motion>", self.mark_laptop_local_mouse_active, add="+")
+        self.root.bind_all("<ButtonPress>", self.mark_laptop_local_mouse_active, add="+")
+        self.root.bind_all("<MouseWheel>", self.mark_laptop_local_mouse_active, add="+")
+        self.root.bind_all("<Button-4>", self.mark_laptop_local_mouse_active, add="+")
+        self.root.bind_all("<Button-5>", self.mark_laptop_local_mouse_active, add="+")
 
         self.set_state(HostState.IDLE, "System ready.")
         self.update_auto_button()
@@ -3162,7 +3199,10 @@ class PixelChallengeConsole:
         self.update_lanes_test_button()
         self.update_reassign_button()
         self.update_mode_button()
-        self.show_external_carousel(active="next_game", ensure_playable=True)
+        # v28.26.8: fresh boot/reboot should land on the Pixel Challenge Home
+        # splash, not silently advance/coerce the dropdown to Dot Dash.
+        self.selected_game.set("Splash")
+        self.show_external_carousel(active="home", ensure_playable=False)
 
     def write_startup_log(self):
         header = f"""
@@ -3253,6 +3293,7 @@ class PixelChallengeConsole:
         return {
             "difficulty": "normal",
             "show_scoreboard": True,
+            "scoreboard_return_seconds": 30,
             "sound_pack": "default",
             "invert_playfield": True,
             "sla": copy.deepcopy(DEFAULT_SLA_GLOBAL),
@@ -3343,6 +3384,11 @@ class PixelChallengeConsole:
             difficulty = "normal"
         merged["difficulty"] = difficulty
         merged["show_scoreboard"] = _safe_bool(merged.get("show_scoreboard"), defaults["show_scoreboard"])
+        scoreboard_seconds = _safe_int(merged.get("scoreboard_return_seconds"), defaults["scoreboard_return_seconds"])
+        if scoreboard_seconds < 3 or scoreboard_seconds > 300:
+            warnings.append("Scoreboard/results timeout was outside the safe 3-300 second range; changed to 30.")
+            scoreboard_seconds = defaults["scoreboard_return_seconds"]
+        merged["scoreboard_return_seconds"] = scoreboard_seconds
         merged["invert_playfield"] = _safe_bool(merged.get("invert_playfield"), defaults["invert_playfield"])
         sound_pack = str(merged.get("sound_pack") or "default").strip() or "default"
         merged["sound_pack"] = sound_pack
@@ -3584,6 +3630,10 @@ class PixelChallengeConsole:
             self.backup_restore.set(bool(data.get("backup_restore", False)))
             self.apply_reboot.set(bool(data.get("apply_reboot", False)))
             self.debug_logging.set(bool(data.get("debug_logging", False)))
+            try:
+                self.console_cursor_size_var.set(max(16, min(128, int(data.get("console_cursor_size", 64)))))
+            except Exception:
+                self.console_cursor_size_var.set(64)
             self.setup_geometry = data.get("setup_geometry")
             self.game_mode.set(int(data.get("game_mode", 1)))
             self.window_geometry = data.get("window_geometry")
@@ -3657,6 +3707,7 @@ class PixelChallengeConsole:
             "backup_restore": bool(self.backup_restore.get()),
             "apply_reboot": bool(self.apply_reboot.get()),
             "debug_logging": bool(self.debug_logging.get()),
+            "console_cursor_size": int(self.console_cursor_size_var.get()) if hasattr(self, "console_cursor_size_var") else 64,
             "setup_geometry": self.setup_geometry,
             "game_mode": int(self.game_mode.get()),
             "window_geometry": self.root.geometry(),
@@ -5840,7 +5891,14 @@ class PixelChallengeConsole:
         if (not force_plain
                 and getattr(self, "external_gsv_preferred", False)
                 and self.host_state not in (HostState.GAME_RUNNING, HostState.GAME_PAUSED, HostState.COUNTDOWN, HostState.GAME_SETUP, HostState.CHECKIN_OPEN)):
-            self.show_external_carousel(active="current_game", ensure_playable=True)
+            # v28.26.5: Preserve a real Splash selection.  The GSV carousel is
+            # game-tile oriented, but selecting Splash from the console must not
+            # call ensure_external_playable_selection(), or it silently changes
+            # the dropdown to Dot Dash and blocks access to Splash/global config.
+            if self.selected_game.get() == "Splash":
+                self.show_external_carousel(active="home", ensure_playable=False)
+            else:
+                self.show_external_carousel(active="current_game", ensure_playable=True)
             return
 
         game = self.current_game()
@@ -5858,7 +5916,13 @@ class PixelChallengeConsole:
     def return_to_external_frontend_or_splash(self, active: str = "next_game"):
         """Return the external viewer to whichever front-end currently owns it."""
         if getattr(self, "external_gsv_preferred", False):
-            self.show_external_carousel(active=active, ensure_playable=True)
+            # v28.26.5: Do not coerce Splash into the first playable game when
+            # returning the viewer/front-end.  Splash should remain the Pixel
+            # Challenge home artwork/config target.
+            if self.selected_game.get() == "Splash":
+                self.show_external_carousel(active="home", ensure_playable=False)
+            else:
+                self.show_external_carousel(active=active, ensure_playable=True)
         else:
             self.show_selected_game_splash(force_plain=True)
 
@@ -6051,8 +6115,13 @@ class PixelChallengeConsole:
             self.log(f"External carousel preview: {action_raw}")
             return
 
-    def show_external_carousel(self, active: str = "current_game", ensure_playable: bool = False):
-        """Show the public-facing 3-tile game carousel on the external viewer."""
+    def show_external_carousel(self, active: str = "current_game", ensure_playable: bool = False, play_preview_audio: bool = True):
+        """Show the public-facing 3-tile game carousel on the external viewer.
+
+        v28.26.3: During gameplay, the carousel can be explicitly summoned on top
+        of the gameplay splash, but preview audio must not interrupt whatever game
+        splash/music is already playing.
+        """
         self.external_gsv_preferred = True
         self.cancel_viewer_return()
         if ensure_playable:
@@ -6071,8 +6140,60 @@ class PixelChallengeConsole:
         except Exception as e:
             self.log(f"External carousel show error: {e}")
         active_item = next((item for item in items if item.get("id") == active_id), None)
-        if active_item:
+        if active_item and play_preview_audio:
             self.play_external_carousel_preview(str(active_item.get("preview_action", "")))
+
+    def force_wii_external_control(self, reason: str = ""):
+        """Ask the Wii menu wand helper to switch back to EXTERNAL control.
+
+        v28.26.6: The console can return the public screen to the carousel after
+        a game/results timeout while the Wii helper is still in LAPTOP mouse
+        mode.  That makes the console indicator say EXTERNAL even though the Wii
+        trigger still clicks the laptop.  Use this tiny command file to re-sync
+        the helper any time the console deliberately returns to external/GSV
+        control.
+        """
+        try:
+            payload = {
+                "command": "set_mode",
+                "mode": "external",
+                "reason": reason or "console_request",
+                "rumble": "double",
+                "updated_at": time.time(),
+            }
+            path = getattr(self, "wii_menu_wand_command_file", WII_MENU_WAND_COMMAND_FILE)
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2)
+            os.replace(tmp, path)
+            self.log(f"Wii Menu Wand <- force EXTERNAL control ({reason or 'console_request'})")
+        except Exception as e:
+            self.log(f"Wii Menu Wand force-external command failed: {e}")
+
+    def force_wii_laptop_control(self, reason: str = ""):
+        """Ask the Wii menu wand helper to switch to LAPTOP mouse control.
+
+        v28.26.8: modal dialogs and direct console actions must remain usable
+        even if the game/action was launched from the external screen.  This
+        command keeps the Wii helper, the actual cursor behavior, and the console
+        header in agreement.
+        """
+        try:
+            payload = {
+                "command": "set_mode",
+                "mode": "laptop",
+                "reason": reason or "console_request",
+                "rumble": "single",
+                "updated_at": time.time(),
+            }
+            path = getattr(self, "wii_menu_wand_command_file", WII_MENU_WAND_COMMAND_FILE)
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2)
+            os.replace(tmp, path)
+            self.log(f"Wii Menu Wand <- force LAPTOP control ({reason or 'console_request'})")
+        except Exception as e:
+            self.log(f"Wii Menu Wand force-laptop command failed: {e}")
 
     def handle_external_menu_action(self, action: str):
         """Handle an action requested by the external viewer carousel."""
@@ -6083,27 +6204,82 @@ class PixelChallengeConsole:
 
         if action in ("laptop_active", "set_laptop", "laptop"):
             self.external_gsv_preferred = False
-            self.log("External carousel: Laptop active / GSV preference cleared")
+            self.set_input_screen_mode("laptop", "WII/PHONE")
+            try:
+                self.viewer.hide_external_tiles()
+            except Exception:
+                pass
+            # v28.26.2: switching mouse focus back to the laptop must hide only
+            # the GSV tiles.  Keep the current external splash/artwork and its
+            # preview music alive so the public screen does not feel like it
+            # changed modes; it simply loses the tile overlay until external
+            # control is selected again.
+            self.log("External carousel: Laptop console active; external tiles hidden; splash/music preserved")
+            return
+
+        gameplay_like_state = self.host_state in (HostState.GAME_RUNNING, HostState.GAME_PAUSED, HostState.COUNTDOWN, HostState.GAME_SETUP)
+
+        if action in ("external_active", "set_external", "external"):
+            self.external_gsv_preferred = True
+            self.set_input_screen_mode("external", "GSV")
+            if gameplay_like_state:
+                # Focus is external again, but active gameplay keeps the gameplay
+                # splash/art visible and does not auto-restore tiles.  Trigger/B
+                # is still the explicit request to bring tiles back.
+                try:
+                    self.viewer.hide_external_tiles()
+                except Exception:
+                    pass
+                self.log(f"External carousel: External active during {self.host_state.name}; tiles remain hidden until trigger")
+                return
+            if self.selected_game.get() == "Splash":
+                self.show_external_carousel(active="home", ensure_playable=False)
+            else:
+                self.show_external_carousel(active="current_game", ensure_playable=True)
+            self.log("External carousel: External active")
             return
 
         self.external_gsv_preferred = True
+        self.set_input_screen_mode("external", "GSV")
 
         if action.startswith("preview_game|") or action.startswith("preview_non_game|"):
             # Preview commands are sent when the center GSV tile changes. These are
             # audio/background-selection cues only and should not start a game.
-            if self.host_state not in (HostState.GAME_RUNNING, HostState.GAME_PAUSED, HostState.COUNTDOWN, HostState.GAME_SETUP):
+            if not gameplay_like_state:
                 self.play_external_carousel_preview(action_raw)
             return
 
-        if self.host_state in (HostState.GAME_RUNNING, HostState.GAME_PAUSED, HostState.COUNTDOWN, HostState.GAME_SETUP):
-            self.log(f"External carousel action blocked during {self.host_state.name}: {action}")
+        if action in ("show_carousel_trigger", "gsv_select_show", "trigger_show_carousel"):
+            # v28.26.3: During gameplay, screen-focus toggling should NOT bring
+            # the tiles back automatically.  A deliberate trigger press may still
+            # summon the carousel overlay on top of the current gameplay splash.
+            self.cancel_viewer_return()
+            if self.selected_game.get() == "Splash" and not gameplay_like_state:
+                self.show_external_carousel(active="home", ensure_playable=False, play_preview_audio=True)
+            else:
+                self.ensure_external_playable_selection()
+                self.show_external_carousel(active="current_game", ensure_playable=True, play_preview_audio=not gameplay_like_state)
+            self.log("External carousel: Trigger requested tile overlay")
             return
 
         if action in ("show_carousel", "gsv_show", "show_gsv"):
             self.cancel_viewer_return()
-            self.ensure_external_playable_selection()
-            self.show_external_carousel(active="current_game", ensure_playable=True)
+            if gameplay_like_state:
+                # External screen is now the active control target, but while a
+                # game is running the public viewer should stay on the gameplay
+                # splash/artwork until the trigger explicitly requests tiles.
+                self.log(f"External carousel: Show suppressed during {self.host_state.name}; current viewer art remains visible")
+                return
+            if self.selected_game.get() == "Splash":
+                self.show_external_carousel(active="home", ensure_playable=False)
+            else:
+                self.ensure_external_playable_selection()
+                self.show_external_carousel(active="current_game", ensure_playable=True)
             self.log("External carousel: Show requested")
+            return
+
+        if gameplay_like_state:
+            self.log(f"External carousel action blocked during {self.host_state.name}: {action}")
             return
 
         if action.startswith("game|"):
@@ -6167,24 +6343,163 @@ class PixelChallengeConsole:
 
         self.log(f"Unknown external carousel action: {action}")
 
-    def poll_console_commands(self):
-        """Poll commands sent back from the external viewer carousel."""
+    def _read_and_clear_command_file(self, path: str) -> str:
+        """Read one atomic command file and remove it.
+
+        v28.26.10: return to single-command atomic files.  v28.26.9 used an
+        append/line queue and that allowed stale focus commands to replay later,
+        causing the Wii control target to flip back and forth by itself.
+        """
         try:
-            if os.path.exists(self.console_command_file):
-                with open(self.console_command_file, "r", encoding="utf-8") as f:
-                    cmd = f.read().strip()
-                try:
-                    os.remove(self.console_command_file)
-                except Exception:
-                    pass
-                if cmd:
-                    if cmd.startswith("EXTERNAL_MENU|"):
-                        self.handle_external_menu_action(cmd.split("|", 1)[1])
-                    else:
-                        self.log(f"Unknown console command file payload: {cmd}")
+            if not path or not os.path.exists(path):
+                return ""
+            with open(path, "r", encoding="utf-8") as f:
+                cmd = f.read().strip()
+            try:
+                os.remove(path)
+            except Exception:
+                pass
+            return cmd
+        except Exception as e:
+            self.log(f"Console command read error for {os.path.basename(path or '')}: {e}")
+            return ""
+
+    def poll_console_commands(self):
+        """Poll commands sent back from the external viewer carousel/Wii helper.
+
+        Focus commands now use console_focus_command.txt while menu/show/select
+        commands stay in console_command.txt.  This keeps the A-button screen
+        toggle from being overwritten by GSV commands without using the flaky
+        v28.26.9 line queue.
+        """
+        try:
+            # Process focus first, then normal menu commands.  If the operator
+            # deliberately presses the trigger after selecting external mode, the
+            # trigger/menu command remains the last visible action.
+            focus_cmd = self._read_and_clear_command_file(getattr(self, "console_focus_command_file", CONSOLE_FOCUS_COMMAND_FILE))
+            if focus_cmd:
+                if focus_cmd.startswith("EXTERNAL_MENU|"):
+                    self.handle_external_menu_action(focus_cmd.split("|", 1)[1])
+                else:
+                    self.log(f"Unknown console focus command payload: {focus_cmd}")
+
+            cmd = self._read_and_clear_command_file(self.console_command_file)
+            if cmd:
+                if cmd.startswith("EXTERNAL_MENU|"):
+                    self.handle_external_menu_action(cmd.split("|", 1)[1])
+                else:
+                    self.log(f"Unknown console command file payload: {cmd}")
         except Exception as e:
             self.log(f"Console command poll error: {e}")
         self.root.after(100, self.poll_console_commands)
+
+    # =========================================================================
+    # INPUT / SCREEN CONTROL INDICATOR (v28.26.0)
+    # =========================================================================
+    def _read_json_file_safe(self, path: str):
+        try:
+            if not path or not os.path.exists(path):
+                return {}
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            return {}
+
+    def mark_laptop_local_mouse_active(self, event=None):
+        """Treat direct laptop mouse activity as LAPTOP console focus.
+
+        v28.26.8: physical/local mouse movement and clicks are a strong signal
+        that the operator is working on the laptop screen, even if the last Wii
+        state file still says EXTERNAL.  Keep the visible header honest and hide
+        only the external tile overlay while preserving the public splash/music.
+        """
+        try:
+            now = time.time()
+            self.local_mouse_activity_at = now
+            self.external_gsv_preferred = False
+            self.set_input_screen_mode("laptop", "LOCAL MOUSE")
+            # Do not spam viewer_command.txt on every Motion event.
+            if now - getattr(self, "local_mouse_activity_last_hide_at", 0.0) > 0.75:
+                self.local_mouse_activity_last_hide_at = now
+                try:
+                    self.viewer.hide_external_tiles()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def set_input_screen_mode(self, mode: str, source: str = ""):
+        """Update the console-visible target-screen indicator.
+
+        mode is "laptop" when the local console screen owns mouse interaction, and
+        "external" when the public viewer/GSV carousel owns the navigation focus.
+        """
+        mode = "laptop" if str(mode).lower().startswith("lap") else "external"
+        source = (source or "").strip()
+        self.input_screen_mode = mode
+        self.input_screen_source = source
+        self.input_screen_last_update = time.time()
+        if mode == "laptop":
+            suffix = f" — {source}" if source else ""
+            text = f"MOUSE TARGET: LAPTOP CONSOLE ACTIVE{suffix}"
+            if self.input_screen_var.get() != text:
+                self.input_screen_var.set(text)
+            if hasattr(self, "input_screen_label"):
+                # v28.26.9: keep the indicator size/relief stable.  The earlier
+                # pulse changed border/relief every refresh and could make the
+                # GAME selector/config/mode controls visibly wiggle.
+                self.input_screen_label.configure(bg="#ff8c00", fg="#180a00", relief="ridge", bd=2)
+        else:
+            suffix = f" — {source}" if source else ""
+            text = f"MOUSE TARGET: EXTERNAL VIEWER / GSV TILES{suffix}"
+            if self.input_screen_var.get() != text:
+                self.input_screen_var.set(text)
+            if hasattr(self, "input_screen_label"):
+                self.input_screen_label.configure(bg="#123b66", fg="#e0f2fe", relief="ridge", bd=2)
+
+    def refresh_input_screen_indicator(self):
+        """Poll Wii/phone status files and keep the top-bar focus indicator obvious."""
+        try:
+            now = time.time()
+            phone = self._read_json_file_safe(getattr(self, "phone_touchpad_status_file", ""))
+            wii = self._read_json_file_safe(getattr(self, "wii_menu_wand_state_file", ""))
+
+            phone_recent = False
+            phone_source = ""
+            try:
+                phone_updated = float(phone.get("updated_at", 0) or 0)
+                phone_clients = int(phone.get("connected_clients", 0) or 0)
+                phone_recent = phone_clients > 0 and (now - phone_updated) < 15.0
+                if phone_recent:
+                    phone_source = "PHONE TOUCHPAD"
+            except Exception:
+                phone_recent = False
+
+            wii_laptop = False
+            try:
+                wii_updated = float(wii.get("updated_at", 0) or 0)
+                wii_laptop = (now - wii_updated) < 30.0 and str(wii.get("mode", "")).lower() == "laptop"
+            except Exception:
+                wii_laptop = False
+
+            local_recent = (now - float(getattr(self, "local_mouse_activity_at", 0.0) or 0.0)) < 4.0
+
+            # v28.26.9: no animated/pulsing indicator while refreshing; keep layout stable.
+            self.input_screen_pulse = False
+            if phone_recent:
+                self.set_input_screen_mode("laptop", phone_source)
+            elif wii_laptop:
+                self.set_input_screen_mode("laptop", "WII REMOTE")
+            elif local_recent:
+                self.set_input_screen_mode("laptop", "LOCAL MOUSE")
+            elif getattr(self, "external_gsv_preferred", True):
+                self.set_input_screen_mode("external", "GSV")
+            else:
+                self.set_input_screen_mode("laptop", "LOCAL MOUSE")
+        except Exception:
+            pass
+        self.root.after(250, self.refresh_input_screen_indicator)
 
     # =========================================================================
     # SCOREBOARD METHODS
@@ -6265,8 +6580,19 @@ class PixelChallengeConsole:
         self.last_scoreboard_payload = self.build_scoreboard_payload(result)
         self._write_scoreboard_data(self.last_scoreboard_payload)
 
-    def show_scoreboard_temporarily(self, seconds: int = 30, payload=None, final=False):
+    def scoreboard_return_seconds(self) -> int:
+        """Return Splash/global-configured scoreboard/final-results timeout seconds."""
+        try:
+            cfg = self.global_game_config if isinstance(getattr(self, "global_game_config", None), dict) else self.load_global_game_config()
+            seconds = _safe_int(cfg.get("scoreboard_return_seconds"), 30)
+        except Exception:
+            seconds = 30
+        return max(3, min(300, int(seconds)))
+
+    def show_scoreboard_temporarily(self, seconds: int | None = None, payload=None, final=False):
         self.cancel_viewer_return()
+        if seconds is None:
+            seconds = self.scoreboard_return_seconds()
         if payload is None:
             payload = self.build_scoreboard_payload(title="Final Results" if final else "Scoreboard")
         if payload is None:
@@ -6290,6 +6616,11 @@ class PixelChallengeConsole:
             self.dmx.apply_scene("warm_amber")
             self.refresh_dmx_fixture_cards()
         self.set_state(HostState.IDLE, "Returned to external carousel after results screen")
+        # v28.26.6: results timeout is an intentional return to the public/GSV
+        # screen. Force the Wii helper back to EXTERNAL mode even if gameplay was
+        # controlled from the laptop, otherwise the indicator and real Wii mouse
+        # mode can disagree.
+        self.force_wii_external_control("results_timeout")
         self.move_external_game_selection(1)
         self.show_external_carousel(active="next_game", ensure_playable=True)
         # Re-kick attract if AUTO is on
@@ -7828,7 +8159,7 @@ class PixelChallengeConsole:
                         if not results_applied:
                             self.dmx.apply_scene("results_white")
                         self.refresh_dmx_fixture_cards()
-                    self.show_scoreboard_temporarily(seconds=30, payload=payload, final=True)
+                    self.show_scoreboard_temporarily(seconds=self.scoreboard_return_seconds(), payload=payload, final=True)
                 else:
                     # No result — restore auto_enabled now since finish_results_screen
                     # will never fire (show_scoreboard_temporarily was not called).
@@ -7930,6 +8261,34 @@ class PixelChallengeConsole:
             self.game_tick_active = True
             self.root.after(33, self.game_tick)
 
+    def prepare_laptop_dialog_mouse(self, reason: str = "Dialog"):
+        """Make modal console dialogs recoverable when launched from the external menu.
+
+        v28.26.4: If a Wii/phone-initiated action opens a Tk messagebox, the
+        operator must still be able to move/click on the laptop screen.  Hide
+        only the external tiles, preserve whatever splash/art/music is already
+        on the viewer, and make the console focus indicator obvious.
+        """
+        try:
+            self.external_gsv_preferred = False
+            self.local_mouse_activity_at = time.time()
+            self.set_input_screen_mode("laptop", reason)
+        except Exception:
+            pass
+        try:
+            self.force_wii_laptop_control(reason)
+        except Exception:
+            pass
+        try:
+            self.viewer.hide_external_tiles()
+        except Exception:
+            pass
+        try:
+            self.root.lift()
+            self.root.focus_force()
+        except Exception:
+            pass
+
     def on_start_game(self):
         if self.host_state == HostState.GAME_RUNNING:
             self.on_pause_game()
@@ -7938,17 +8297,19 @@ class PixelChallengeConsole:
             self.on_resume_game()
             return
         self.cancel_viewer_return()
-        self.stop_music()  # Stop splash background music before game starts
         self.rescan_controllers()
         game_name = self.selected_game.get()
         if game_name == "Splash":
+            self.prepare_laptop_dialog_mouse("DIALOG")
             messagebox.showinfo("Splash", "Splash is display-only.")
             return
         if self.players_joined.get() == 0:
+            self.prepare_laptop_dialog_mouse("DIALOG")
             messagebox.showwarning("No Players", "No players have joined.")
             return
         game_key = game_name.lower().replace(" ", "_")
         if game_key not in self.game_manager.registry:
+            self.prepare_laptop_dialog_mouse("DIALOG")
             messagebox.showerror("Error", f"Game '{game_name}' not implemented.")
             return
         players = []
@@ -7967,8 +8328,11 @@ class PixelChallengeConsole:
                 players.append(player)
                 self.player_status[player_id]["state"] = "ACTIVE"
         if not players:
+            self.prepare_laptop_dialog_mouse("DIALOG")
             messagebox.showwarning("No Players", "No players checked in.")
             return
+
+        self.stop_music()  # Stop splash background music only after the game is actually allowed to start.
 
         # Remember animate state before turning it off
         self.animate_was_enabled_before_game = self.auto_enabled.get()
@@ -8143,6 +8507,14 @@ class PixelChallengeConsole:
         self.root.after(33, self.game_tick)
 
     def on_stop_game(self):
+        # v28.26.8: STOP/Reset is normally an operator laptop-console action.
+        # Keep the header and Wii helper in laptop mode so the visible target is
+        # truthful while the operator is using the console.
+        try:
+            self.mark_laptop_local_mouse_active()
+            self.force_wii_laptop_control("STOP_RESET")
+        except Exception:
+            pass
         # Cancel any pending countdown if it exists
         if hasattr(self, 'countdown_after_id') and self.countdown_after_id:
             try:
@@ -8250,7 +8622,7 @@ class PixelChallengeConsole:
         if payload is None:
             self.log("Scoreboard unavailable.")
             return
-        self.show_scoreboard_temporarily(30, payload, final=False)
+        self.show_scoreboard_temporarily(self.scoreboard_return_seconds(), payload, final=False)
 
     # =========================================================================
     # PLAYER CHECK-IN / CONFIRM
@@ -8591,6 +8963,10 @@ class PixelChallengeConsole:
         left.grid(row=0, column=0, sticky="w", padx=12, pady=8)
         tk.Label(left, text="HOST CONSOLE", bg="#0f0617", fg="white", font=("Arial", 22, "bold")).pack(anchor="w")
         tk.Label(left, textvariable=self.state_var, bg="#0f0617", fg="#6cff66", font=("Arial", 20, "bold")).pack(anchor="w", padx=(10, 0))
+        self.input_screen_label = tk.Label(left, textvariable=self.input_screen_var, bg="#123b66", fg="#e0f2fe",
+                                           font=("Arial", 13, "bold"), padx=8, pady=3, relief="ridge", bd=2,
+                                           width=56, anchor="w")
+        self.input_screen_label.pack(anchor="w", padx=(10, 0), pady=(4, 0))
         center = tk.Frame(top, bg="#0f0617")
         center.grid(row=0, column=1, sticky="", padx=30)
         tk.Label(center, text="GAME", bg="#0f0617", fg="white", font=("Arial", 18, "bold")).grid(row=0, column=0, padx=(0, 8))
@@ -9452,16 +9828,22 @@ class PixelChallengeConsole:
         gen = make_tab("General")
         difficulty = str_var("difficulty", config.get("difficulty", "normal"))
         show_scoreboard = bool_var("show_scoreboard", config.get("show_scoreboard", True))
+        scoreboard_return_seconds = int_var("scoreboard_return_seconds", config.get("scoreboard_return_seconds", 30))
         invert_playfield = bool_var("invert_playfield", config.get("invert_playfield", True))
         sound_pack = str_var("sound_pack", config.get("sound_pack", "default"))
         label(gen, 0, "Game Baseline")
         ttk.Combobox(gen, textvariable=difficulty, values=("casual", "normal", "challenge", "tournament"), state="readonly", width=18).grid(row=0, column=1, sticky="w", pady=8)
         label(gen, 2, "Scoreboard")
         check(gen, 2, "Show scoreboard/results when games finish", show_scoreboard)
-        label(gen, 3, "Invert Playfield", "Keep ON for the inverted physical lane orientation unless testing raw wiring.")
-        check(gen, 3, "Invert physical lane orientation", invert_playfield)
-        label(gen, 5, "Sound Pack")
-        ttk.Combobox(gen, textvariable=sound_pack, values=self._sound_pack_choices(), state="readonly", width=22).grid(row=5, column=1, sticky="w", pady=8)
+        label(gen, 3, "Results Timeout", "How long Final Results / Scoreboard stays on the external viewer before returning to the public carousel/splash.")
+        timeout_row = tk.Frame(gen, bg="#12061f")
+        timeout_row.grid(row=3, column=1, sticky="w", pady=8)
+        tk.Spinbox(timeout_row, from_=3, to=300, increment=1, textvariable=scoreboard_return_seconds, width=7, bg="#1b0b28", fg="white", insertbackground="white").pack(side="left")
+        tk.Label(timeout_row, text="seconds", bg="#12061f", fg="#cfd3ff", font=("Arial", 11)).pack(side="left", padx=(8, 0))
+        label(gen, 5, "Invert Playfield", "Keep ON for the inverted physical lane orientation unless testing raw wiring.")
+        check(gen, 5, "Invert physical lane orientation", invert_playfield)
+        label(gen, 7, "Sound Pack")
+        ttk.Combobox(gen, textvariable=sound_pack, values=self._sound_pack_choices(), state="readonly", width=22).grid(row=7, column=1, sticky="w", pady=8)
 
         # SLA tab
         sla_cfg = config.get("sla", {})
@@ -9558,6 +9940,7 @@ class PixelChallengeConsole:
             raw = copy.deepcopy(config)
             raw["difficulty"] = difficulty.get()
             raw["show_scoreboard"] = bool(show_scoreboard.get())
+            raw["scoreboard_return_seconds"] = int(scoreboard_return_seconds.get())
             raw["invert_playfield"] = bool(invert_playfield.get())
             raw["sound_pack"] = sound_pack.get().strip() or "default"
             raw["sla"] = {
@@ -9597,7 +9980,7 @@ class PixelChallengeConsole:
                     message += "\n\nCorrections:\n- " + "\n- ".join(save_warnings)
                     status_var.set("Saved with corrections: " + "; ".join(save_warnings))
                 else:
-                    status_var.set("Saved. Global config applied to Falcon, controller actions, rumble, and SLA.")
+                    status_var.set("Saved. Global config applied to Falcon, controller actions, rumble, SLA, and scoreboard timeout.")
                 messagebox.showinfo("Splash Config", message)
             except Exception as e:
                 messagebox.showerror("Splash Config", f"Failed to save: {e}")
@@ -10350,6 +10733,14 @@ class PixelChallengeConsole:
     def load_wii_menu_wand_config(self):
         default = {
             "ir_mouse_enabled": True,
+            "ir_mouse_mode": "absolute",
+            "ir_status_file": "wii_ir_status.json",
+            "ir_calibration_reset_seq": 0,
+            "ir_abs_min_x": 100,
+            "ir_abs_max_x": 920,
+            "ir_abs_min_y": 40,
+            "ir_abs_max_y": 740,
+            "ir_abs_smoothing_alpha": 0.35,
             "ir_sensitivity": 1.15,
             "ir_deadzone": 4,
             "ir_max_step": 22,
@@ -10395,6 +10786,12 @@ class PixelChallengeConsole:
             return
         cfg = self.load_wii_menu_wand_config()
         self.wii_ir_enabled_var = tk.BooleanVar(value=bool(cfg.get("ir_mouse_enabled", True)))
+        self.wii_ir_mode_var = tk.StringVar(value=str(cfg.get("ir_mouse_mode", "absolute")).lower())
+        self.wii_ir_abs_min_x_var = tk.IntVar(value=self._safe_int_config(cfg, "ir_abs_min_x", 100))
+        self.wii_ir_abs_max_x_var = tk.IntVar(value=self._safe_int_config(cfg, "ir_abs_max_x", 920))
+        self.wii_ir_abs_min_y_var = tk.IntVar(value=self._safe_int_config(cfg, "ir_abs_min_y", 40))
+        self.wii_ir_abs_max_y_var = tk.IntVar(value=self._safe_int_config(cfg, "ir_abs_max_y", 740))
+        self.wii_ir_abs_smoothing_var = tk.DoubleVar(value=self._safe_float_config(cfg, "ir_abs_smoothing_alpha", 0.35))
         self.wii_ir_sensitivity_var = tk.DoubleVar(value=self._safe_float_config(cfg, "ir_sensitivity", 1.15))
         self.wii_ir_deadzone_var = tk.IntVar(value=self._safe_int_config(cfg, "ir_deadzone", 4))
         self.wii_ir_max_step_var = tk.IntVar(value=self._safe_int_config(cfg, "ir_max_step", 22))
@@ -10413,6 +10810,7 @@ class PixelChallengeConsole:
         self.wii_ir_bounds_h_var = tk.IntVar(value=self._safe_int_config(cfg, "console_mouse_h", 1080))
         self.wii_ir_bounds_margin_var = tk.IntVar(value=self._safe_int_config(cfg, "console_mouse_margin", 6))
         self.wii_ir_setup_status_var = tk.StringVar(value="Wii IR mouse setup: ready")
+        self.wii_ir_diag_status_var = tk.StringVar(value="IR diagnostics: waiting for wand status")
 
     def _wii_ir_scale_row(self, parent, row, label, var, from_, to_, resolution, hint=""):
         tk.Label(parent, text=label, bg="#1a1a2e", fg="white", font=("Arial", 10)).grid(
@@ -10429,6 +10827,134 @@ class PixelChallengeConsole:
             tk.Label(parent, text=hint, bg="#1a1a2e", fg="#888888", font=("Arial", 8, "italic")).grid(
                 row=row, column=3, sticky="w", pady=2
             )
+
+    def load_wii_ir_status(self):
+        try:
+            if os.path.exists(WII_IR_STATUS_FILE):
+                with open(WII_IR_STATUS_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+        except Exception as e:
+            self.log(f"Wii IR status read error: {e}")
+        return {}
+
+    def refresh_wii_ir_diagnostics(self):
+        self.ensure_wii_ir_setup_vars()
+        st = self.load_wii_ir_status()
+        if not st:
+            msg = "IR diagnostics: no status yet. Switch wand to LAPTOP mode and aim at the IR bar."
+        else:
+            try:
+                age = time.time() - float(st.get("updated_at", 0))
+            except Exception:
+                age = 999
+            raw_x = st.get("raw_cx")
+            raw_y = st.get("raw_cy")
+            dist = st.get("point_distance")
+            obs = (st.get("observed_min_x"), st.get("observed_max_x"), st.get("observed_min_y"), st.get("observed_max_y"))
+            msg = (
+                f"IR diagnostics: mode={st.get('mouse_mode')} points={st.get('point_count')} tracking={st.get('tracking')} "
+                f"raw=({raw_x},{raw_y}) dist={dist} observed x={obs[0]}..{obs[1]} y={obs[2]}..{obs[3]} age={age:.1f}s"
+            )
+        self.wii_ir_diag_status_var.set(msg)
+        return st
+
+    def reset_wii_ir_observed_range(self):
+        self.ensure_wii_ir_setup_vars()
+        cfg = self.load_wii_menu_wand_config()
+        try:
+            cfg["ir_calibration_reset_seq"] = int(cfg.get("ir_calibration_reset_seq", 0) or 0) + 1
+            tmp = WII_MENU_WAND_CONFIG_FILE + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(cfg, f, indent=2)
+                f.write("\n")
+            os.replace(tmp, WII_MENU_WAND_CONFIG_FILE)
+            self.wii_ir_setup_status_var.set("Observed IR range reset. Move the Wii Remote to the desired edges/corners, then click Use Observed Range.")
+            self.log("Wii IR calibration observed range reset requested")
+        except Exception as e:
+            self.wii_ir_setup_status_var.set(f"Reset error: {e}")
+            self.log(f"Wii IR calibration reset error: {e}")
+
+    def use_wii_ir_observed_range(self):
+        self.ensure_wii_ir_setup_vars()
+        st = self.refresh_wii_ir_diagnostics()
+        try:
+            min_x = int(float(st.get("observed_min_x")))
+            max_x = int(float(st.get("observed_max_x")))
+            min_y = int(float(st.get("observed_min_y")))
+            max_y = int(float(st.get("observed_max_y")))
+        except Exception:
+            self.wii_ir_setup_status_var.set("No complete observed range yet. Reset range, move around the full desired area, then try again.")
+            return
+        if max_x - min_x < 80 or max_y - min_y < 60:
+            self.wii_ir_setup_status_var.set(f"Observed range too small: x={min_x}..{max_x} y={min_y}..{max_y}")
+            return
+        # Add a small pad so the screen edge is reachable before the IR point hits the camera edge.
+        pad_x = 10
+        pad_y = 10
+        self.wii_ir_abs_min_x_var.set(max(0, min_x - pad_x))
+        self.wii_ir_abs_max_x_var.set(min(1022, max_x + pad_x))
+        self.wii_ir_abs_min_y_var.set(max(0, min_y - pad_y))
+        self.wii_ir_abs_max_y_var.set(min(1022, max_y + pad_y))
+        self.wii_ir_mode_var.set("absolute")
+        self.apply_wii_ir_mouse_setup(show_popup=False)
+        self.wii_ir_setup_status_var.set(f"Using observed range: x={min_x}..{max_x} y={min_y}..{max_y}")
+
+    def apply_mouse_behavior_setup(self, show_popup: bool = False, log_change: bool = True):
+        """Apply operator mouse behavior settings to the Ubuntu desktop.
+
+        Currently this controls GNOME cursor size for the laptop console.  This
+        keeps the normal OS mouse easy to see for Wii IR and phone-touchpad use
+        without adding a custom animated cursor overlay.
+        """
+        try:
+            size = int(self.console_cursor_size_var.get()) if hasattr(self, "console_cursor_size_var") else 64
+        except Exception:
+            size = 64
+        size = max(16, min(128, size))
+        try:
+            if hasattr(self, "console_cursor_size_var"):
+                self.console_cursor_size_var.set(size)
+        except Exception:
+            pass
+        try:
+            subprocess.run(
+                ["gsettings", "set", "org.gnome.desktop.interface", "cursor-size", str(size)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=2,
+                check=False,
+            )
+            if log_change:
+                self.log(f"Mouse Behavior: GNOME cursor size set to {size}")
+            if show_popup:
+                messagebox.showinfo("Mouse Behavior", f"Console cursor size applied: {size}")
+            return True
+        except Exception as e:
+            if log_change:
+                self.log(f"Mouse Behavior apply failed: {e}")
+            if show_popup:
+                messagebox.showwarning("Mouse Behavior", f"Could not apply cursor size.\n\n{e}")
+            return False
+
+    def build_mouse_behavior_setup_section(self, parent):
+        frame = tk.LabelFrame(parent, text="Mouse Behavior", bg="#1a1a2e", fg="#ffd74f", font=("Arial", 11, "bold"))
+        frame.pack(fill="x", padx=20, pady=(0, 10))
+        inner = tk.Frame(frame, bg="#1a1a2e")
+        inner.pack(fill="x", padx=10, pady=8)
+        inner.grid_columnconfigure(1, weight=1)
+
+        tk.Label(inner, text="Console cursor size", bg="#1a1a2e", fg="white", font=("Arial", 10)).grid(row=0, column=0, sticky="w", padx=(0, 10), pady=2)
+        scale = tk.Scale(inner, variable=self.console_cursor_size_var, from_=16, to=128, resolution=1,
+                         orient="horizontal", length=420, bg="#1a1a2e", fg="white",
+                         troughcolor="#3a3a5c", highlightthickness=0, activebackground="#36d1ff")
+        scale.grid(row=0, column=1, sticky="we", pady=2)
+        tk.Label(inner, textvariable=self.console_cursor_size_var, bg="#1a1a2e", fg="#ffd74f", font=("Arial", 10, "bold"), width=5).grid(row=0, column=2, sticky="w", padx=(8, 12), pady=2)
+        tk.Button(inner, text="APPLY NOW", command=lambda: self.apply_mouse_behavior_setup(show_popup=True),
+                  bg="#2ea62e", fg="white", font=("Arial", 10, "bold"), width=12, cursor="hand2").grid(row=0, column=3, sticky="w", padx=(0, 8), pady=2)
+        tk.Label(inner, text="Applies Ubuntu/GNOME cursor-size for Wii Remote laptop mode and phone touchpad use. 64 is the current preferred show size.",
+                 bg="#1a1a2e", fg="#888888", font=("Arial", 9, "italic"), wraplength=980, justify="left").grid(row=1, column=0, columnspan=4, sticky="w", pady=(3, 0))
 
     def build_wii_ir_setup_section(self, parent):
         self.ensure_wii_ir_setup_vars()
@@ -10470,6 +10996,10 @@ class PixelChallengeConsole:
             tk.Checkbutton(checks, text=text, variable=var, bg="#1a1a2e", fg="white",
                            activebackground="#1a1a2e", activeforeground="white", selectcolor="#3a3a5c",
                            font=("Arial", 10)).pack(side="left", padx=(0, 18))
+        tk.Label(checks, text="Mouse mode", bg="#1a1a2e", fg="white", font=("Arial", 10)).pack(side="left", padx=(10, 6))
+        mode_menu = tk.OptionMenu(checks, self.wii_ir_mode_var, "absolute", "relative")
+        mode_menu.config(bg="#3a3a5c", fg="white", activebackground="#555580", activeforeground="white", highlightthickness=0)
+        mode_menu.pack(side="left", padx=(0, 12))
 
         bounds = tk.Frame(inner, bg="#1a1a2e")
         bounds.grid(row=9, column=0, columnspan=4, sticky="w", pady=(6, 2))
@@ -10477,8 +11007,23 @@ class PixelChallengeConsole:
         for var, width in ((self.wii_ir_bounds_x_var, 5), (self.wii_ir_bounds_y_var, 5), (self.wii_ir_bounds_w_var, 6), (self.wii_ir_bounds_h_var, 6), (self.wii_ir_bounds_margin_var, 4)):
             tk.Entry(bounds, textvariable=var, font=("Arial", 10), width=width, bg="#3a3a5c", fg="white", insertbackground="white").pack(side="left", padx=(0, 6))
 
+        calib = tk.LabelFrame(inner, text="Absolute IR Calibration", bg="#1a1a2e", fg="#ffd74f", font=("Arial", 10, "bold"))
+        calib.grid(row=10, column=0, columnspan=4, sticky="we", pady=(8, 4))
+        tk.Label(calib, text="Raw midpoint range  X min/max   Y min/max   abs smoothing", bg="#1a1a2e", fg="white", font=("Arial", 9)).pack(side="left", padx=(8, 8))
+        for var, width in ((self.wii_ir_abs_min_x_var, 5), (self.wii_ir_abs_max_x_var, 5), (self.wii_ir_abs_min_y_var, 5), (self.wii_ir_abs_max_y_var, 5), (self.wii_ir_abs_smoothing_var, 5)):
+            tk.Entry(calib, textvariable=var, font=("Arial", 10), width=width, bg="#3a3a5c", fg="white", insertbackground="white").pack(side="left", padx=(0, 6))
+        tk.Button(calib, text="Reset Observed", command=self.reset_wii_ir_observed_range,
+                  bg="#7040a0", fg="white", font=("Arial", 9, "bold"), cursor="hand2").pack(side="left", padx=(8, 4))
+        tk.Button(calib, text="Use Observed Range", command=self.use_wii_ir_observed_range,
+                  bg="#2ea62e", fg="white", font=("Arial", 9, "bold"), cursor="hand2").pack(side="left", padx=(4, 4))
+        tk.Button(calib, text="Refresh Diag", command=self.refresh_wii_ir_diagnostics,
+                  bg="#1b63ff", fg="white", font=("Arial", 9, "bold"), cursor="hand2").pack(side="left", padx=(4, 8))
+
+        tk.Label(inner, textvariable=self.wii_ir_diag_status_var, bg="#1a1a2e", fg="#c0ffc0",
+                 font=("Arial", 8, "italic"), wraplength=1000, justify="left").grid(row=11, column=0, columnspan=4, sticky="we", pady=(2, 0))
+
         buttons = tk.Frame(inner, bg="#1a1a2e")
-        buttons.grid(row=10, column=0, columnspan=4, sticky="w", pady=(8, 2))
+        buttons.grid(row=12, column=0, columnspan=4, sticky="w", pady=(8, 2))
         tk.Button(buttons, text="APPLY LIVE", command=lambda: self.apply_wii_ir_mouse_setup(show_popup=False),
                   bg="#2ea62e", fg="white", font=("Arial", 10, "bold"), width=12, cursor="hand2").pack(side="left", padx=(0, 8))
         tk.Button(buttons, text="Balanced", command=lambda: self.apply_wii_ir_preset("balanced"),
@@ -10488,16 +11033,16 @@ class PixelChallengeConsole:
         tk.Button(buttons, text="Precision", command=lambda: self.apply_wii_ir_preset("precision"),
                   bg="#555555", fg="white", font=("Arial", 10, "bold"), width=10, cursor="hand2").pack(side="left", padx=(0, 8))
         tk.Label(inner, textvariable=self.wii_ir_setup_status_var, bg="#1a1a2e", fg="#8ec5ff",
-                 font=("Arial", 9, "italic")).grid(row=11, column=0, columnspan=4, sticky="w", pady=(3, 0))
-        tk.Label(inner, text="Live Apply writes wii_menu_wand_config.json. The wand reloads changes within about one second; no restart needed.",
-                 bg="#1a1a2e", fg="#888888", font=("Arial", 8, "italic")).grid(row=12, column=0, columnspan=4, sticky="w", pady=(2, 0))
+                 font=("Arial", 9, "italic")).grid(row=13, column=0, columnspan=4, sticky="w", pady=(3, 0))
+        tk.Label(inner, text="Absolute mode maps calibrated raw IR midpoint directly into the console screen. Live Apply writes wii_menu_wand_config.json; no wand restart needed.",
+                 bg="#1a1a2e", fg="#888888", font=("Arial", 8, "italic")).grid(row=14, column=0, columnspan=4, sticky="w", pady=(2, 0))
 
     def apply_wii_ir_preset(self, preset):
         self.ensure_wii_ir_setup_vars()
         presets = {
-            "precision": dict(s=0.75, dz=5, step=14, smooth=0.38, jump=150, drag=0.45, nudge=6),
-            "balanced": dict(s=1.15, dz=4, step=22, smooth=0.50, jump=180, drag=0.60, nudge=12),
-            "responsive": dict(s=1.55, dz=3, step=30, smooth=0.65, jump=230, drag=0.75, nudge=18),
+            "precision": dict(s=0.75, dz=5, step=14, smooth=0.38, jump=150, drag=0.45, nudge=6, mode="absolute", abs_smooth=0.25),
+            "balanced": dict(s=1.15, dz=4, step=22, smooth=0.50, jump=180, drag=0.60, nudge=12, mode="absolute", abs_smooth=0.35),
+            "responsive": dict(s=1.55, dz=3, step=30, smooth=0.65, jump=230, drag=0.75, nudge=18, mode="absolute", abs_smooth=0.55),
         }
         vals = presets.get(preset, presets["balanced"])
         self.wii_ir_sensitivity_var.set(vals["s"])
@@ -10507,6 +11052,8 @@ class PixelChallengeConsole:
         self.wii_ir_jump_limit_var.set(vals["jump"])
         self.wii_ir_drag_scale_var.set(vals["drag"])
         self.wii_ir_nudge_var.set(vals["nudge"])
+        self.wii_ir_mode_var.set(vals.get("mode", "absolute"))
+        self.wii_ir_abs_smoothing_var.set(vals.get("abs_smooth", 0.35))
         self.apply_wii_ir_mouse_setup(show_popup=False)
 
     def apply_wii_ir_mouse_setup(self, show_popup=False):
@@ -10514,6 +11061,12 @@ class PixelChallengeConsole:
         cfg = self.load_wii_menu_wand_config()
         cfg.update({
             "ir_mouse_enabled": bool(self.wii_ir_enabled_var.get()),
+            "ir_mouse_mode": str(self.wii_ir_mode_var.get()).lower(),
+            "ir_abs_min_x": int(self.wii_ir_abs_min_x_var.get()),
+            "ir_abs_max_x": int(self.wii_ir_abs_max_x_var.get()),
+            "ir_abs_min_y": int(self.wii_ir_abs_min_y_var.get()),
+            "ir_abs_max_y": int(self.wii_ir_abs_max_y_var.get()),
+            "ir_abs_smoothing_alpha": round(float(self.wii_ir_abs_smoothing_var.get()), 3),
             "ir_sensitivity": round(float(self.wii_ir_sensitivity_var.get()), 3),
             "ir_deadzone": int(self.wii_ir_deadzone_var.get()),
             "ir_max_step": int(self.wii_ir_max_step_var.get()),
@@ -10536,6 +11089,7 @@ class PixelChallengeConsole:
         if not isinstance(notes, dict):
             notes = {}
         notes["LIVE_IR_TUNING"] = "Updated from the console Setup > Wii Remote IR Mouse section. The Wii Menu Wand reloads this file while running."
+        notes["IR_ABSOLUTE_CALIBRATION"] = "Absolute mode maps raw Wii IR midpoint into the console screen using ir_abs_min/max_x/y. Use Reset Observed + Use Observed Range to calibrate."
         cfg["notes"] = notes
         try:
             tmp = WII_MENU_WAND_CONFIG_FILE + ".tmp"
@@ -10543,7 +11097,7 @@ class PixelChallengeConsole:
                 json.dump(cfg, f, indent=2)
                 f.write("\n")
             os.replace(tmp, WII_MENU_WAND_CONFIG_FILE)
-            msg = f"Applied live: sensitivity={cfg['ir_sensitivity']} deadzone={cfg['ir_deadzone']} max_step={cfg['ir_max_step']} smoothing={cfg['ir_smoothing_alpha']}"
+            msg = f"Applied live: mode={cfg.get('ir_mouse_mode')} abs=({cfg.get('ir_abs_min_x')},{cfg.get('ir_abs_max_x')},{cfg.get('ir_abs_min_y')},{cfg.get('ir_abs_max_y')}) sensitivity={cfg['ir_sensitivity']}"
             self.log("Wii IR mouse setup saved. " + msg)
             if hasattr(self, "wii_ir_setup_status_var"):
                 self.wii_ir_setup_status_var.set(msg)
@@ -11068,6 +11622,9 @@ class PixelChallengeConsole:
                        bg="#1a1a2e", fg="yellow", activebackground="#1a1a2e", activeforeground="yellow",
                        selectcolor="#3a3a5c", font=("Arial", 10)).pack(anchor="w", pady=2)
 
+        # === Mouse Behavior ===
+        self.build_mouse_behavior_setup_section(setup_body)
+
         # === Wii Remote IR Mouse Live Setup ===
         self.build_wii_ir_setup_section(setup_body)
 
@@ -11149,6 +11706,9 @@ class PixelChallengeConsole:
         # Save geometry
         if self.setup_window:
             self.setup_geometry = self.setup_window.geometry()
+
+        if hasattr(self, "console_cursor_size_var"):
+            self.apply_mouse_behavior_setup(show_popup=False)
 
         if hasattr(self, "wii_ir_sensitivity_var"):
             self.apply_wii_ir_mouse_setup(show_popup=False)

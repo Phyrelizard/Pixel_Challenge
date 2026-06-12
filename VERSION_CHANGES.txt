@@ -112,3 +112,10 @@ WARM/COOL buttons: color temperature shifts in COLOR PALETTE section
 Scoped scrolling: module-level _scroll_owner guard prevents multiple scrollable frames from interfering
 ASCEND game filter: fixed key from "custom" to "ascend"
 
+v28.26.3
+--------
+- Added System Setup > Mouse Behavior with saved GNOME console cursor-size setting.
+- Fixed gameplay external-viewer behavior: focus toggles no longer auto-restore GSV tiles while a game is running.
+- Viewer now preserves the pre-carousel artwork when tiles are hidden, so gameplay_image.png stays visible during gameplay.
+- GSV trigger/select can deliberately bring tiles back during gameplay.
+

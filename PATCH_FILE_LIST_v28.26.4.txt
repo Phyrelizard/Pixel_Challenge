@@ -1,0 +1,25 @@
+Pixel Challenge v28.26.4 - Wii laptop recovery / scroll / dialog-safe patch
+
+Files included in patch:
+- pixel_challenge_console_v28.26.4.py
+- tools/wii_menu_wand.py
+- PATCH_FILE_LIST_v28.26.4.txt
+
+Changes:
+- A button on Wii Remote is now always the screen-focus toggle.
+  - External -> laptop works even if tiles are hidden or gameplay is running.
+  - Laptop -> external still requests the external side, but gameplay keeps the gameplay splash visible unless the trigger explicitly summons tiles.
+- Added Wii Remote laptop-mode D-pad scrolling:
+  - Up = scroll up
+  - Down = scroll down
+  - Left/Right still nudge the mouse left/right
+- No-player / splash / missing-game dialogs now switch the console indicator to laptop/dialog mode and hide only the external tiles before showing the modal dialog.
+- Start-game validation no longer stops splash/music before the game is actually allowed to start.
+
+Install:
+1. Extract into the project root, preserving folders.
+2. chmod +x start_console.sh start_viewer.sh start_pixelchallenge_manual.sh start_phone_touchpad_remote.sh stop_pixelchallenge_all.sh
+3. ./start_pixelchallenge_manual.sh
+
+Expected startup:
+CONSOLE START - v28.26.4
