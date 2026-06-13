@@ -6,7 +6,7 @@
   "players": [
     {
       "player_id": 1,
-      "score": -50,
+      "score": -45,
       "selected_lane": "left",
       "is_active": true,
       "lives": null

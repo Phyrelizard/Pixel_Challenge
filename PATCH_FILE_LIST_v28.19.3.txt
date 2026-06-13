@@ -1,8 +1,0 @@
-pixel_challenge_console_v28.19.3.py
-games/ascend/ascend.py
-games/ascend/config.json
-games/global.config.json
-CHANGELOG.md
-README_v28.19.3_ascend_band_passing_patch.txt
-PATCH_FILE_LIST_v28.19.3.txt
-requirements_t480s_working.txt

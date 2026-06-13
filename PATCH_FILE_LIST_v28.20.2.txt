@@ -1,8 +1,0 @@
-PATCH_FILE_LIST_v28.20.2
-=========================
-
-pixel_challenge_console_v28.20.2.py
-CHANGELOG.md
-README_v28.20.2_local_simulator_offline_patch.txt
-PATCH_FILE_LIST_v28.20.2.txt
-games/global.config.json

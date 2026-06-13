@@ -463,7 +463,7 @@
     }
   },
   "pixel_pop": {
-    "sample_count": 175,
+    "sample_count": 176,
     "last_calibrated": 1781239912.9648848,
     "reaction_times_ms": [],
     "accuracies": [
@@ -641,7 +641,8 @@
       0.522,
       0.0,
       0.333,
-      0.0
+      0.0,
+      0.4
     ],
     "thresholds": {
       "reaction_expert_ms": 300,

@@ -1,24 +1,24 @@
 {
-  "updated_at": 1781262151.8431346,
+  "updated_at": 1781328660.869917,
   "mode": "laptop",
   "mouse_mode": "absolute",
   "tracking": true,
   "point_count": 2,
-  "raw_cx": 542.5,
-  "raw_cy": 395.5,
-  "point_distance": 171.49344010777787,
-  "observed_min_x": 29.0,
-  "observed_max_x": 989.5,
+  "raw_cx": 617.5,
+  "raw_cy": 493.5,
+  "point_distance": 204.78769494283586,
+  "observed_min_x": 2.0,
+  "observed_max_x": 997.0,
   "observed_min_y": 2.0,
-  "observed_max_y": 757.5,
+  "observed_max_y": 757.0,
   "calibration": {
     "min_x": 100.0,
     "max_x": 920.0,
     "min_y": 40.0,
     "max_y": 740.0
   },
-  "hat0x": 599,
-  "hat0y": 460,
-  "hat1x": 486,
-  "hat1y": 331
+  "hat0x": 516,
+  "hat0y": 507,
+  "hat1x": 719,
+  "hat1y": 480
 }

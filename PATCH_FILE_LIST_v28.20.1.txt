@@ -1,7 +1,0 @@
-pixel_challenge_console_v28.20.1.py
-games/chomp_chase/chomp_chase.py
-games/chomp_chase/config.json
-games/chomp_chase/__init__.py
-CHANGELOG.md
-READMEs/README_v28.20.1_chomp_chase_easier_patch.txt
-PATCH_FILE_LIST_v28.20.1.txt
