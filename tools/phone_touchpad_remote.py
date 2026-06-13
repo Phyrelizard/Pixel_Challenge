@@ -2,7 +2,7 @@
 """
 tools/phone_touchpad_remote.py
 
-Phone-as-touchpad remote for Pixel Challenge laptop console control.
+Phone-as-touchpad and GSV tile remote for Pixel Challenge control.
 
 Run:
   ./start_phone_touchpad_remote.sh
@@ -35,11 +35,13 @@ mouse = Controller()
 APP_DIR = Path(os.environ.get("PIXEL_CHALLENGE_APP_DIR") or Path(__file__).resolve().parents[1])
 STATUS_FILE = APP_DIR / "phone_touchpad_status.json"
 CONSOLE_COMMAND_FILE = APP_DIR / "console_command.txt"
+GSV_INPUT_FILE = APP_DIR / "gsv_input_command.txt"
 LOG_DIR = APP_DIR / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 CONNECTED_CLIENTS = 0
 LAST_STATUS_WRITE = 0.0
+ACTIVE_TARGET = "laptop"
 
 
 def parse_xrandr_monitor_line(line: str):
@@ -93,6 +95,29 @@ def write_console_command(cmd: str):
         pass
 
 
+def append_gsv_command(cmd: str):
+    """Append a viewer/GSV command without stomping on nearby scroll/select taps."""
+    try:
+        with GSV_INPUT_FILE.open("a", encoding="utf-8") as f:
+            f.write(cmd.rstrip() + "\n")
+    except Exception:
+        pass
+
+
+def set_active_target(target: str, event: str = "target"):
+    global ACTIVE_TARGET
+    target = "external" if str(target).lower() in ("external", "viewer", "gsv") else "laptop"
+    ACTIVE_TARGET = target
+    if target == "external":
+        # Console decides whether the tiles may appear during gameplay; the GSV
+        # command gives the viewer the same nudge path used by the Wii Remote.
+        write_console_command("EXTERNAL_MENU|show_carousel")
+        append_gsv_command("GSV_SHOW")
+    else:
+        write_console_command("EXTERNAL_MENU|phone_laptop_active")
+    safe_write_status({"event": event, "mode": ACTIVE_TARGET})
+
+
 def safe_write_status(extra=None):
     global LAST_STATUS_WRITE
     now = time.time()
@@ -101,7 +126,7 @@ def safe_write_status(extra=None):
     LAST_STATUS_WRITE = now
     payload = {
         "updated_at": now,
-        "mode": "laptop",
+        "mode": ACTIVE_TARGET,
         "source": "phone_touchpad",
         "connected_clients": CONNECTED_CLIENTS,
         "target": {"x": TARGET_X, "y": TARGET_Y, "w": TARGET_W, "h": TARGET_H},
@@ -194,6 +219,43 @@ HTML = r"""<!doctype html>
   button.pill {
     cursor: pointer;
     font-weight: 700;
+  }
+  .pill.target {
+    border-color: #475569;
+    background: #111827;
+  }
+  .pill.target.viewer {
+    border-color: #9333ea;
+    background: #3b0764;
+    color: #f5d0fe;
+  }
+  #remotePanel {
+    position: fixed;
+    left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom));
+    z-index: 26;
+    display: none;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    background: rgba(2, 6, 23, 0.88);
+    border: 1px solid #334155;
+    border-radius: 18px;
+    padding: 10px;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.45);
+  }
+  #remotePanel.open { display: grid; }
+  #remotePanel .wide { grid-column: span 3; }
+  #remotePanel button {
+    min-height: 48px;
+    border-radius: 14px;
+    border: 1px solid #475569;
+    background: #111827;
+    color: var(--text);
+    font-weight: 900;
+    font-size: 15px;
+  }
+  #remotePanel button.primary {
+    border-color: #9333ea;
+    background: #581c87;
   }
   #status {
     min-width: 88px;
@@ -336,6 +398,7 @@ HTML = r"""<!doctype html>
 <body>
   <div id="topbar">
     <div id="status" class="pill">Connecting</div>
+    <button id="targetBtn" class="pill target">Console</button>
     <button id="modeBtn" class="pill mode">FitPad</button>
     <div id="readout" class="pill">DX 0.0 / DY 0.0</div>
     <button id="editBtn" class="pill">Edit</button>
@@ -344,12 +407,21 @@ HTML = r"""<!doctype html>
 
   <div id="pad">
     <div id="padLabel">
-      <div>
+      <div id="padTitle">
         TOUCHPAD
-        <small>drag = move • tap = click • long press = hold</small>
+        <small id="padHint">drag = move • tap = click • long press = hold</small>
       </div>
     </div>
     <div id="handle"></div>
+  </div>
+
+  <div id="remotePanel">
+    <button data-cmd="prev">◀ TILE</button>
+    <button data-cmd="select" class="primary">SELECT</button>
+    <button data-cmd="next">TILE ▶</button>
+    <button data-cmd="show">SHOW TILES</button>
+    <button data-cmd="home">HOME</button>
+    <button data-cmd="score">SCORE</button>
   </div>
 
   <div id="settings">
@@ -426,11 +498,15 @@ HTML = r"""<!doctype html>
   const statusEl = document.getElementById('status');
   const readout = document.getElementById('readout');
   const modeBtn = document.getElementById('modeBtn');
+  const targetBtn = document.getElementById('targetBtn');
   const editBtn = document.getElementById('editBtn');
   const settingsBtn = document.getElementById('settingsBtn');
   const settingsPanel = document.getElementById('settings');
   const closeSettings = document.getElementById('closeSettings');
   const handle = document.getElementById('handle');
+  const remotePanel = document.getElementById('remotePanel');
+  const padTitle = document.getElementById('padTitle');
+  const padHint = document.getElementById('padHint');
 
   const defaults = {
     mode: 'fit',
@@ -441,6 +517,8 @@ HTML = r"""<!doctype html>
     longPress: 425,
     minMove: 2.5,
     liftDrop: 1,
+    target: 'console',
+    swipeThreshold: 64,
     padMode: 'full',
     padX: 0,
     padY: 48,
@@ -460,6 +538,7 @@ HTML = r"""<!doctype html>
   let holding = false;
   let pendingDx = 0;
   let pendingDy = 0;
+  let viewerGestureScrolled = false;
   let editing = false;
   let editMode = null;
   let editStart = null;
@@ -497,6 +576,30 @@ HTML = r"""<!doctype html>
     if (cfg.mode === 'normal') return 'Normal';
     return 'Absolute';
   }
+  function prettyTarget() {
+    return cfg.target === 'viewer' ? 'Viewer' : 'Console';
+  }
+  function syncTargetUi() {
+    const viewer = cfg.target === 'viewer';
+    targetBtn.textContent = prettyTarget();
+    targetBtn.classList.toggle('viewer', viewer);
+    remotePanel.classList.toggle('open', viewer);
+    pad.classList.toggle('viewerTarget', viewer);
+    if (viewer) {
+      padTitle.firstChild.nodeValue = 'VIEWER TILE PAD';
+      padHint.textContent = 'swipe left/right = move tiles • tap = select';
+      readout.textContent = 'Viewer tile control';
+    } else {
+      padTitle.firstChild.nodeValue = 'TOUCHPAD';
+      padHint.textContent = 'drag = move • tap = click • long press = hold';
+    }
+  }
+  function setTarget(target, announce=true) {
+    cfg.target = target === 'viewer' ? 'viewer' : 'console';
+    saveCfg();
+    syncTargetUi();
+    if (announce) send({type:'set_target', target: cfg.target});
+  }
   function syncSettingsUi() {
     els.mode.value = cfg.mode;
     els.speed.value = cfg.speed;
@@ -514,6 +617,7 @@ HTML = r"""<!doctype html>
     els.longPressVal.textContent = cfg.longPress + ' ms';
     els.minMoveVal.textContent = Number(cfg.minMove).toFixed(1) + ' px';
     modeBtn.textContent = prettyMode();
+    syncTargetUi();
   }
   function applyPadLayout() {
     const top = 48 + (window.visualViewport ? Math.max(0, window.visualViewport.offsetTop) : 0);
@@ -539,7 +643,11 @@ HTML = r"""<!doctype html>
   function connect() {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     ws = new WebSocket(proto + '://' + location.host + '/ws');
-    ws.onopen = () => setStatus(true, 'Connected');
+    ws.onopen = () => {
+      setStatus(true, 'Connected');
+      send({type:'set_target', target: cfg.target});
+      send({type:'heartbeat', target: cfg.target});
+    };
     ws.onclose = () => {
       setStatus(false, 'Disconnected');
       setTimeout(connect, 750);
@@ -548,6 +656,28 @@ HTML = r"""<!doctype html>
   }
   function send(obj) {
     if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+  }
+  setInterval(() => send({type:'heartbeat', target: cfg.target}), 5000);
+
+  function viewerScroll(direction) {
+    setTarget('viewer', false);
+    send({type:'gsv_scroll', direction});
+    readout.textContent = direction < 0 ? 'TILE ◀' : 'TILE ▶';
+  }
+  function viewerSelect() {
+    setTarget('viewer', false);
+    send({type:'gsv_select'});
+    readout.textContent = 'SELECT';
+  }
+  function viewerShow() {
+    setTarget('viewer', false);
+    send({type:'gsv_show'});
+    readout.textContent = 'SHOW TILES';
+  }
+  function viewerAction(action) {
+    setTarget('viewer', false);
+    send({type:'menu_action', action});
+    readout.textContent = action.toUpperCase();
   }
 
   function movePointer(rawDx, rawDy) {
@@ -601,14 +731,17 @@ HTML = r"""<!doctype html>
     moved = 0;
     pendingDx = 0;
     pendingDy = 0;
+    viewerGestureScrolled = false;
     holding = false;
 
     clearLongTimer();
-    longTimer = setTimeout(() => {
-      holding = true;
-      send({type:'down'});
-      readout.textContent = 'HOLD';
-    }, cfg.longPress);
+    if (cfg.target !== 'viewer') {
+      longTimer = setTimeout(() => {
+        holding = true;
+        send({type:'down'});
+        readout.textContent = 'HOLD';
+      }, cfg.longPress);
+    }
   });
 
   pad.addEventListener('pointermove', (e) => {
@@ -638,6 +771,21 @@ HTML = r"""<!doctype html>
     lastX = e.clientX;
     lastY = e.clientY;
 
+    if (cfg.target === 'viewer') {
+      clearLongTimer();
+      const totalDx = e.clientX - startX;
+      const totalDy = e.clientY - startY;
+      if (Math.abs(totalDx) >= Number(cfg.swipeThreshold || 64) && Math.abs(totalDx) > Math.abs(totalDy) * 1.15) {
+        // Natural phone behavior: swipe left moves to the next tile, swipe right to previous.
+        viewerScroll(totalDx < 0 ? 1 : -1);
+        startX = e.clientX;
+        startY = e.clientY;
+        moved = 0;
+        viewerGestureScrolled = true;
+      }
+      return;
+    }
+
     if (moved > cfg.tapMove) clearLongTimer();
 
     // Lift-jitter filter:
@@ -666,6 +814,15 @@ HTML = r"""<!doctype html>
     }
 
     clearLongTimer();
+
+    if (cfg.target === 'viewer') {
+      const dt = performance.now() - downAt;
+      if (!viewerGestureScrolled && moved <= cfg.tapMove && dt < 600) {
+        viewerSelect();
+      }
+      pointerId = null;
+      return;
+    }
 
     // On lift, drop any leftover tiny movement by default. This is the part
     // that keeps the pointer from creeping when your thumb peels off the glass.
@@ -721,6 +878,18 @@ HTML = r"""<!doctype html>
       saveCfg();
     }
     applyPadLayout();
+  }
+
+  targetBtn.onclick = () => setTarget(cfg.target === 'viewer' ? 'console' : 'viewer');
+  for (const btn of remotePanel.querySelectorAll('button[data-cmd]')) {
+    btn.onclick = () => {
+      const cmd = btn.dataset.cmd;
+      if (cmd === 'prev') viewerScroll(-1);
+      else if (cmd === 'next') viewerScroll(1);
+      else if (cmd === 'select') viewerSelect();
+      else if (cmd === 'show') viewerShow();
+      else viewerAction(cmd);
+    };
   }
 
   settingsBtn.onclick = () => toggleSettings();
@@ -795,12 +964,11 @@ async def index(request):
     return web.Response(text=html, content_type="text/html")
 
 async def ws_handler(request):
-    global CONNECTED_CLIENTS
+    global CONNECTED_CLIENTS, ACTIVE_TARGET
     ws = web.WebSocketResponse(heartbeat=20)
     await ws.prepare(request)
     CONNECTED_CLIENTS += 1
     safe_write_status({"event": "client_connected"})
-    write_console_command("EXTERNAL_MENU|laptop_active")
 
     try:
         async for msg in ws:
@@ -812,32 +980,70 @@ async def ws_handler(request):
 
                 typ = data.get("type")
                 try:
-                    if typ == "move":
+                    if typ == "set_target":
+                        set_active_target(data.get("target", "laptop"), "set_target")
+
+                    elif typ == "heartbeat":
+                        requested = str(data.get("target", ACTIVE_TARGET) or ACTIVE_TARGET).lower()
+                        ACTIVE_TARGET = "external" if requested in ("external", "viewer", "gsv") else "laptop"
+                        safe_write_status({"event": "heartbeat", "mode": ACTIVE_TARGET})
+
+                    elif typ == "gsv_scroll":
+                        set_active_target("external", "gsv_scroll")
+                        direction = int(float(data.get("direction", 0) or 0))
+                        if direction < 0:
+                            append_gsv_command("GSV_SCROLL|-1")
+                        elif direction > 0:
+                            append_gsv_command("GSV_SCROLL|1")
+
+                    elif typ == "gsv_select":
+                        set_active_target("external", "gsv_select")
+                        append_gsv_command("GSV_SELECT")
+
+                    elif typ == "gsv_show":
+                        set_active_target("external", "gsv_show")
+                        append_gsv_command("GSV_SHOW")
+
+                    elif typ == "menu_action":
+                        action = str(data.get("action", "") or "").strip().lower()
+                        if action in ("home", "score", "menu"):
+                            set_active_target("external", f"menu_{action}")
+                            write_console_command(f"EXTERNAL_MENU|{action}")
+
+                    elif typ == "move":
+                        if ACTIVE_TARGET != "laptop":
+                            set_active_target("laptop", "move")
                         dx = float(data.get("dx", 0))
                         dy = float(data.get("dy", 0))
                         cur_x, cur_y = mouse.position
                         nx, ny = clamp_to_target(cur_x + dx, cur_y + dy)
                         mouse.position = (nx, ny)
-                        safe_write_status({"event": "move"})
+                        safe_write_status({"event": "move", "mode": "laptop"})
+
                     elif typ == "absolute":
+                        if ACTIVE_TARGET != "laptop":
+                            set_active_target("laptop", "absolute")
                         x = float(data.get("x", 0))
                         y = float(data.get("y", 0))
                         nx, ny = clamp_to_target(TARGET_X + x, TARGET_Y + y)
                         mouse.position = (nx, ny)
-                        safe_write_status({"event": "absolute"})
+                        safe_write_status({"event": "absolute", "mode": "laptop"})
+
                     elif typ == "click":
-                        write_console_command("EXTERNAL_MENU|laptop_active")
+                        set_active_target("laptop", "click")
                         mouse.click(Button.left, 1)
-                        safe_write_status({"event": "click"})
+                        safe_write_status({"event": "click", "mode": "laptop"})
+
                     elif typ == "down":
-                        write_console_command("EXTERNAL_MENU|laptop_active")
+                        set_active_target("laptop", "down")
                         mouse.press(Button.left)
-                        safe_write_status({"event": "down"})
+                        safe_write_status({"event": "down", "mode": "laptop"})
+
                     elif typ == "up":
                         mouse.release(Button.left)
-                        safe_write_status({"event": "up"})
+                        safe_write_status({"event": "up", "mode": "laptop"})
                 except Exception as exc:
-                    print("mouse command error:", exc)
+                    print("phone command error:", exc)
     finally:
         CONNECTED_CLIENTS = max(0, CONNECTED_CLIENTS - 1)
         safe_write_status({"event": "client_disconnected"})
@@ -849,13 +1055,13 @@ def main():
     app.add_routes([web.get("/", index), web.get("/ws", ws_handler)])
 
     print()
-    print("Pixel Challenge Phone Touchpad Remote v28.26.0")
+    print("Pixel Challenge Phone Touchpad Remote v28.26.14")
     print("------------------------------------")
     print(f"Detected desktop size: {SCREEN_W} x {SCREEN_H}")
     print("On the phone, connect to the laptop hotspot and open:")
     print("  http://10.42.0.1:8080")
     print()
-    print("Phone touchpad controls the laptop console screen and announces LAPTOP ACTIVE to the console.")
+    print("Phone touchpad controls the laptop console; Viewer mode controls the GSV tile carousel.")
     print("Press Ctrl+C to stop.")
     print()
 

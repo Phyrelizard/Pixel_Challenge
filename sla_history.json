@@ -843,6 +843,29 @@
           ]
         }
       }
+    },
+    {
+      "session_id": "2026-06-13_14-28-04",
+      "timestamp": 1781387286.3945286,
+      "players": {
+        "1": {
+          "games_played": 1,
+          "final_sla": 9,
+          "samples": [
+            {
+              "game_key": "pixel_pop",
+              "timestamp": 1781386489.6543381,
+              "metrics": {
+                "accuracy": 0.826,
+                "reaction_time_sec": 0.0,
+                "completion_time_sec": null,
+                "score": 630
+              },
+              "calculated_sla": 9
+            }
+          ]
+        }
+      }
     }
   ]
 }

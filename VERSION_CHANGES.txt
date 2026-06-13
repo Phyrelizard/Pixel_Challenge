@@ -1,3 +1,11 @@
+v28.26.14
+--------
+- Built from v28.26.13.
+- Added phone touchpad dual-mode behavior: Console mode for laptop mouse/touchpad, Viewer mode for external/GSV carousel control.
+- Phone Viewer mode now sends GSV_SHOW, GSV_SCROLL, and GSV_SELECT through gsv_input_command.txt, matching the Wii Remote command path.
+- Added phone buttons for Viewer/Console, previous tile, select, next tile, show tiles, Home, and Score.
+- Console focus indicator now shows PHONE TOUCHPAD in laptop or external mode based on phone_touchpad_status.json.
+
 
 
 CONSOLE 

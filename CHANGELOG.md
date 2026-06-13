@@ -1,3 +1,14 @@
+## v28.26.14 - Phone touchpad GSV remote
+
+- Built from v28.26.13.
+- Kept the Wii Remote menu wand path intact and added phone control as a companion remote.
+- Upgraded `tools/phone_touchpad_remote.py` with Console and Viewer modes.
+- Console mode keeps the phone as the laptop touchpad/mouse.
+- Viewer mode controls the external/GSV carousel using the same `gsv_input_command.txt` path as the Wii Remote: Show, Scroll, and Select.
+- Added phone UI controls for Viewer/Console target, previous tile, select, next tile, show tiles, Home, and Score.
+- Added tile-pad gestures in Viewer mode: swipe left/right to move tiles, tap to select.
+- Console header now distinguishes PHONE TOUCHPAD in laptop mode versus external/GSV mode.
+
 ## v28.26.13 - Check-In keeps laptop focus
 
 - Based on v28.26.12.

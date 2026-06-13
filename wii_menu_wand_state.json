@@ -1,6 +1,6 @@
 {
-  "mode": "external",
-  "updated_at": 1781328661.0631053,
+  "mode": "laptop",
+  "updated_at": 1781388768.715234,
   "device": "/dev/input/event22",
   "device_name": "Nintendo Wii Remote",
   "ir_device": "/dev/input/event21",

@@ -1,6 +1,6 @@
 {
-  "mode": "carousel",
-  "carousel_visible": true,
-  "updated_at": 1781328661.4998972,
-  "image_path": "/home/led_game/pixel_challenge/assets/dot_dash_splash.png"
+  "mode": "image",
+  "carousel_visible": false,
+  "updated_at": 1781388664.0306587,
+  "image_path": "/home/led_game/pixel_challenge/assets/pixel_challenge_splash_final.png"
 }

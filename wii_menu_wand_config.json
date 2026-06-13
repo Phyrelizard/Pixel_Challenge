@@ -46,7 +46,7 @@
     "BTN_SOUTH": "Wii A button toggles laptop/external active mode.",
     "BTN_EAST": "Wii B trigger release selects the active GSV tile when external mode is active.",
     "KEY_LEFT_RIGHT": "D-pad left/right scrolls the GSV carousel when external mode is active.",
-    "BTN_MODE": "Wii Home button is reserved for later.",
+    "BTN_MODE": "Wii Home toggles to Pixel Challenge Home and back to the previously centered GSV tile.",
     "A_EXTERNAL_SHOWS_GSV": "When A toggles into external mode, the wand asks the console to show the GSV carousel.",
     "A_REFRESH_EXTERNAL": "If the wand is already in EXTERNAL mode but the viewer is not showing the GSV carousel, A asks the console to show the GSV instead of switching to LAPTOP.",
     "A_LAPTOP_NOTIFY": "When A toggles to laptop mode, the wand notifies the console so STOP/idle returns can stay plain if the public GSV is no longer preferred.",
@@ -66,10 +66,20 @@
     "IR_TUNING_BALANCED": "Balanced default is sensitivity=1.15, deadzone=4, max_step=22, smoothing=0.50. Use Responsive if still lethargic; use Precision if too jumpy.",
     "IR_ABSOLUTE_MODE": "v28.25.2 adds absolute IR mode: calibrated raw IR midpoint maps directly into console screen bounds.",
     "IR_CALIBRATION": "In Setup > Wii Remote IR Mouse, use Reset Observed, move the remote through the usable aiming area, then Use Observed Range and Apply Live.",
-    "IR_STATUS_FILE": "wii_ir_status.json is written by the Wii Menu Wand with live raw midpoint, point count, dot distance, and observed min/max range."
+    "IR_STATUS_FILE": "wii_ir_status.json is written by the Wii Menu Wand with live raw midpoint, point count, dot distance, and observed min/max range.",
+    "WII_PLUS_MINUS_VOLUME": "Wii + increases MASTER volume; Wii - decreases MASTER volume. Press and hold ramps repeatedly.",
+    "WII_MINUS_DOUBLE_TAP": "Double-tap Wii - to mute MASTER volume. Pressing/holding + or - after mute restores the previous master level first.",
+    "WII_HOME": "Wii Home is now a toggle: first press shows Pixel Challenge Home, second press returns to the saved previous tile.",
+    "WII_HOME_TOGGLE": "Wii Home toggles between Pixel Challenge Home and the previously centered GSV tile.",
+    "WII_MINUS_DOUBLE_TAP_V28_26_16": "Minus single-tap is delayed until the double-tap window expires, so double-tap mute preserves the original master volume and +/- unmute restores without applying another step.",
+    "WII_MINUS_DOUBLE_TAP_SETUP": "Adjust wii_minus_double_tap_seconds from Setup > Wii Remote IR Mouse."
   },
   "ir_device_name": "Nintendo Wii Remote IR",
   "ir_missing_value": 1023,
   "ir_lost_timeout_seconds": 0.25,
-  "console_mouse_clamp_interval_seconds": 0.05
+  "console_mouse_clamp_interval_seconds": 0.05,
+  "wii_volume_step": 5,
+  "wii_volume_hold_initial_delay_seconds": 0.35,
+  "wii_volume_hold_repeat_seconds": 0.16,
+  "wii_minus_double_tap_seconds": 0.38
 }

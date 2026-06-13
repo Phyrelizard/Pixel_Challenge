@@ -45,6 +45,12 @@ DEFAULT_CONFIG = {
     "external_rumble_ms": 110,
     "external_rumble_gap_ms": 90,
 
+    # Wii Remote Plus/Minus master volume controls.
+    "wii_volume_step": 5,
+    "wii_volume_hold_initial_delay_seconds": 0.35,
+    "wii_volume_hold_repeat_seconds": 0.16,
+    "wii_minus_double_tap_seconds": 0.38,
+
     # IR mouse configuration. The Wii IR driver reports ABS_HAT0/1 X/Y values.
     # 1023 generally means that IR point is missing/off-camera.
     "ir_mouse_enabled": True,
@@ -395,8 +401,18 @@ def main():
     bounds_margin = int(cfg.get("console_mouse_margin", 8))
     clamp_interval = float(cfg.get("console_mouse_clamp_interval_seconds", 0.05))
     xdotool_path = shutil.which("xdotool")
+    volume_step = max(1, min(25, int(cfg.get("wii_volume_step", 5) or 5)))
+    volume_hold_initial_delay = max(0.05, float(cfg.get("wii_volume_hold_initial_delay_seconds", 0.35) or 0.35))
+    volume_hold_repeat = max(0.05, float(cfg.get("wii_volume_hold_repeat_seconds", 0.16) or 0.16))
+    minus_double_tap = max(0.10, float(cfg.get("wii_minus_double_tap_seconds", 0.38) or 0.38))
 
     last_press_time: dict[int, float] = {}
+    volume_button_down: dict[int, float] = {}
+    volume_last_repeat: dict[int, float] = {}
+    volume_hold_sent: dict[int, bool] = {}
+    last_minus_tap_release = 0.0
+    pending_minus_tap = False
+    pending_minus_tap_time = 0.0
     external_select_down = False
     mouse_left_down = False
     ir_values: dict[int, int] = {}
@@ -426,6 +442,7 @@ def main():
         nonlocal bounds_w, bounds_h, bounds_margin, clamp_interval, last_centroid
         nonlocal ir_mouse_mode, abs_min_x, abs_max_x, abs_min_y, abs_max_y, abs_smoothing_alpha
         nonlocal calibration_reset_seq, observed_min_x, observed_max_x, observed_min_y, observed_max_y, last_abs_pos
+        nonlocal volume_step, volume_hold_initial_delay, volume_hold_repeat, minus_double_tap
         try:
             mtime = cfg_path.stat().st_mtime if cfg_path.exists() else 0.0
         except Exception:
@@ -457,6 +474,10 @@ def main():
         jump_limit = float(cfg.get("ir_jump_limit", jump_limit))
         min_point_distance = float(cfg.get("ir_min_point_distance", min_point_distance))
         nudge = int(cfg.get("laptop_dpad_nudge_pixels", nudge))
+        volume_step = max(1, min(25, int(cfg.get("wii_volume_step", volume_step) or volume_step)))
+        volume_hold_initial_delay = max(0.05, float(cfg.get("wii_volume_hold_initial_delay_seconds", volume_hold_initial_delay) or volume_hold_initial_delay))
+        volume_hold_repeat = max(0.05, float(cfg.get("wii_volume_hold_repeat_seconds", volume_hold_repeat) or volume_hold_repeat))
+        minus_double_tap = max(0.10, float(cfg.get("wii_minus_double_tap_seconds", minus_double_tap) or minus_double_tap))
         bounds_enabled = bool(cfg.get("console_mouse_bounds_enabled", bounds_enabled))
         bounds_x = int(cfg.get("console_mouse_x", bounds_x))
         bounds_y = int(cfg.get("console_mouse_y", bounds_y))
@@ -630,6 +651,45 @@ def main():
         except Exception as e:
             logger.log(f"Console show carousel command failed: {e}")
 
+    def send_volume_command(action: str):
+        """Send a master-volume command to the console."""
+        try:
+            write_console_command(console_command_path, f"WII_VOLUME|{action}")
+            logger.log(f"Console <- Wii master volume {action}")
+        except Exception as e:
+            logger.log(f"Wii volume command failed: {e}")
+
+    def flush_pending_minus_tap(reason: str = "single"):
+        """Apply a delayed single-tap minus if it did not become a double-tap.
+
+        v28.26.16: Previously the first minus tap immediately lowered master
+        volume, then the second tap muted. That meant muting from 90% stored 85%
+        as the restore level.  Delaying the single-tap minus until the
+        double-tap window expires lets double-tap mute preserve the original
+        volume exactly.
+        """
+        nonlocal pending_minus_tap, pending_minus_tap_time
+        if not pending_minus_tap:
+            return False
+        pending_minus_tap = False
+        pending_minus_tap_time = 0.0
+        send_volume_command("down")
+        logger.log(f"Wii - single tap applied after double-tap window ({reason})")
+        return True
+
+    def home_to_pixel_challenge_screen():
+        """Home button: return the public viewer to the Pixel Challenge home screen."""
+        try:
+            set_mode("external")
+            write_console_command(console_command_path, "EXTERNAL_MENU|home_toggle")
+            try:
+                append_gsv_command(gsv_input_path, "GSV_SHOW")
+            except Exception:
+                pass
+            logger.log("Console <- Wii Home toggle")
+        except Exception as e:
+            logger.log(f"Wii Home command failed: {e}")
+
     def viewer_has_carousel_visible() -> bool:
         status = read_viewer_status(gsv_status_path)
         if not status:
@@ -660,7 +720,15 @@ def main():
         recency window, the banner could fall back to EXTERNAL even though the
         Wii helper was still controlling the laptop.
         """
-        write_wand_state()
+        safe_write_json(state_path, {
+            "mode": mode,
+            "updated_at": time.time(),
+            "device": getattr(dev, "path", ""),
+            "device_name": getattr(dev, "name", ""),
+            "ir_device": getattr(ir_dev, "path", "") if ir_dev else "",
+            "ir_device_name": getattr(ir_dev, "name", "") if ir_dev else "",
+            "ir_mouse_enabled": bool(mouse),
+        })
 
     def poll_console_control_command():
         """Accept one-shot mode commands from the Pixel Challenge console.
@@ -868,7 +936,7 @@ def main():
 
     set_mode(mode)
     logger.log("Wii Menu Wand started.")
-    logger.log("Mapping: A toggles laptop/external; EXTERNAL uses GSV D-pad/B; LAPTOP uses IR mouse with B left-click/drag.")
+    logger.log("Mapping: A toggles laptop/external; Home toggles Pixel Challenge Home/previous tile; +/- control master volume; double-tap - mutes; EXTERNAL uses GSV D-pad/B; LAPTOP uses IR mouse with B left-click/drag.")
     if not ir_dev:
         logger.log("IR mouse is enabled but no IR device is open yet. The service will retry while running.")
     if not mouse:
@@ -896,6 +964,27 @@ def main():
             if now - last_state_heartbeat > 1.0:
                 last_state_heartbeat = now
                 write_wand_state()
+
+            # Plus/minus hold repeat for master volume. This runs even when no
+            # new evdev events arrive so holding the button ramps volume.
+            for vcode, direction in ((KEY_NEXT, "up"), (KEY_PREVIOUS, "down")):
+                if vcode in volume_button_down:
+                    held = now - volume_button_down[vcode]
+                    last_rep = volume_last_repeat.get(vcode, 0.0)
+                    if held >= volume_hold_initial_delay and now - last_rep >= volume_hold_repeat:
+                        if vcode == KEY_PREVIOUS:
+                            pending_minus_tap = False
+                            pending_minus_tap_time = 0.0
+                        send_volume_command(direction)
+                        volume_last_repeat[vcode] = now
+                        volume_hold_sent[vcode] = True
+
+            # Apply a minus single tap only after the configured double-tap
+            # mute window expires. This preserves the original volume when the
+            # operator meant double-tap mute instead of volume-down + mute.
+            if pending_minus_tap and KEY_PREVIOUS not in volume_button_down and (now - pending_minus_tap_time) > minus_double_tap:
+                flush_pending_minus_tap("timeout")
+
             if bool(cfg.get("ir_mouse_enabled", True)) and ir_dev is None and now - last_ir_retry > 3.0:
                 last_ir_retry = now
                 ir_dev = find_ir_device(InputDevice, list_devices, str(cfg.get("ir_device_name", "Nintendo Wii Remote IR")), logger)
@@ -948,6 +1037,40 @@ def main():
                                 set_mode("external")
                             continue
 
+                        if code in (KEY_NEXT, KEY_PREVIOUS):
+                            # Wii +/- are global master volume controls in both modes.
+                            # + press = immediate step. + hold = repeated steps.
+                            # - tap is delayed just long enough to know whether it is
+                            # a double-tap mute.  That prevents a double-tap from first
+                            # lowering 90 -> 85, then muting and restoring to 85 later.
+                            if code == KEY_NEXT:
+                                if pending_minus_tap:
+                                    flush_pending_minus_tap("plus pressed")
+                                send_volume_command("up")
+                                volume_button_down[code] = tnow
+                                volume_last_repeat[code] = tnow
+                                volume_hold_sent[code] = False
+                            else:
+                                if pending_minus_tap and (tnow - pending_minus_tap_time) <= minus_double_tap:
+                                    pending_minus_tap = False
+                                    pending_minus_tap_time = 0.0
+                                    send_volume_command("mute")
+                                    volume_button_down.pop(code, None)
+                                    volume_last_repeat.pop(code, None)
+                                    volume_hold_sent[code] = True
+                                    logger.log("Wii - double-tap mute detected")
+                                else:
+                                    pending_minus_tap = True
+                                    pending_minus_tap_time = tnow
+                                    volume_button_down[code] = tnow
+                                    volume_last_repeat[code] = tnow
+                                    volume_hold_sent[code] = False
+                            continue
+
+                        if code == BTN_MODE:
+                            home_to_pixel_challenge_screen()
+                            continue
+
                         if mode == "laptop":
                             if code == BTN_EAST:
                                 mouse_button_down()
@@ -966,10 +1089,7 @@ def main():
                             if code == KEY_DOWN:
                                 mouse_scroll(-3)
                                 continue
-                            if code == BTN_MODE:
-                                logger.log("Home pressed - reserved in laptop mode")
-                                continue
-                            if code in (BTN_1, BTN_2, KEY_NEXT, KEY_PREVIOUS):
+                            if code in (BTN_1, BTN_2):
                                 logger.log(f"Button code {code} pressed - reserved in laptop mode")
                                 continue
 
@@ -990,15 +1110,23 @@ def main():
                             external_select_down = True
                             continue
 
-                        if code == BTN_MODE:
-                            logger.log("Home pressed - reserved")
-                            continue
-
-                        if code in (KEY_UP, KEY_DOWN, BTN_1, BTN_2, KEY_NEXT, KEY_PREVIOUS):
+                        if code in (KEY_UP, KEY_DOWN, BTN_1, BTN_2):
                             logger.log(f"Button code {code} pressed - reserved")
                             continue
 
                     elif value == 0:
+                        if code in (KEY_NEXT, KEY_PREVIOUS):
+                            start = volume_button_down.pop(code, None)
+                            volume_last_repeat.pop(code, None)
+                            was_hold = bool(volume_hold_sent.pop(code, False))
+                            # v28.26.16: minus single-tap is no longer applied on
+                            # release. It is applied by the timeout above unless a
+                            # second minus press arrives first and becomes mute.
+                            if code == KEY_PREVIOUS and was_hold:
+                                pending_minus_tap = False
+                                pending_minus_tap_time = 0.0
+                            continue
+
                         if code == BTN_EAST:
                             if mode == "laptop":
                                 mouse_button_up()

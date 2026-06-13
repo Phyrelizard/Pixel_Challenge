@@ -86,7 +86,11 @@ class PixelChallengeViewer:
         self.root.destroy()
 
     def write_gsv_status(self):
-        """Best-effort status file so the Wii Menu Wand knows whether tiles are visible."""
+        """Best-effort status file so helpers know whether tiles are visible.
+
+        v28.26.16 adds the centered carousel tile id/action so the Wii Home
+        button can toggle back to the exact tile that was active before Home.
+        """
         try:
             payload = {
                 "mode": self.current_mode,
@@ -94,6 +98,16 @@ class PixelChallengeViewer:
                 "updated_at": time.time(),
                 "image_path": self.current_image_path or "",
             }
+            if self.current_mode == "carousel":
+                item = self._active_carousel_item()
+                if item:
+                    payload.update({
+                        "carousel_active_index": int(self.carousel_active_index),
+                        "carousel_active_id": str(item.get("id", "")),
+                        "carousel_active_label": str(item.get("label", "")),
+                        "carousel_active_action": str(item.get("action", "")),
+                        "carousel_active_preview_action": str(item.get("preview_action", "")),
+                    })
             tmp = self.gsv_status_file + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(payload, f, indent=2)
@@ -376,6 +390,7 @@ class PixelChallengeViewer:
         active = str(payload.get("active", "current_game"))
         ids = [str(item.get("id", "")) for item in self.carousel_items]
         self.carousel_active_index = ids.index(active) if active in ids else 0
+        self.write_gsv_status()
 
         canvas = tk.Canvas(self.image_label, width=self.screen_w, height=self.screen_h, bg="black", highlightthickness=0, bd=0)
         canvas.place(x=0, y=0)
@@ -396,7 +411,19 @@ class PixelChallengeViewer:
         showing that splash/artwork but remove only the tile band.
         """
         if self.current_mode == "carousel" or self.carousel_canvas is not None:
-            background_path = self.pre_carousel_image_path or self.current_image_path or self._carousel_item_background_path()
+            # v28.26.17: In normal idle/GSV mode, hiding tiles should leave the
+            # centered tile's splash on screen.  Only restore the pre-carousel
+            # image when the console explicitly says the carousel was summoned
+            # on top of gameplay.
+            preserve_existing = False
+            try:
+                preserve_existing = bool((self.carousel_last_payload or {}).get("preserve_existing_background", False))
+            except Exception:
+                preserve_existing = False
+            if preserve_existing:
+                background_path = self.pre_carousel_image_path or self._carousel_item_background_path() or self.current_image_path
+            else:
+                background_path = self._carousel_item_background_path() or self.current_image_path or self.pre_carousel_image_path
             if background_path and os.path.exists(background_path):
                 self.show_image(background_path)
             else:
@@ -486,6 +513,7 @@ class PixelChallengeViewer:
                 self.carousel_active_index = (self.carousel_active_index + direction) % len(self.carousel_items)
                 self.carousel_animating = False
                 self._draw_carousel_frame(0.0, 0)
+                self.write_gsv_status()
                 self._notify_carousel_preview()
                 self._run_next_pending_scroll()
         step(0)
