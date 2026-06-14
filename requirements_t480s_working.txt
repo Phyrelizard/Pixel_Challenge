@@ -21,3 +21,6 @@ evdev>=1.9.3
 # Phone touchpad remote web server / mouse control
 aiohttp>=3.9
 pynput>=1.7
+# USB HID relay for Wii IR bar power switching
+hidapi>=0.14
+pyhid-usb-relay>=0.3

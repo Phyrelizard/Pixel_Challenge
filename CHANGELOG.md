@@ -1,3 +1,13 @@
+## v28.26.18 - Merge USB IR relay switching into current v28.26.17
+
+- Built from the GitHub v28.26.17 baseline (`ac7aa20`) so the current GSV restore, reset-home-audio, large dialog, Wii Home, and Wii +/- master-volume behavior are preserved.
+- Added optional USB HID relay control to the Wii Menu Wand for active-screen IR light bars.
+- Relay mapping: Relay 1 powers the laptop/console close-range IR bar; Relay 2 powers the external/GSV IR bar.
+- On LAPTOP active: Relay 2 turns off first, then Relay 1 turns on.
+- On EXTERNAL active: Relay 1 turns off first, then Relay 2 turns on.
+- Relay state is verified/logged with `pyhid-usb-relay state` when enabled.
+- Added USB relay requirements, udev permission installer, and a standalone relay test utility.
+
 ## v28.26.14 - Phone touchpad GSV remote
 
 - Built from v28.26.13.

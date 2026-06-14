@@ -45,6 +45,18 @@ DEFAULT_CONFIG = {
     "external_rumble_ms": 110,
     "external_rumble_gap_ms": 90,
 
+    # Optional USB HID relay control for active-screen IR light bars.
+    # Relay 1 powers the close/narrow laptop IR bar.
+    # Relay 2 powers the external-monitor IR bar.
+    "ir_bar_relay_enabled": False,
+    "ir_bar_relay_command": "pyhid-usb-relay",
+    "ir_bar_relay_use_sudo": False,
+    "ir_bar_relay_laptop_channel": 1,
+    "ir_bar_relay_external_channel": 2,
+    "ir_bar_relay_verify_state": True,
+    "ir_bar_relay_off_unused_first": True,
+    "ir_bar_relay_log_state": True,
+
     # Wii Remote Plus/Minus master volume controls.
     "wii_volume_step": 5,
     "wii_volume_hold_initial_delay_seconds": 0.35,
@@ -730,6 +742,92 @@ def main():
             "ir_mouse_enabled": bool(mouse),
         })
 
+    def relay_command_path() -> str | None:
+        raw = str(cfg.get("ir_bar_relay_command", "pyhid-usb-relay") or "pyhid-usb-relay").strip()
+        if not raw:
+            return None
+        if "/" in raw:
+            candidate = Path(raw)
+            if not candidate.is_absolute():
+                candidate = app_dir / candidate
+            return str(candidate)
+        found = shutil.which(raw)
+        if found:
+            return found
+        venv_candidate = app_dir / ".venv" / "bin" / raw
+        if venv_candidate.exists():
+            return str(venv_candidate)
+        return raw
+
+    def relay_run(args: list[str], timeout: float = 2.0) -> subprocess.CompletedProcess | None:
+        exe = relay_command_path()
+        if not exe:
+            logger.log("IR relay: no command configured")
+            return None
+        cmd = [exe] + [str(a) for a in args]
+        if bool(cfg.get("ir_bar_relay_use_sudo", False)) and os.geteuid() != 0:
+            cmd = ["sudo", "-n"] + cmd
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+            if proc.returncode != 0:
+                output = (proc.stderr or proc.stdout or "").strip().replace("\n", "; ")
+                logger.log(f"IR relay command rc={proc.returncode}: {' '.join(cmd)} {output}")
+            return proc
+        except FileNotFoundError:
+            logger.log(f"IR relay: command not found: {exe}")
+        except subprocess.TimeoutExpired:
+            logger.log(f"IR relay: command timed out: {' '.join(cmd)}")
+        except Exception as e:
+            logger.log(f"IR relay: command failed: {e}")
+        return None
+
+    def relay_channel(name: str, fallback: int) -> str:
+        try:
+            return str(int(cfg.get(name, fallback)))
+        except Exception:
+            return str(fallback)
+
+    last_relay_target: str | None = None
+
+    def apply_ir_bar_relay(target_mode: str, force: bool = False):
+        """Switch USB relay channels to match the active Wii target screen.
+
+        Laptop mode powers the close/narrow laptop IR bar.
+        External mode powers the external-monitor IR bar.
+        """
+        nonlocal last_relay_target
+        if not bool(cfg.get("ir_bar_relay_enabled", False)):
+            return
+        target = "laptop" if str(target_mode).lower() == "laptop" else "external"
+        if not force and target == last_relay_target:
+            return
+
+        laptop_ch = relay_channel("ir_bar_relay_laptop_channel", 1)
+        external_ch = relay_channel("ir_bar_relay_external_channel", 2)
+        on_ch = laptop_ch if target == "laptop" else external_ch
+        off_ch = external_ch if target == "laptop" else laptop_ch
+
+        # Break-before-make prevents both IR bars from being on at the same time.
+        if bool(cfg.get("ir_bar_relay_off_unused_first", True)):
+            relay_run(["off", off_ch])
+            relay_run(["on", on_ch])
+        else:
+            relay_run(["on", on_ch])
+            relay_run(["off", off_ch])
+
+        last_relay_target = target
+        if bool(cfg.get("ir_bar_relay_verify_state", True)):
+            proc = relay_run(["state"], timeout=2.0)
+            if proc is not None:
+                output = (proc.stdout or proc.stderr or "").strip().replace("\n", "; ")
+                if proc.returncode == 0:
+                    if bool(cfg.get("ir_bar_relay_log_state", True)):
+                        logger.log(f"IR relay -> {target.upper()} active ({output})")
+                else:
+                    logger.log(f"IR relay verify failed rc={proc.returncode}: {output}")
+        else:
+            logger.log(f"IR relay -> {target.upper()} active")
+
     def poll_console_control_command():
         """Accept one-shot mode commands from the Pixel Challenge console.
 
@@ -789,6 +887,7 @@ def main():
             "ir_device_name": getattr(ir_dev, "name", "") if ir_dev else "",
             "ir_mouse_enabled": bool(mouse),
         })
+        apply_ir_bar_relay(mode, force=False)
         logger.log(f"Mode -> {mode.upper()}")
         if changed and mode == "external":
             rumble_external_active()
@@ -936,7 +1035,7 @@ def main():
 
     set_mode(mode)
     logger.log("Wii Menu Wand started.")
-    logger.log("Mapping: A toggles laptop/external; Home toggles Pixel Challenge Home/previous tile; +/- control master volume; double-tap - mutes; EXTERNAL uses GSV D-pad/B; LAPTOP uses IR mouse with B left-click/drag.")
+    logger.log("Mapping: A toggles laptop/external; Home toggles Pixel Challenge Home/previous tile; +/- control master volume; double-tap - mutes; EXTERNAL uses GSV D-pad/B; LAPTOP uses IR mouse with B left-click/drag; optional USB relay switches active IR bar power.")
     if not ir_dev:
         logger.log("IR mouse is enabled but no IR device is open yet. The service will retry while running.")
     if not mouse:

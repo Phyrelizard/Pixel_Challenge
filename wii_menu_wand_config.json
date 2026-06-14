@@ -25,6 +25,7 @@
   "console_mouse_w": 1920,
   "console_mouse_h": 1080,
   "console_mouse_margin": 6,
+  "wii_minus_double_tap_seconds": 0.4,
   "device_name": "Nintendo Wii Remote",
   "bluetooth_mac": "CC:9E:00:6C:0B:13",
   "bluetooth_name": "Nintendo RVL-CNT-01",
@@ -62,7 +63,7 @@
     "CONSOLE_MOUSE_BOUNDS": "In laptop mode, the wand uses xdotool when available to clamp the pointer inside the laptop/console monitor bounds.",
     "XDOOTOOL_NOTE": "If logs say xdotool is missing, install with: sudo apt install xdotool",
     "IR_TUNING": "For more control, reduce ir_sensitivity or ir_max_step; for less stickiness, reduce ir_deadzone or increase ir_sensitivity slightly.",
-    "LIVE_IR_TUNING": "v28.25.0 adds Setup > Wii Remote IR Mouse with live tuning. The wand reloads wii_menu_wand_config.json while running; no restart needed after APPLY LIVE.",
+    "LIVE_IR_TUNING": "Updated from the console Setup > Wii Remote IR Mouse section. The Wii Menu Wand reloads this file while running.",
     "IR_TUNING_BALANCED": "Balanced default is sensitivity=1.15, deadzone=4, max_step=22, smoothing=0.50. Use Responsive if still lethargic; use Precision if too jumpy.",
     "IR_ABSOLUTE_MODE": "v28.25.2 adds absolute IR mode: calibrated raw IR midpoint maps directly into console screen bounds.",
     "IR_CALIBRATION": "In Setup > Wii Remote IR Mouse, use Reset Observed, move the remote through the usable aiming area, then Use Observed Range and Apply Live.",
@@ -72,7 +73,12 @@
     "WII_HOME": "Wii Home is now a toggle: first press shows Pixel Challenge Home, second press returns to the saved previous tile.",
     "WII_HOME_TOGGLE": "Wii Home toggles between Pixel Challenge Home and the previously centered GSV tile.",
     "WII_MINUS_DOUBLE_TAP_V28_26_16": "Minus single-tap is delayed until the double-tap window expires, so double-tap mute preserves the original master volume and +/- unmute restores without applying another step.",
-    "WII_MINUS_DOUBLE_TAP_SETUP": "Adjust wii_minus_double_tap_seconds from Setup > Wii Remote IR Mouse."
+    "WII_MINUS_DOUBLE_TAP_SETUP": "Minus double-tap controls the maximum time between two Wii - taps for muting. A double-tap mute no longer applies a volume-down step before muting.",
+    "IR_BAR_RELAY": "v28.26.18 can switch a USB HID relay board so only the active screen's Wii IR bar is powered.",
+    "IR_BAR_RELAY_MAPPING": "Relay 1 = laptop/console IR bar; Relay 2 = external/GSV monitor IR bar.",
+    "IR_BAR_RELAY_PERMISSION": "Run install_usb_relay_permissions.sh once so the led_game user can control 16c0:05df HID relay boards without sudo.",
+    "IR_BAR_RELAY_WIRING": "Switch +5V through relay COM/NO contacts and keep USB ground common to both IR bars. Use NO so bars default off.",
+    "IR_ABSOLUTE_CALIBRATION": "Absolute mode maps raw Wii IR midpoint into the console screen using ir_abs_min/max_x/y. Use Reset Observed + Use Observed Range to calibrate."
   },
   "ir_device_name": "Nintendo Wii Remote IR",
   "ir_missing_value": 1023,
@@ -81,5 +87,12 @@
   "wii_volume_step": 5,
   "wii_volume_hold_initial_delay_seconds": 0.35,
   "wii_volume_hold_repeat_seconds": 0.16,
-  "wii_minus_double_tap_seconds": 0.38
+  "ir_bar_relay_enabled": true,
+  "ir_bar_relay_command": ".venv/bin/pyhid-usb-relay",
+  "ir_bar_relay_use_sudo": false,
+  "ir_bar_relay_laptop_channel": 1,
+  "ir_bar_relay_external_channel": 2,
+  "ir_bar_relay_verify_state": true,
+  "ir_bar_relay_off_unused_first": true,
+  "ir_bar_relay_log_state": true
 }

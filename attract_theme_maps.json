@@ -1,5 +1,5 @@
 {
-  "auto_enabled": false,
+  "auto_enabled": true,
   "cycle_enabled": true,
   "cycle_seconds": 20,
   "per_theme_speed": {
@@ -16,8 +16,9 @@
     "Sound Visualizer": 10
   },
   "selected_themes": [
+    "Galaxy Wave",
     "Rainbow Pulse",
-    "Galaxy Wave"
+    "Team Colors"
   ],
   "flame_theme_tuning": {
     "Candle Flame": {
@@ -87,18 +88,18 @@
       "peak_hold": 65
     }
   },
-  "sash_left_attract_bottom": 577,
+  "sash_left_attract_bottom": 584,
   "sash_center_ctrl": 401,
   "sash_main_info": 504,
   "sash_bottom_log": 510,
-  "sash_center_mixer": 630,
+  "sash_center_mixer": 599,
   "sash_mixer_height": null,
   "falcon_brightness": 10,
   "gameplay_brightness": 20,
   "music_volume": 13,
   "sfx_volume": 28,
   "voice_volume": 46,
-  "master_volume": 65,
+  "master_volume": 0,
   "falcon_ip": "192.168.2.25",
   "pixels_per_lane": 143,
   "pixel_sim_enabled": true,

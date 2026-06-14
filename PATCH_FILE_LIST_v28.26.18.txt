@@ -1,0 +1,9 @@
+pixel_challenge_console_v28.26.18.py
+tools/wii_menu_wand.py
+wii_menu_wand_config.json
+requirements_t480s_working.txt
+install_usb_relay_permissions.sh
+tools/test_usb_ir_relay.py
+READMEs/README_v28.26.18_usb_ir_relay_merge.txt
+PATCH_FILE_LIST_v28.26.18.txt
+CHANGELOG.md
