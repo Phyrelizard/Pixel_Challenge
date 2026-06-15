@@ -1,8 +1,8 @@
 {
-  "updated_at": 1781419953.7711444,
+  "updated_at": 1781517639.6058261,
   "mode": "laptop",
   "source": "phone_touchpad",
-  "connected_clients": 0,
+  "connected_clients": 1,
   "target": {
     "x": 0,
     "y": 0,
@@ -10,5 +10,5 @@
     "h": 1080
   },
   "url_hint": "http://10.42.0.1:8080",
-  "event": "client_disconnected"
+  "event": "heartbeat"
 }

@@ -16,8 +16,9 @@
     "Sound Visualizer": 10
   },
   "selected_themes": [
-    "Galaxy Wave",
     "Rainbow Pulse",
+    "Galaxy Wave",
+    "Red Flame",
     "Team Colors"
   ],
   "flame_theme_tuning": {
@@ -96,7 +97,7 @@
   "sash_mixer_height": null,
   "falcon_brightness": 10,
   "gameplay_brightness": 20,
-  "music_volume": 13,
+  "music_volume": 26,
   "sfx_volume": 28,
   "voice_volume": 46,
   "master_volume": 0,

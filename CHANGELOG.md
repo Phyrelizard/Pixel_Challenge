@@ -1,5 +1,14 @@
 ## v28.26.18 - Merge USB IR relay switching into current v28.26.17
 
+## v28.26.19 - Phone touchpad image overlay
+
+- Added the cleaned Samsung Galaxy S9+ phone touchpad background artwork.
+- Added a percentage/pixel touch-zone map for the phone overlay.
+- Updated the phone touchpad remote web UI to use invisible hitboxes over the artwork.
+- Added phone scroll-wheel support for laptop-console scrolling.
+- Added phone buttons for GSV navigation/select, Console/Viewer toggle, Home, volume +/- and settings.
+
+
 - Built from the GitHub v28.26.17 baseline (`ac7aa20`) so the current GSV restore, reset-home-audio, large dialog, Wii Home, and Wii +/- master-volume behavior are preserved.
 - Added optional USB HID relay control to the Wii Menu Wand for active-screen IR light bars.
 - Relay mapping: Relay 1 powers the laptop/console close-range IR bar; Relay 2 powers the external/GSV IR bar.

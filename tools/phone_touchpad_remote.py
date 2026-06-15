@@ -38,6 +38,7 @@ CONSOLE_COMMAND_FILE = APP_DIR / "console_command.txt"
 GSV_INPUT_FILE = APP_DIR / "gsv_input_command.txt"
 LOG_DIR = APP_DIR / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
+PHONE_TOUCHPAD_DIR = APP_DIR / "assets" / "phone_touchpad"
 
 CONNECTED_CLIENTS = 0
 LAST_STATUS_WRITE = 0.0
@@ -161,20 +162,11 @@ HTML = r"""<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Pixel Challenge Phone Touch Mouse</title>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Pixel Challenge Phone Touchpad</title>
 <style>
-  :root {
-    --bar-h: 48px;
-    --bg: #07090d;
-    --panel: #111827;
-    --pad: #141b2a;
-    --pad2: #1e293b;
-    --line: #3b82f6;
-    --text: #f8fafc;
-    --muted: #94a3b8;
-    --ok: #22c55e;
-    --warn: #f59e0b;
-  }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
     margin: 0;
@@ -184,331 +176,341 @@ HTML = r"""<!doctype html>
     overscroll-behavior: none;
     touch-action: none;
     user-select: none;
-    background: var(--bg);
-    color: var(--text);
+    background: #000;
+    color: #f8fafc;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
-  #topbar {
+  #stage {
     position: fixed;
-    left: 0; right: 0; top: 0;
-    height: calc(var(--bar-h) + env(safe-area-inset-top));
-    padding-top: env(safe-area-inset-top);
-    background: rgba(2, 6, 23, 0.94);
-    border-bottom: 1px solid #263244;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding-left: 6px;
-    padding-right: 6px;
-    z-index: 20;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background-image: url('/static/phone_touchpad/pixel_touchpad_s9plus_1440x2960.png');
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    background-position: center;
+    overflow: hidden;
+    touch-action: none;
   }
-  .pill {
-    height: 34px;
-    border: 1px solid #334155;
-    background: #0f172a;
-    color: var(--text);
+  .zone {
+    position: absolute;
+    z-index: 5;
+    border: 0;
+    background: rgba(0,0,0,0);
+    border-radius: 16px;
+    touch-action: none;
+  }
+  #stage.showZones .zone {
+    border: 2px solid rgba(0, 255, 255, 0.85);
+    background: rgba(0, 255, 255, 0.10);
+  }
+  #stage.showZones .zone::after {
+    content: attr(data-id);
+    position: absolute;
+    left: 4px;
+    top: 4px;
+    font-size: 11px;
+    line-height: 1;
+    color: white;
+    background: rgba(0,0,0,0.70);
+    border-radius: 5px;
+    padding: 3px 5px;
+    pointer-events: none;
+  }
+  .zone.active {
+    background: rgba(124, 58, 237, 0.18);
+    box-shadow: inset 0 0 0 2px rgba(167, 139, 250, 0.7), 0 0 18px rgba(124, 58, 237, 0.45);
+  }
+  #statusDot {
+    position: absolute;
+    right: 18px;
+    top: 18px;
+    z-index: 10;
+    min-width: 9px;
+    height: 9px;
     border-radius: 999px;
-    padding: 0 10px;
-    display: flex;
-    align-items: center;
-    font-size: 13px;
+    background: #ef4444;
+    box-shadow: 0 0 10px rgba(239,68,68,0.75);
+    opacity: 0.8;
+  }
+  #statusDot.ok {
+    background: #22c55e;
+    box-shadow: 0 0 10px rgba(34,197,94,0.75);
+  }
+  #toast {
+    position: absolute;
+    left: 50%;
+    top: 18px;
+    transform: translateX(-50%);
+    z-index: 12;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(2, 6, 23, 0.72);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    color: #cbd5e1;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    max-width: 80%;
     white-space: nowrap;
-  }
-  .pill.ok { border-color: #166534; color: #bbf7d0; }
-  .pill.mode { border-color: #1d4ed8; }
-  button.pill {
-    cursor: pointer;
-    font-weight: 700;
-  }
-  .pill.target {
-    border-color: #475569;
-    background: #111827;
-  }
-  .pill.target.viewer {
-    border-color: #9333ea;
-    background: #3b0764;
-    color: #f5d0fe;
-  }
-  #remotePanel {
-    position: fixed;
-    left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom));
-    z-index: 26;
-    display: none;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    background: rgba(2, 6, 23, 0.88);
-    border: 1px solid #334155;
-    border-radius: 18px;
-    padding: 10px;
-    box-shadow: 0 10px 28px rgba(0,0,0,0.45);
-  }
-  #remotePanel.open { display: grid; }
-  #remotePanel .wide { grid-column: span 3; }
-  #remotePanel button {
-    min-height: 48px;
-    border-radius: 14px;
-    border: 1px solid #475569;
-    background: #111827;
-    color: var(--text);
-    font-weight: 900;
-    font-size: 15px;
-  }
-  #remotePanel button.primary {
-    border-color: #9333ea;
-    background: #581c87;
-  }
-  #status {
-    min-width: 88px;
-  }
-  #readout {
-    flex: 1;
-    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-    color: var(--muted);
-    justify-content: center;
-  }
-  #pad {
-    position: fixed;
-    left: 0;
-    top: calc(var(--bar-h) + env(safe-area-inset-top));
-    width: 100vw;
-    height: calc(100vh - var(--bar-h) - env(safe-area-inset-top));
-    background:
-      radial-gradient(circle at center, rgba(59,130,246,0.18), transparent 35%),
-      linear-gradient(135deg, var(--pad), #07090d);
-    border: 2px solid rgba(59,130,246,0.35);
-    border-radius: 0;
-    z-index: 1;
-    overflow: hidden;
-  }
-  #pad.custom {
-    border-radius: 18px;
-    box-shadow: 0 0 0 9999px rgba(0,0,0,0.38);
-  }
-  #pad.editing {
-    outline: 3px dashed #f59e0b;
-    background:
-      repeating-linear-gradient(45deg, rgba(245,158,11,0.08) 0, rgba(245,158,11,0.08) 10px, transparent 10px, transparent 20px),
-      linear-gradient(135deg, var(--pad), #07090d);
-  }
-  #padLabel {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    text-align: center;
+    opacity: 0.75;
     pointer-events: none;
-    color: rgba(248,250,252,0.72);
-    font-weight: 800;
-    letter-spacing: 0.03em;
   }
-  #padLabel small {
-    display: block;
-    margin-top: 8px;
-    font-weight: 500;
-    color: rgba(148,163,184,0.9);
-  }
-  #handle {
-    display: none;
-    position: absolute;
-    right: 8px;
-    bottom: 8px;
-    width: 34px;
-    height: 34px;
-    border: 2px solid #f59e0b;
-    border-radius: 8px;
-    background: rgba(245,158,11,0.20);
-    z-index: 5;
-  }
-  #pad.editing #handle { display: block; }
-  #settings {
+  #settingsPanel {
     position: fixed;
-    left: 8px; right: 8px;
-    top: calc(var(--bar-h) + env(safe-area-inset-top) + 8px);
-    max-height: calc(100vh - var(--bar-h) - env(safe-area-inset-top) - 16px);
+    left: max(14px, env(safe-area-inset-left));
+    right: max(14px, env(safe-area-inset-right));
+    top: max(14px, env(safe-area-inset-top));
+    max-height: calc(100dvh - 28px);
     overflow: auto;
-    background: rgba(15,23,42,0.98);
-    border: 1px solid #334155;
-    border-radius: 16px;
-    padding: 14px;
-    z-index: 30;
+    z-index: 50;
     display: none;
-    box-shadow: 0 12px 36px rgba(0,0,0,0.55);
+    padding: 14px;
+    border-radius: 18px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(2, 6, 23, 0.96);
+    box-shadow: 0 14px 40px rgba(0,0,0,0.65);
   }
-  #settings.open { display: block; }
-  .settingsHeader {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    margin-bottom: 10px;
-  }
-  .settingsHeader h2 {
-    margin: 0;
-    font-size: 18px;
-  }
-  .row {
-    margin: 12px 0;
-  }
-  label {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    color: #e2e8f0;
-    font-size: 14px;
-    margin-bottom: 4px;
-  }
-  input[type="range"] {
-    width: 100%;
-  }
-  select, input[type="number"] {
-    width: 100%;
-    padding: 10px;
-    border-radius: 10px;
-    border: 1px solid #334155;
-    background: #020617;
-    color: var(--text);
-    font-size: 16px;
-  }
-  .btnGrid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-top: 12px;
-  }
-  .btn {
-    border: 1px solid #334155;
+  #settingsPanel.open { display: block; }
+  #settingsPanel h2 { margin: 0 0 10px; font-size: 18px; }
+  .settingsHeader { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+  .row { margin: 12px 0; }
+  .row label { display:flex; justify-content:space-between; gap:12px; font-size:14px; color:#e2e8f0; margin-bottom:5px; }
+  input[type="range"], select { width:100%; }
+  select { padding: 10px; border-radius: 12px; border: 1px solid #334155; background: #020617; color:#fff; font-size:16px; }
+  button.panelBtn {
+    border: 1px solid #475569;
     background: #111827;
-    color: var(--text);
+    color: #f8fafc;
     border-radius: 12px;
-    padding: 12px 10px;
+    padding: 11px 12px;
     font-weight: 800;
-    font-size: 15px;
   }
-  .btn.primary { border-color: #2563eb; background: #1d4ed8; }
-  .btn.warn { border-color: #d97706; background: #92400e; }
-  .hint {
-    color: var(--muted);
-    font-size: 13px;
-    line-height: 1.3;
-  }
+  .btnGrid { display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:12px; }
+  .hint { color:#94a3b8; font-size:13px; line-height:1.35; }
 </style>
 </head>
 <body>
-  <div id="topbar">
-    <div id="status" class="pill">Connecting</div>
-    <button id="targetBtn" class="pill target">Console</button>
-    <button id="modeBtn" class="pill mode">FitPad</button>
-    <div id="readout" class="pill">DX 0.0 / DY 0.0</div>
-    <button id="editBtn" class="pill">Edit</button>
-    <button id="settingsBtn" class="pill">Settings</button>
+  <div id="stage" aria-label="Pixel Challenge Touchpad">
+    <div id="statusDot" title="Connection status"></div>
+    <div id="toast">Connecting…</div>
   </div>
 
-  <div id="pad">
-    <div id="padLabel">
-      <div id="padTitle">
-        TOUCHPAD
-        <small id="padHint">drag = move • tap = click • long press = hold</small>
-      </div>
-    </div>
-    <div id="handle"></div>
-  </div>
-
-  <div id="remotePanel">
-    <button data-cmd="prev">◀ TILE</button>
-    <button data-cmd="select" class="primary">SELECT</button>
-    <button data-cmd="next">TILE ▶</button>
-    <button data-cmd="show">SHOW TILES</button>
-    <button data-cmd="home">HOME</button>
-    <button data-cmd="score">SCORE</button>
-  </div>
-
-  <div id="settings">
+  <div id="settingsPanel">
     <div class="settingsHeader">
-      <h2>Touchpad Settings</h2>
-      <button id="closeSettings" class="btn">Close</button>
+      <h2>Phone Touchpad Settings</h2>
+      <button id="closeSettings" class="panelBtn">Close</button>
     </div>
-
     <div class="row">
-      <label>Mode <span id="modeVal"></span></label>
-      <select id="mode">
-        <option value="fit">Fit pad width/height to screen</option>
-        <option value="normal">Normal touchpad speed</option>
-        <option value="absolute">Absolute pad-to-screen map</option>
+      <label>Target <span id="targetVal"></span></label>
+      <select id="targetSelect">
+        <option value="console">Console / laptop mouse</option>
+        <option value="viewer">External viewer / GSV tiles</option>
       </select>
     </div>
-
     <div class="row">
-      <label>Normal speed <span id="speedVal"></span></label>
-      <input id="speed" type="range" min="0.25" max="8" step="0.05">
+      <label>Mouse mode <span id="modeVal"></span></label>
+      <select id="mode">
+        <option value="fit">Fit touchpad to console screen</option>
+        <option value="normal">Normal relative speed</option>
+        <option value="absolute">Absolute touchpad map</option>
+      </select>
     </div>
-
-    <div class="row">
-      <label>X trim <span id="xTrimVal"></span></label>
-      <input id="xTrim" type="range" min="0.10" max="8" step="0.01">
-    </div>
-
-    <div class="row">
-      <label>Y trim <span id="yTrimVal"></span></label>
-      <input id="yTrim" type="range" min="0.10" max="8" step="0.01">
-    </div>
-
-    <div class="row">
-      <label>Tap click max movement <span id="tapMoveVal"></span></label>
-      <input id="tapMove" type="range" min="2" max="30" step="1">
-    </div>
-
-    <div class="row">
-      <label>Long press delay <span id="longPressVal"></span></label>
-      <input id="longPress" type="range" min="150" max="900" step="25">
-    </div>
-
-    <div class="row">
-      <label>Lift jitter filter <span id="minMoveVal"></span></label>
-      <input id="minMove" type="range" min="0" max="8" step="0.1">
-    </div>
-
-    <div class="row">
-      <label>
-        <span>Drop tiny movement on thumb lift</span>
-        <input id="liftDrop" type="checkbox" style="width:auto; transform:scale(1.4);">
-      </label>
-    </div>
-
+    <div class="row"><label>Normal speed <span id="speedVal"></span></label><input id="speed" type="range" min="0.25" max="8" step="0.05"></div>
+    <div class="row"><label>X trim <span id="xTrimVal"></span></label><input id="xTrim" type="range" min="0.10" max="8" step="0.01"></div>
+    <div class="row"><label>Y trim <span id="yTrimVal"></span></label><input id="yTrim" type="range" min="0.10" max="8" step="0.01"></div>
+    <div class="row"><label>Tap click max movement <span id="tapMoveVal"></span></label><input id="tapMove" type="range" min="2" max="30" step="1"></div>
+    <div class="row"><label>Long press delay <span id="longPressVal"></span></label><input id="longPress" type="range" min="150" max="900" step="25"></div>
+    <div class="row"><label>Lift jitter filter <span id="minMoveVal"></span></label><input id="minMove" type="range" min="0" max="8" step="0.1"></div>
     <div class="btnGrid">
-      <button id="fullPadBtn" class="btn primary">Full screen pad</button>
-      <button id="largePadBtn" class="btn">Reset large pad</button>
-      <button id="editBtn2" class="btn warn">Move/resize pad</button>
-      <button id="resetAllBtn" class="btn">Reset settings</button>
+      <button id="showZonesBtn" class="panelBtn">Show touch zones</button>
+      <button id="resetBtn" class="panelBtn">Reset settings</button>
     </div>
-
     <p class="hint">
-      Tip: For your left-to-right swipe test, use <b>Fit pad width/height to screen</b>.
-      Increase X trim if the pointer does not move far enough across the display.
-      Decrease X trim if it overshoots. If the pointer wiggles when you lift your thumb,
-      increase <b>Lift jitter filter</b> slightly.
+      Console mode: touchpad moves the laptop cursor; tap clicks; long press holds/drag. Viewer mode: arrows/select/B control GSV tiles and touchpad swipes left/right move tiles.
     </p>
   </div>
 
 <script>
 (() => {
+  const DESIGN = { w: 1440, h: 2960 };
   const serverScreen = { w: __SCREEN_W__, h: __SCREEN_H__ };
-  const pad = document.getElementById('pad');
-  const statusEl = document.getElementById('status');
-  const readout = document.getElementById('readout');
-  const modeBtn = document.getElementById('modeBtn');
-  const targetBtn = document.getElementById('targetBtn');
-  const editBtn = document.getElementById('editBtn');
-  const settingsBtn = document.getElementById('settingsBtn');
-  const settingsPanel = document.getElementById('settings');
+  const ZONES = [
+  {
+    "id": "top_banner",
+    "action": "start_view_challenges",
+    "x": 0.182639,
+    "y": 0.045608,
+    "w": 0.617361,
+    "h": 0.091892,
+    "notes": "Top Pixel Challenge banner."
+  },
+  {
+    "id": "power",
+    "action": "power_or_connect",
+    "x": 0.051389,
+    "y": 0.158446,
+    "w": 0.182639,
+    "h": 0.088851,
+    "notes": "Power/connect/emergency placeholder."
+  },
+  {
+    "id": "edit",
+    "action": "edit_layout",
+    "x": 0.388889,
+    "y": 0.158446,
+    "w": 0.205556,
+    "h": 0.088851,
+    "notes": "Open edit/calibration mode."
+  },
+  {
+    "id": "b_button",
+    "action": "trigger_b",
+    "x": 0.765972,
+    "y": 0.158446,
+    "w": 0.194444,
+    "h": 0.088851,
+    "notes": "Wii B / trigger / press-hold."
+  },
+  {
+    "id": "nav_left",
+    "action": "gsv_left",
+    "x": 0.063194,
+    "y": 0.291892,
+    "w": 0.279861,
+    "h": 0.058446,
+    "notes": "Move carousel/selection left."
+  },
+  {
+    "id": "select",
+    "action": "select",
+    "x": 0.343056,
+    "y": 0.291892,
+    "w": 0.302778,
+    "h": 0.058446,
+    "notes": "Select/confirm/launch centered item."
+  },
+  {
+    "id": "nav_right",
+    "action": "gsv_right",
+    "x": 0.645833,
+    "y": 0.291892,
+    "w": 0.279861,
+    "h": 0.058446,
+    "notes": "Move carousel/selection right."
+  },
+  {
+    "id": "scroll_up",
+    "action": "scroll_up",
+    "x": 0.056944,
+    "y": 0.408784,
+    "w": 0.182639,
+    "h": 0.066892,
+    "notes": "Tap/hold for scroll up."
+  },
+  {
+    "id": "scroll_wheel",
+    "action": "scroll_drag_or_select",
+    "x": 0.063194,
+    "y": 0.447635,
+    "w": 0.171528,
+    "h": 0.183446,
+    "notes": "Vertical scroll wheel drag; optional center press."
+  },
+  {
+    "id": "scroll_down",
+    "action": "scroll_down",
+    "x": 0.056944,
+    "y": 0.625676,
+    "w": 0.182639,
+    "h": 0.069595,
+    "notes": "Tap/hold for scroll down."
+  },
+  {
+    "id": "touchpad",
+    "action": "mouse_touchpad",
+    "x": 0.263194,
+    "y": 0.39223,
+    "w": 0.685417,
+    "h": 0.316892,
+    "notes": "Relative mouse movement; tap click; drag hold."
+  },
+  {
+    "id": "console_viewer",
+    "action": "toggle_console_viewer",
+    "x": 0.063194,
+    "y": 0.722973,
+    "w": 0.86875,
+    "h": 0.072297,
+    "notes": "Toggle laptop console/external viewer target."
+  },
+  {
+    "id": "minus",
+    "action": "volume_down",
+    "x": 0.079861,
+    "y": 0.812162,
+    "w": 0.159722,
+    "h": 0.080743,
+    "notes": "Volume down / minus."
+  },
+  {
+    "id": "home",
+    "action": "home",
+    "x": 0.411111,
+    "y": 0.812162,
+    "w": 0.171528,
+    "h": 0.080743,
+    "notes": "Home / Pixel Challenge splash."
+  },
+  {
+    "id": "plus",
+    "action": "volume_up",
+    "x": 0.759722,
+    "y": 0.812162,
+    "w": 0.165972,
+    "h": 0.080743,
+    "notes": "Volume up / plus."
+  },
+  {
+    "id": "one",
+    "action": "button_1",
+    "x": 0.079861,
+    "y": 0.903716,
+    "w": 0.159722,
+    "h": 0.080743,
+    "notes": "Wii 1 / shortcut 1."
+  },
+  {
+    "id": "settings",
+    "action": "settings",
+    "x": 0.411111,
+    "y": 0.903716,
+    "w": 0.171528,
+    "h": 0.080743,
+    "notes": "Settings/System setup."
+  },
+  {
+    "id": "two",
+    "action": "button_2",
+    "x": 0.759722,
+    "y": 0.903716,
+    "w": 0.165972,
+    "h": 0.080743,
+    "notes": "Wii 2 / shortcut 2."
+  }
+];
+
+  const stage = document.getElementById('stage');
+  const statusDot = document.getElementById('statusDot');
+  const toast = document.getElementById('toast');
+  const settingsPanel = document.getElementById('settingsPanel');
   const closeSettings = document.getElementById('closeSettings');
-  const handle = document.getElementById('handle');
-  const remotePanel = document.getElementById('remotePanel');
-  const padTitle = document.getElementById('padTitle');
-  const padHint = document.getElementById('padHint');
+  const targetSelect = document.getElementById('targetSelect');
+  const modeSelect = document.getElementById('mode');
 
   const defaults = {
+    target: 'console',
     mode: 'fit',
     speed: 2.0,
     xTrim: 1.0,
@@ -516,174 +518,155 @@ HTML = r"""<!doctype html>
     tapMove: 10,
     longPress: 425,
     minMove: 2.5,
-    liftDrop: 1,
-    target: 'console',
-    swipeThreshold: 64,
-    padMode: 'full',
-    padX: 0,
-    padY: 48,
-    padW: window.innerWidth,
-    padH: Math.max(100, window.innerHeight - 48)
+    showZones: 0,
+    swipeThreshold: 64
   };
 
   let cfg = loadCfg();
   let ws = null;
   let connected = false;
   let pointerId = null;
-  let lastX = 0, lastY = 0;
-  let startX = 0, startY = 0;
-  let downAt = 0;
-  let moved = 0;
+  let activeZone = null;
+  let lastX = 0, lastY = 0, startX = 0, startY = 0;
+  let moved = 0, downAt = 0;
   let longTimer = null;
   let holding = false;
-  let pendingDx = 0;
-  let pendingDy = 0;
+  let pendingDx = 0, pendingDy = 0;
   let viewerGestureScrolled = false;
-  let editing = false;
-  let editMode = null;
-  let editStart = null;
+  let scrollAccum = 0;
+  let repeatTimer = null;
+  let repeatDelayTimer = null;
 
   const els = {
-    mode: document.getElementById('mode'),
-    speed: document.getElementById('speed'),
-    xTrim: document.getElementById('xTrim'),
-    yTrim: document.getElementById('yTrim'),
-    tapMove: document.getElementById('tapMove'),
-    longPress: document.getElementById('longPress'),
-    minMove: document.getElementById('minMove'),
-    liftDrop: document.getElementById('liftDrop'),
+    targetVal: document.getElementById('targetVal'),
     modeVal: document.getElementById('modeVal'),
-    speedVal: document.getElementById('speedVal'),
-    xTrimVal: document.getElementById('xTrimVal'),
-    yTrimVal: document.getElementById('yTrimVal'),
-    tapMoveVal: document.getElementById('tapMoveVal'),
-    longPressVal: document.getElementById('longPressVal'),
-    minMoveVal: document.getElementById('minMoveVal')
+    speed: document.getElementById('speed'), speedVal: document.getElementById('speedVal'),
+    xTrim: document.getElementById('xTrim'), xTrimVal: document.getElementById('xTrimVal'),
+    yTrim: document.getElementById('yTrim'), yTrimVal: document.getElementById('yTrimVal'),
+    tapMove: document.getElementById('tapMove'), tapMoveVal: document.getElementById('tapMoveVal'),
+    longPress: document.getElementById('longPress'), longPressVal: document.getElementById('longPressVal'),
+    minMove: document.getElementById('minMove'), minMoveVal: document.getElementById('minMoveVal'),
+    showZonesBtn: document.getElementById('showZonesBtn'),
+    resetBtn: document.getElementById('resetBtn')
   };
 
   function loadCfg() {
-    try {
-      return {...defaults, ...(JSON.parse(localStorage.getItem('pc_touch_mouse_v28_26_0') || '{}'))};
-    } catch {
-      return {...defaults};
+    try { return {...defaults, ...(JSON.parse(localStorage.getItem('pc_touchpad_overlay_v28_26_19') || '{}'))}; }
+    catch { return {...defaults}; }
+  }
+  function saveCfg() { localStorage.setItem('pc_touchpad_overlay_v28_26_19', JSON.stringify(cfg)); }
+  function showToast(text) { toast.textContent = text; }
+  function prettyTarget() { return cfg.target === 'viewer' ? 'Viewer / GSV' : 'Console / laptop'; }
+  function prettyMode() { return cfg.mode === 'fit' ? 'FitPad' : cfg.mode === 'normal' ? 'Normal' : 'Absolute'; }
+
+  function syncStageSize() {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const ratio = DESIGN.w / DESIGN.h;
+    let w = vw;
+    let h = w / ratio;
+    if (h > vh) {
+      h = vh;
+      w = h * ratio;
+    }
+    stage.style.width = Math.round(w) + 'px';
+    stage.style.height = Math.round(h) + 'px';
+  }
+
+  function makeZones() {
+    for (const z of ZONES) {
+      const el = document.createElement('div');
+      el.className = 'zone';
+      el.dataset.id = z.id;
+      el.dataset.action = z.action;
+      el.title = z.id + ' → ' + z.action;
+      el.style.left = (z.x * 100) + '%';
+      el.style.top = (z.y * 100) + '%';
+      el.style.width = (z.w * 100) + '%';
+      el.style.height = (z.h * 100) + '%';
+      stage.appendChild(el);
+      bindZone(el, z);
     }
   }
-  function saveCfg() {
-    localStorage.setItem('pc_touch_mouse_v28_26_0', JSON.stringify(cfg));
-  }
-  function prettyMode() {
-    if (cfg.mode === 'fit') return 'FitPad';
-    if (cfg.mode === 'normal') return 'Normal';
-    return 'Absolute';
-  }
-  function prettyTarget() {
-    return cfg.target === 'viewer' ? 'Viewer' : 'Console';
-  }
-  function syncTargetUi() {
-    const viewer = cfg.target === 'viewer';
-    targetBtn.textContent = prettyTarget();
-    targetBtn.classList.toggle('viewer', viewer);
-    remotePanel.classList.toggle('open', viewer);
-    pad.classList.toggle('viewerTarget', viewer);
-    if (viewer) {
-      padTitle.firstChild.nodeValue = 'VIEWER TILE PAD';
-      padHint.textContent = 'swipe left/right = move tiles • tap = select';
-      readout.textContent = 'Viewer tile control';
-    } else {
-      padTitle.firstChild.nodeValue = 'TOUCHPAD';
-      padHint.textContent = 'drag = move • tap = click • long press = hold';
-    }
-  }
-  function setTarget(target, announce=true) {
-    cfg.target = target === 'viewer' ? 'viewer' : 'console';
-    saveCfg();
-    syncTargetUi();
-    if (announce) send({type:'set_target', target: cfg.target});
-  }
+
   function syncSettingsUi() {
-    els.mode.value = cfg.mode;
-    els.speed.value = cfg.speed;
-    els.xTrim.value = cfg.xTrim;
-    els.yTrim.value = cfg.yTrim;
-    els.tapMove.value = cfg.tapMove;
-    els.longPress.value = cfg.longPress;
-    els.minMove.value = cfg.minMove;
-    els.liftDrop.checked = !!cfg.liftDrop;
+    targetSelect.value = cfg.target;
+    modeSelect.value = cfg.mode;
+    els.targetVal.textContent = prettyTarget();
     els.modeVal.textContent = prettyMode();
-    els.speedVal.textContent = Number(cfg.speed).toFixed(2) + 'x';
-    els.xTrimVal.textContent = Number(cfg.xTrim).toFixed(2) + 'x';
-    els.yTrimVal.textContent = Number(cfg.yTrim).toFixed(2) + 'x';
-    els.tapMoveVal.textContent = cfg.tapMove + ' px';
-    els.longPressVal.textContent = cfg.longPress + ' ms';
-    els.minMoveVal.textContent = Number(cfg.minMove).toFixed(1) + ' px';
-    modeBtn.textContent = prettyMode();
-    syncTargetUi();
+    els.speed.value = cfg.speed; els.speedVal.textContent = Number(cfg.speed).toFixed(2) + 'x';
+    els.xTrim.value = cfg.xTrim; els.xTrimVal.textContent = Number(cfg.xTrim).toFixed(2) + 'x';
+    els.yTrim.value = cfg.yTrim; els.yTrimVal.textContent = Number(cfg.yTrim).toFixed(2) + 'x';
+    els.tapMove.value = cfg.tapMove; els.tapMoveVal.textContent = cfg.tapMove + ' px';
+    els.longPress.value = cfg.longPress; els.longPressVal.textContent = cfg.longPress + ' ms';
+    els.minMove.value = cfg.minMove; els.minMoveVal.textContent = Number(cfg.minMove).toFixed(1) + ' px';
+    stage.classList.toggle('showZones', !!cfg.showZones);
+    els.showZonesBtn.textContent = cfg.showZones ? 'Hide touch zones' : 'Show touch zones';
   }
-  function applyPadLayout() {
-    const top = 48 + (window.visualViewport ? Math.max(0, window.visualViewport.offsetTop) : 0);
-    if (cfg.padMode === 'full') {
-      pad.classList.remove('custom');
-      pad.style.left = '0px';
-      pad.style.top = 'calc(var(--bar-h) + env(safe-area-inset-top))';
-      pad.style.width = '100vw';
-      pad.style.height = 'calc(100vh - var(--bar-h) - env(safe-area-inset-top))';
-    } else {
-      pad.classList.add('custom');
-      pad.style.left = cfg.padX + 'px';
-      pad.style.top = cfg.padY + 'px';
-      pad.style.width = cfg.padW + 'px';
-      pad.style.height = cfg.padH + 'px';
-    }
-  }
+
   function setStatus(ok, text) {
     connected = ok;
-    statusEl.textContent = text;
-    statusEl.classList.toggle('ok', ok);
+    statusDot.classList.toggle('ok', ok);
+    showToast(text);
   }
+
   function connect() {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     ws = new WebSocket(proto + '://' + location.host + '/ws');
     ws.onopen = () => {
-      setStatus(true, 'Connected');
+      setStatus(true, 'Connected • ' + prettyTarget());
       send({type:'set_target', target: cfg.target});
       send({type:'heartbeat', target: cfg.target});
     };
-    ws.onclose = () => {
-      setStatus(false, 'Disconnected');
-      setTimeout(connect, 750);
-    };
-    ws.onerror = () => setStatus(false, 'Error');
+    ws.onclose = () => { setStatus(false, 'Disconnected'); setTimeout(connect, 750); };
+    ws.onerror = () => setStatus(false, 'Connection error');
   }
-  function send(obj) {
-    if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
-  }
+
+  function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
   setInterval(() => send({type:'heartbeat', target: cfg.target}), 5000);
+
+  function setTarget(target, announce=true) {
+    cfg.target = target === 'viewer' ? 'viewer' : 'console';
+    saveCfg();
+    syncSettingsUi();
+    showToast(prettyTarget());
+    if (announce) send({type:'set_target', target: cfg.target});
+  }
+  function toggleTarget() { setTarget(cfg.target === 'viewer' ? 'console' : 'viewer'); }
 
   function viewerScroll(direction) {
     setTarget('viewer', false);
     send({type:'gsv_scroll', direction});
-    readout.textContent = direction < 0 ? 'TILE ◀' : 'TILE ▶';
+    showToast(direction < 0 ? 'Tile ◀' : 'Tile ▶');
   }
   function viewerSelect() {
     setTarget('viewer', false);
     send({type:'gsv_select'});
-    readout.textContent = 'SELECT';
+    showToast('Select');
   }
   function viewerShow() {
     setTarget('viewer', false);
     send({type:'gsv_show'});
-    readout.textContent = 'SHOW TILES';
+    showToast('Show tiles');
   }
   function viewerAction(action) {
     setTarget('viewer', false);
     send({type:'menu_action', action});
-    readout.textContent = action.toUpperCase();
+    showToast(action.replace('_', ' ').toUpperCase());
+  }
+  function volume(action) {
+    send({type:'volume', action});
+    showToast(action === 'up' ? 'Volume +' : action === 'down' ? 'Volume -' : 'Mute');
+  }
+  function scrollConsole(steps) {
+    setTarget('console', false);
+    send({type:'scroll', steps});
+    showToast(steps > 0 ? 'Scroll up' : 'Scroll down');
   }
 
-  function movePointer(rawDx, rawDy) {
-    const r = pad.getBoundingClientRect();
+  function movePointer(rawDx, rawDy, zoneEl) {
+    const r = zoneEl.getBoundingClientRect();
     let dx = rawDx, dy = rawDy;
-
     if (cfg.mode === 'fit') {
       dx = (rawDx / Math.max(1, r.width)) * serverScreen.w * cfg.xTrim;
       dy = (rawDy / Math.max(1, r.height)) * serverScreen.h * cfg.yTrim;
@@ -694,264 +677,179 @@ HTML = r"""<!doctype html>
       const x = ((lastX - r.left) / Math.max(1, r.width)) * serverScreen.w;
       const y = ((lastY - r.top) / Math.max(1, r.height)) * serverScreen.h;
       send({type:'absolute', x, y});
-      readout.textContent = `ABS ${Math.round(x)}, ${Math.round(y)}`;
+      showToast(`ABS ${Math.round(x)}, ${Math.round(y)}`);
       return;
     }
-
     send({type:'move', dx, dy});
-    readout.textContent = `DX ${dx.toFixed(1)} / DY ${dy.toFixed(1)}`;
   }
 
-  function clearLongTimer() {
-    if (longTimer) clearTimeout(longTimer);
-    longTimer = null;
+  function clearLongTimer() { if (longTimer) clearTimeout(longTimer); longTimer = null; }
+  function clearRepeat() {
+    if (repeatDelayTimer) clearTimeout(repeatDelayTimer);
+    if (repeatTimer) clearInterval(repeatTimer);
+    repeatDelayTimer = null; repeatTimer = null;
   }
 
-  pad.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-
-    if (editing) {
-      pointerId = e.pointerId;
-      pad.setPointerCapture(pointerId);
-      const r = pad.getBoundingClientRect();
-      const nearHandle = (e.clientX > r.right - 56 && e.clientY > r.bottom - 56);
-      editMode = nearHandle ? 'resize' : 'move';
-      editStart = {
-        x: e.clientX, y: e.clientY,
-        padX: r.left, padY: r.top, padW: r.width, padH: r.height
-      };
-      return;
+  function handleButton(id, action) {
+    switch (id) {
+      case 'top_banner': viewerShow(); break;
+      case 'power': send({type:'button_action', action:'power'}); showToast(connected ? 'Connected' : 'Reconnecting…'); if (!connected) connect(); break;
+      case 'edit': cfg.showZones = cfg.showZones ? 0 : 1; saveCfg(); syncSettingsUi(); showToast(cfg.showZones ? 'Touch zones visible' : 'Touch zones hidden'); break;
+      case 'b_button': cfg.target === 'viewer' ? viewerSelect() : send({type:'click'}); showToast('B / trigger'); break;
+      case 'nav_left': viewerScroll(-1); break;
+      case 'select': cfg.target === 'viewer' ? viewerSelect() : send({type:'click'}); showToast('Select'); break;
+      case 'nav_right': viewerScroll(1); break;
+      case 'scroll_up': scrollConsole(3); break;
+      case 'scroll_down': scrollConsole(-3); break;
+      case 'console_viewer': toggleTarget(); break;
+      case 'minus': volume('down'); break;
+      case 'home': viewerAction('home_toggle'); break;
+      case 'plus': volume('up'); break;
+      case 'settings': settingsPanel.classList.add('open'); break;
+      case 'one': send({type:'button_action', action:'one'}); showToast('Button 1'); break;
+      case 'two': send({type:'button_action', action:'two'}); showToast('Button 2'); break;
+      default: send({type:'button_action', action:id}); showToast(id); break;
     }
+  }
 
-    pointerId = e.pointerId;
-    pad.setPointerCapture(pointerId);
-    lastX = startX = e.clientX;
-    lastY = startY = e.clientY;
-    downAt = performance.now();
-    moved = 0;
-    pendingDx = 0;
-    pendingDy = 0;
-    viewerGestureScrolled = false;
-    holding = false;
+  function bindZone(el, z) {
+    const id = z.id;
+    if (id === 'touchpad') { bindTouchpad(el); return; }
+    if (id === 'scroll_wheel') { bindScrollWheel(el); return; }
 
-    clearLongTimer();
-    if (cfg.target !== 'viewer') {
-      longTimer = setTimeout(() => {
-        holding = true;
-        send({type:'down'});
-        readout.textContent = 'HOLD';
-      }, cfg.longPress);
-    }
-  });
-
-  pad.addEventListener('pointermove', (e) => {
-    if (e.pointerId !== pointerId) return;
-    e.preventDefault();
-
-    if (editing && editStart) {
-      const dx = e.clientX - editStart.x;
-      const dy = e.clientY - editStart.y;
-      if (editMode === 'move') {
-        cfg.padMode = 'custom';
-        cfg.padX = Math.max(0, Math.min(window.innerWidth - 60, editStart.padX + dx));
-        cfg.padY = Math.max(48, Math.min(window.innerHeight - 60, editStart.padY + dy));
-      } else {
-        cfg.padMode = 'custom';
-        cfg.padW = Math.max(120, Math.min(window.innerWidth - editStart.padX, editStart.padW + dx));
-        cfg.padH = Math.max(120, Math.min(window.innerHeight - editStart.padY, editStart.padH + dy));
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      el.classList.add('active');
+      if (id === 'plus' || id === 'minus') {
+        const act = id === 'plus' ? 'up' : 'down';
+        volume(act);
+        clearRepeat();
+        repeatDelayTimer = setTimeout(() => { repeatTimer = setInterval(() => volume(act), 160); }, 360);
       }
-      applyPadLayout();
-      saveCfg();
-      return;
-    }
+    });
+    el.addEventListener('pointerup', (e) => {
+      e.preventDefault();
+      el.classList.remove('active');
+      clearRepeat();
+      if (id !== 'plus' && id !== 'minus') handleButton(id, z.action);
+    });
+    el.addEventListener('pointercancel', () => { el.classList.remove('active'); clearRepeat(); });
+    el.addEventListener('pointerleave', () => { el.classList.remove('active'); clearRepeat(); });
+  }
 
-    const rawDx = e.clientX - lastX;
-    const rawDy = e.clientY - lastY;
-    moved += Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY);
-    lastX = e.clientX;
-    lastY = e.clientY;
+  function bindScrollWheel(el) {
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      pointerId = e.pointerId; activeZone = 'scroll_wheel';
+      el.setPointerCapture(pointerId);
+      el.classList.add('active');
+      lastY = startY = e.clientY; moved = 0; scrollAccum = 0;
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== pointerId || activeZone !== 'scroll_wheel') return;
+      e.preventDefault();
+      const dy = e.clientY - lastY;
+      lastY = e.clientY;
+      moved += Math.abs(e.clientY - startY);
+      scrollAccum += dy;
+      while (Math.abs(scrollAccum) >= 18) {
+        const step = scrollAccum < 0 ? 1 : -1;
+        scrollConsole(step);
+        scrollAccum += step > 0 ? 18 : -18;
+      }
+    });
+    el.addEventListener('pointerup', (e) => {
+      if (e.pointerId !== pointerId || activeZone !== 'scroll_wheel') return;
+      e.preventDefault();
+      el.classList.remove('active');
+      if (moved <= cfg.tapMove) { cfg.target === 'viewer' ? viewerSelect() : send({type:'click'}); }
+      pointerId = null; activeZone = null;
+    });
+    el.addEventListener('pointercancel', () => { el.classList.remove('active'); pointerId = null; activeZone = null; });
+  }
 
-    if (cfg.target === 'viewer') {
+  function bindTouchpad(el) {
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      pointerId = e.pointerId; activeZone = 'touchpad';
+      el.setPointerCapture(pointerId);
+      el.classList.add('active');
+      lastX = startX = e.clientX;
+      lastY = startY = e.clientY;
+      downAt = performance.now();
+      moved = 0; pendingDx = 0; pendingDy = 0; viewerGestureScrolled = false; holding = false;
       clearLongTimer();
-      const totalDx = e.clientX - startX;
-      const totalDy = e.clientY - startY;
-      if (Math.abs(totalDx) >= Number(cfg.swipeThreshold || 64) && Math.abs(totalDx) > Math.abs(totalDy) * 1.15) {
-        // Natural phone behavior: swipe left moves to the next tile, swipe right to previous.
-        viewerScroll(totalDx < 0 ? 1 : -1);
-        startX = e.clientX;
-        startY = e.clientY;
-        moved = 0;
-        viewerGestureScrolled = true;
+      if (cfg.target !== 'viewer') {
+        longTimer = setTimeout(() => { holding = true; send({type:'down'}); showToast('Hold / drag'); }, cfg.longPress);
       }
-      return;
-    }
-
-    if (moved > cfg.tapMove) clearLongTimer();
-
-    // Lift-jitter filter:
-    // Accumulate tiny raw touch movements until they exceed the threshold.
-    // On pointerup, leftover tiny movement is discarded, so the cursor does not
-    // twitch when your thumb leaves the glass.
-    pendingDx += rawDx;
-    pendingDy += rawDy;
-    const pendingDist = Math.hypot(pendingDx, pendingDy);
-    if (pendingDist >= Number(cfg.minMove || 0)) {
-      movePointer(pendingDx, pendingDy);
-      pendingDx = 0;
-      pendingDy = 0;
-    }
-  });
-
-  pad.addEventListener('pointerup', (e) => {
-    if (e.pointerId !== pointerId) return;
-    e.preventDefault();
-
-    if (editing) {
-      pointerId = null;
-      editMode = null;
-      editStart = null;
-      return;
-    }
-
-    clearLongTimer();
-
-    if (cfg.target === 'viewer') {
-      const dt = performance.now() - downAt;
-      if (!viewerGestureScrolled && moved <= cfg.tapMove && dt < 600) {
-        viewerSelect();
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== pointerId || activeZone !== 'touchpad') return;
+      e.preventDefault();
+      const rawDx = e.clientX - lastX;
+      const rawDy = e.clientY - lastY;
+      moved += Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY);
+      lastX = e.clientX; lastY = e.clientY;
+      if (cfg.target === 'viewer') {
+        clearLongTimer();
+        const totalDx = e.clientX - startX;
+        const totalDy = e.clientY - startY;
+        if (Math.abs(totalDx) >= Number(cfg.swipeThreshold || 64) && Math.abs(totalDx) > Math.abs(totalDy) * 1.15) {
+          viewerScroll(totalDx < 0 ? 1 : -1);
+          startX = e.clientX; startY = e.clientY; moved = 0; viewerGestureScrolled = true;
+        }
+        return;
       }
-      pointerId = null;
-      return;
-    }
-
-    // On lift, drop any leftover tiny movement by default. This is the part
-    // that keeps the pointer from creeping when your thumb peels off the glass.
-    if (!cfg.liftDrop && (Math.abs(pendingDx) || Math.abs(pendingDy))) {
-      movePointer(pendingDx, pendingDy);
-    }
-    pendingDx = 0;
-    pendingDy = 0;
-
-    if (holding) {
-      send({type:'up'});
-      holding = false;
-    } else {
-      const dt = performance.now() - downAt;
-      if (moved <= cfg.tapMove && dt < cfg.longPress) {
-        send({type:'click'});
-        readout.textContent = 'CLICK';
+      if (moved > cfg.tapMove) clearLongTimer();
+      pendingDx += rawDx;
+      pendingDy += rawDy;
+      if (Math.hypot(pendingDx, pendingDy) >= Number(cfg.minMove || 0)) {
+        movePointer(pendingDx, pendingDy, el);
+        pendingDx = 0; pendingDy = 0;
       }
-    }
-    pointerId = null;
-  });
-
-  pad.addEventListener('pointercancel', () => {
-    clearLongTimer();
-    if (holding) send({type:'up'});
-    holding = false;
-    pointerId = null;
-  });
-
-  function toggleSettings(force) {
-    const open = (force === undefined) ? !settingsPanel.classList.contains('open') : force;
-    settingsPanel.classList.toggle('open', open);
+    });
+    el.addEventListener('pointerup', (e) => {
+      if (e.pointerId !== pointerId || activeZone !== 'touchpad') return;
+      e.preventDefault();
+      el.classList.remove('active');
+      clearLongTimer();
+      if (cfg.target === 'viewer') {
+        const dt = performance.now() - downAt;
+        if (!viewerGestureScrolled && moved <= cfg.tapMove && dt < 600) viewerSelect();
+        pointerId = null; activeZone = null; return;
+      }
+      pendingDx = 0; pendingDy = 0;
+      if (holding) { send({type:'up'}); holding = false; }
+      else {
+        const dt = performance.now() - downAt;
+        if (moved <= cfg.tapMove && dt < cfg.longPress) { send({type:'click'}); showToast('Click'); }
+      }
+      pointerId = null; activeZone = null;
+    });
+    el.addEventListener('pointercancel', () => {
+      el.classList.remove('active');
+      clearLongTimer();
+      if (holding) send({type:'up'});
+      holding = false; pointerId = null; activeZone = null;
+    });
   }
 
-  function toggleEdit() {
-    editing = !editing;
-    if (editing) {
-      cfg.padMode = 'custom';
-      if (!cfg.padW || cfg.padW < 120) {
-        cfg.padX = Math.round(window.innerWidth * 0.08);
-        cfg.padY = 70;
-        cfg.padW = Math.round(window.innerWidth * 0.84);
-        cfg.padH = Math.round(window.innerHeight * 0.78);
-      }
-      pad.classList.add('editing');
-      editBtn.textContent = 'Done';
-      readout.textContent = 'Drag pad to move • drag corner to resize';
-      toggleSettings(false);
-    } else {
-      pad.classList.remove('editing');
-      editBtn.textContent = 'Edit';
-      readout.textContent = 'Edit saved';
-      saveCfg();
-    }
-    applyPadLayout();
-  }
-
-  targetBtn.onclick = () => setTarget(cfg.target === 'viewer' ? 'console' : 'viewer');
-  for (const btn of remotePanel.querySelectorAll('button[data-cmd]')) {
-    btn.onclick = () => {
-      const cmd = btn.dataset.cmd;
-      if (cmd === 'prev') viewerScroll(-1);
-      else if (cmd === 'next') viewerScroll(1);
-      else if (cmd === 'select') viewerSelect();
-      else if (cmd === 'show') viewerShow();
-      else viewerAction(cmd);
-    };
-  }
-
-  settingsBtn.onclick = () => toggleSettings();
-  closeSettings.onclick = () => toggleSettings(false);
-  editBtn.onclick = toggleEdit;
-  document.getElementById('editBtn2').onclick = toggleEdit;
-
-  modeBtn.onclick = () => {
-    cfg.mode = cfg.mode === 'fit' ? 'normal' : cfg.mode === 'normal' ? 'absolute' : 'fit';
-    saveCfg();
-    syncSettingsUi();
-  };
-
-  els.mode.onchange = () => { cfg.mode = els.mode.value; saveCfg(); syncSettingsUi(); };
+  closeSettings.onclick = () => settingsPanel.classList.remove('open');
+  targetSelect.onchange = () => setTarget(targetSelect.value);
+  modeSelect.onchange = () => { cfg.mode = modeSelect.value; saveCfg(); syncSettingsUi(); };
   for (const id of ['speed','xTrim','yTrim','tapMove','longPress','minMove']) {
-    els[id].oninput = () => {
-      cfg[id] = Number(els[id].value);
-      saveCfg();
-      syncSettingsUi();
-    };
+    els[id].oninput = () => { cfg[id] = Number(els[id].value); saveCfg(); syncSettingsUi(); };
   }
+  els.showZonesBtn.onclick = () => { cfg.showZones = cfg.showZones ? 0 : 1; saveCfg(); syncSettingsUi(); };
+  els.resetBtn.onclick = () => { cfg = {...defaults}; saveCfg(); syncSettingsUi(); };
 
-  els.liftDrop.onchange = () => {
-    cfg.liftDrop = els.liftDrop.checked ? 1 : 0;
-    saveCfg();
-    syncSettingsUi();
-  };
-
-  document.getElementById('fullPadBtn').onclick = () => {
-    cfg.padMode = 'full';
-    saveCfg();
-    applyPadLayout();
-    toggleSettings(false);
-  };
-
-  document.getElementById('largePadBtn').onclick = () => {
-    cfg.padMode = 'custom';
-    cfg.padX = Math.round(window.innerWidth * 0.04);
-    cfg.padY = 58;
-    cfg.padW = Math.round(window.innerWidth * 0.92);
-    cfg.padH = Math.round(window.innerHeight - 68);
-    saveCfg();
-    applyPadLayout();
-    toggleSettings(false);
-  };
-
-  document.getElementById('resetAllBtn').onclick = () => {
-    cfg = {...defaults};
-    saveCfg();
-    syncSettingsUi();
-    applyPadLayout();
-  };
-
-  window.addEventListener('resize', () => {
-    if (cfg.padMode === 'full') applyPadLayout();
-  });
-
+  window.addEventListener('resize', syncStageSize);
   document.addEventListener('contextmenu', e => e.preventDefault());
   document.addEventListener('touchmove', e => e.preventDefault(), {passive:false});
 
+  syncStageSize();
+  makeZones();
   syncSettingsUi();
-  applyPadLayout();
   connect();
 })();
 </script>
@@ -1006,9 +904,27 @@ async def ws_handler(request):
 
                     elif typ == "menu_action":
                         action = str(data.get("action", "") or "").strip().lower()
-                        if action in ("home", "score", "menu"):
+                        if action in ("home", "home_toggle", "score", "menu"):
                             set_active_target("external", f"menu_{action}")
                             write_console_command(f"EXTERNAL_MENU|{action}")
+
+                    elif typ == "volume":
+                        action = str(data.get("action", "") or "").strip().lower()
+                        if action in ("up", "down", "mute", "unmute", "toggle_mute"):
+                            write_console_command(f"WII_VOLUME|{action}")
+                            safe_write_status({"event": f"volume_{action}", "mode": ACTIVE_TARGET})
+
+                    elif typ == "scroll":
+                        if ACTIVE_TARGET != "laptop":
+                            set_active_target("laptop", "scroll")
+                        steps = int(float(data.get("steps", 0) or 0))
+                        if steps:
+                            mouse.scroll(0, max(-8, min(8, steps)))
+                            safe_write_status({"event": "scroll", "mode": "laptop", "steps": steps})
+
+                    elif typ == "button_action":
+                        action = str(data.get("action", "") or "").strip().lower()
+                        safe_write_status({"event": f"button_{action}", "mode": ACTIVE_TARGET})
 
                     elif typ == "move":
                         if ACTIVE_TARGET != "laptop":
@@ -1052,10 +968,11 @@ async def ws_handler(request):
 
 def main():
     app = web.Application()
+    app.router.add_static("/static/phone_touchpad", PHONE_TOUCHPAD_DIR, name="phone_touchpad")
     app.add_routes([web.get("/", index), web.get("/ws", ws_handler)])
 
     print()
-    print("Pixel Challenge Phone Touchpad Remote v28.26.14")
+    print("Pixel Challenge Phone Touchpad Remote v28.26.19")
     print("------------------------------------")
     print(f"Detected desktop size: {SCREEN_W} x {SCREEN_H}")
     print("On the phone, connect to the laptop hotspot and open:")

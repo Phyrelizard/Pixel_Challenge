@@ -1,9 +1,9 @@
 {
   "mode": "laptop",
-  "updated_at": 1781420722.079297,
-  "device": "/dev/input/event18",
+  "updated_at": 1781517655.3157825,
+  "device": "/dev/input/event16",
   "device_name": "Nintendo Wii Remote",
-  "ir_device": "/dev/input/event17",
+  "ir_device": "/dev/input/event15",
   "ir_device_name": "Nintendo Wii Remote IR",
   "ir_mouse_enabled": true
 }
